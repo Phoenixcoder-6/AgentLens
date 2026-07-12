@@ -1,0 +1,32 @@
+# AgentLens v1.0 Dependencies
+#
+# IMPORTANT: Install PyTorch CPU-only FIRST, before the rest:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+#
+# This avoids the WinError 1114 DLL failure from the default CUDA build.
+
+# Agent framework
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-groq>=0.2.0
+
+# Schema / validation
+pydantic>=2.7.0
+
+# Semantic embeddings (local, no API)
+# Requires torch — install CPU-only torch first (see note above)
+sentence-transformers>=3.0.0
+
+# Dashboard
+streamlit>=1.36.0
+
+# Configuration
+pyyaml>=6.0.1
+python-dotenv>=1.0.0
+
+# Storage
+# sqlite3 is built-in to Python — no extra package needed
+
+# Utilities
+numpy>=1.26.0

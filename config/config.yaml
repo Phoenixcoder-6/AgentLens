@@ -1,0 +1,92 @@
+# AgentLens v1.0 — Master Configuration
+# All thresholds, models, paths, and priorities live here.
+# Nothing in the codebase should be hardcoded.
+
+# ─────────────────────────────────────────────
+# LLM Provider
+# ─────────────────────────────────────────────
+llm:
+  provider: "groq"                          # groq | openai | local
+  model: "llama-3.3-70b-versatile"          # Groq model ID
+  temperature: 0.0                          # Deterministic output for extraction
+  max_tokens: 2048
+  timeout_seconds: 30
+  retry_attempts: 1                         # Retry once on malformed extraction output
+
+# ─────────────────────────────────────────────
+# Storage
+# ─────────────────────────────────────────────
+storage:
+  db_path: "data/agentlens.db"             # SQLite database path
+  traces_dir: "data/traces"                # JSON blob storage for full trace payloads
+  schema_version: "1.0"                    # Stamped on every normalized record
+
+# ─────────────────────────────────────────────
+# Evidence Extraction
+# ─────────────────────────────────────────────
+extraction:
+  fields:
+    - source_count                          # Number of sources referenced
+    - entity_count                          # Named entities mentioned
+    - claim_count                           # Factual claims made
+    - tool_calls                            # Tool invocations observed
+    - references                            # Explicit citations/URLs
+    - numbers                               # Numeric values in output
+    - dates                                 # Date mentions
+  fail_on_malformed: false                  # Flag but don't crash on bad extraction output
+
+# ─────────────────────────────────────────────
+# Diff Engine
+# ─────────────────────────────────────────────
+diff:
+  embedding_model: "all-MiniLM-L6-v2"      # sentence-transformers model (local, no API)
+  similarity_threshold: 0.85               # Below this → semantic divergence flagged
+  alignment: "graph"                        # Graph-based alignment by agent identity + parent/child
+
+# ─────────────────────────────────────────────
+# Metrics & Statistical Anomaly Detection
+# ─────────────────────────────────────────────
+metrics:
+  latency_threshold_ms: 5000               # Per-step latency alert threshold
+  token_stddev_multiplier: 2.5             # Flag if tokens > mean + (N * stddev)
+  latency_stddev_multiplier: 2.5           # Flag if latency > mean + (N * stddev)
+  min_runs_for_baseline: 5                 # Min runs needed before statistical detection activates
+
+# ─────────────────────────────────────────────
+# Arbiter Priority Levels
+# ─────────────────────────────────────────────
+arbiter:
+  priorities:
+    P1: "ground_truth_mismatch"            # expected_output present and output differs
+    P2: "rule_match"                       # Deterministic rule fired
+    P3: "workflow_violation"               # Workflow validator flagged handoff issue
+    P4: "statistical_anomaly"              # Metrics analyzer detected anomaly
+    P5: "unknown"                          # No evidence matched
+  tie_break: "rule_id_ascending"           # Same-priority ties resolved by rule ID (ascending)
+
+# ─────────────────────────────────────────────
+# Rule Engine
+# ─────────────────────────────────────────────
+rules:
+  enabled: true
+  categories:
+    - execution                             # Tool timeout, API error, crash
+    - reasoning                             # Hallucination, wrong facts, missed sources
+    - workflow                              # Information loss in handoff, skipped node
+    - verification                          # Verifier approved a bad answer
+
+# ─────────────────────────────────────────────
+# Dashboard
+# ─────────────────────────────────────────────
+dashboard:
+  host: "localhost"
+  port: 8501
+  page_title: "AgentLens"
+  default_run_limit: 50                    # Max runs shown in Run Explorer
+
+# ─────────────────────────────────────────────
+# Logging
+# ─────────────────────────────────────────────
+logging:
+  level: "INFO"                            # DEBUG | INFO | WARNING | ERROR
+  log_dir: "logs"
