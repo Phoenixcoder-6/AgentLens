@@ -20,11 +20,11 @@ Models defined here:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Schema Version — stamped on every record
@@ -184,7 +184,7 @@ class WorkflowState(BaseModel):
         default_factory=dict,
         description="The full LangGraph state dict at this point in the pipeline"
     )
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -250,11 +250,13 @@ class AgentStep(BaseModel):
         default=None,
         description="Error message if status is FAILURE or ERROR"
     )
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    model_config = {
-        "json_encoders": {datetime: lambda v: v.isoformat()}
-    }
+    @field_serializer('timestamp')
+    def serialize_timestamp(self, v: datetime) -> str:
+        return v.isoformat()
+
+    model_config = {}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -278,7 +280,7 @@ class RunTrace(BaseModel):
     )
     workflow: str = Field(description="Workflow name, e.g. 'research_report_pipeline'")
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When this run started"
     )
 
@@ -305,9 +307,11 @@ class RunTrace(BaseModel):
         description="Relative path to the full JSON trace blob in data/traces/"
     )
 
-    model_config = {
-        "json_encoders": {datetime: lambda v: v.isoformat()}
-    }
+    @field_serializer('timestamp')
+    def serialize_timestamp(self, v: datetime) -> str:
+        return v.isoformat()
+
+    model_config = {}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -440,8 +444,10 @@ class AnalysisBundle(BaseModel):
         description="LLM-generated suggested fix (filled by explanation layer)"
     )
 
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    model_config = {
-        "json_encoders": {datetime: lambda v: v.isoformat()}
-    }
+    @field_serializer('timestamp')
+    def serialize_timestamp(self, v: datetime) -> str:
+        return v.isoformat()
+
+    model_config = {}

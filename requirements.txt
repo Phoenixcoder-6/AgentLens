@@ -30,3 +30,7 @@ python-dotenv>=1.0.0
 
 # Utilities
 numpy>=1.26.0
+
+# Testing
+pytest>=8.0.0
+pytest-dotenv>=0.5.2
