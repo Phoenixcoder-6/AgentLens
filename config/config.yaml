@@ -85,6 +85,36 @@ dashboard:
   default_run_limit: 50                    # Max runs shown in Run Explorer
 
 # ─────────────────────────────────────────────
+# Pipeline Agent Behaviour
+# Customize what each agent is asked to produce.
+# Change these values — no code changes needed.
+# ─────────────────────────────────────────────
+pipeline:
+  researcher:
+    min_sources: 5                        # Minimum sources the researcher must cite
+    max_sources: 8                        # Upper guidance (LLM will aim for this range)
+    min_entities: 5                       # Minimum named entities to identify
+    depth: "comprehensive"                 # "brief" | "standard" | "comprehensive"
+
+  writer:
+    report_sections:                       # Sections the writer must include
+      - "Introduction"
+      - "Background"
+      - "Key Findings"
+      - "Applications"
+      - "Limitations"
+      - "Conclusion"
+      - "References"
+    citation_style: "APA"                  # "APA" | "MLA" | "Chicago"
+    word_count_target: 1500                 # Target word count for the report
+
+  verifier:
+    strictness: "standard"                   # "lenient" | "standard" | "strict"
+    check_source_coverage: true            # Verify all sources are mentioned
+    check_entity_coverage: true            # Verify all entities are mentioned
+    check_no_new_facts: true               # Flag any facts not in research findings
+
+# ─────────────────────────────────────────────
 # Logging
 # ─────────────────────────────────────────────
 logging:
