@@ -56,6 +56,6 @@ def test_trace_step_captures_errors():
     
     step = trace.steps[0]
     assert step.status == StepStatus.ERROR
-    assert step.error == "Something broke"
+    assert step.error == "ValueError: Something broke"
     
     assert trace.status == StepStatus.ERROR
