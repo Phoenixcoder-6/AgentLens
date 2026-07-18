@@ -55,8 +55,11 @@ class CaptureSession:
         trace.total_latency_ms = total_latency
         trace.total_tokens = total_tokens
         
-        # Save trace to disk
+        # 1. Save full JSON trace to disk
         cls._save_trace_to_disk(trace)
+        
+        # 2. Normalize and persist to SQLite
+        cls._save_trace_to_db(trace)
         
         cls._current_trace = None
         return trace
@@ -70,3 +73,33 @@ class CaptureSession:
         
         with open(trace.trace_path, "w", encoding="utf-8") as f:
             f.write(trace.model_dump_json(indent=2))
+
+    @classmethod
+    def _save_trace_to_db(cls, trace: RunTrace) -> None:
+        """Normalize the completed RunTrace and write to SQLite."""
+        try:
+            from normalizer.normalizer import Normalizer
+            from storage.db import DatabaseManager
+            from storage.writer import StorageWriter
+
+            db = DatabaseManager()
+            db.initialize()
+
+            normalized = Normalizer().normalize_run(trace)
+
+            # Read the JSON blob we just saved to disk
+            trace_json: Optional[str] = None
+            if trace.trace_path and os.path.exists(trace.trace_path):
+                with open(trace.trace_path, "r", encoding="utf-8") as f:
+                    trace_json = f.read()
+
+            writer = StorageWriter(db)
+            writer.write_run(
+                run=normalized,
+                trace_json=trace_json,
+                trace_path=trace.trace_path,
+            )
+        except Exception as exc:
+            # Storage failure must never crash the pipeline
+            print(f"[CaptureSession] Warning: storage write failed: {exc}")
+
