@@ -94,33 +94,45 @@ class StorageWriter:
 
         # Write latency metric
         self.db.insert_metric(
-            run_id       = run_id,
-            step         = step.step,
-            agent        = step.agent,
-            metric_name  = "latency_ms",
-            metric_value = step.latency_ms,
-            metric_unit  = "ms",
-            timestamp    = ts,
+            run_id         = run_id,
+            step           = step.step,
+            agent          = step.agent,
+            metric_name    = "latency_ms",
+            metric_value   = step.latency_ms,
+            metric_unit    = "ms",
+            timestamp      = ts,
             schema_version = SCHEMA_VERSION,
         )
 
-        # Write token metrics (only if non-zero)
-        if step.tokens.total > 0:
-            for name, value in [
-                ("tokens_prompt",     step.tokens.prompt),
-                ("tokens_completion", step.tokens.completion),
-                ("tokens_total",      step.tokens.total),
-            ]:
-                self.db.insert_metric(
-                    run_id         = run_id,
-                    step           = step.step,
-                    agent          = step.agent,
-                    metric_name    = name,
-                    metric_value   = float(value),
-                    metric_unit    = "tokens",
-                    timestamp      = ts,
-                    schema_version = SCHEMA_VERSION,
-                )
+        # Write execution_time_ms (wall-clock = latency for current pipeline)
+        self.db.insert_metric(
+            run_id         = run_id,
+            step           = step.step,
+            agent          = step.agent,
+            metric_name    = "execution_time_ms",
+            metric_value   = step.latency_ms,
+            metric_unit    = "ms",
+            timestamp      = ts,
+            schema_version = SCHEMA_VERSION,
+        )
+
+        # Write token metrics — always write rows so MetricsAnalyzer can read them
+        # Value is 0 when the LLM provider doesn't return token counts (e.g. Groq)
+        for name, value in [
+            ("tokens_prompt",     step.tokens.prompt),
+            ("tokens_completion", step.tokens.completion),
+            ("tokens_total",      step.tokens.total),
+        ]:
+            self.db.insert_metric(
+                run_id         = run_id,
+                step           = step.step,
+                agent          = step.agent,
+                metric_name    = name,
+                metric_value   = float(value),
+                metric_unit    = "tokens",
+                timestamp      = ts,
+                schema_version = SCHEMA_VERSION,
+            )
 
 
 def _iso(value) -> str:

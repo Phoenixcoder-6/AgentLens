@@ -82,12 +82,24 @@ def trace_step(func: Callable) -> Callable:
             step.handoff.filtered_state = filtered_s   # agent's own return dict
             step.handoff.output_state   = output_s     # full merged state
 
+            # Apply token counts staged by the node via set_step_tokens()
+            # Consumed here (after node returns) so the correct step gets them
+            pending = CaptureSession.consume_pending_tokens()
+            if pending:
+                from schema.models import TokenUsage
+                step.tokens = TokenUsage(
+                    prompt=pending[0],
+                    completion=pending[1],
+                    total=pending[0] + pending[1],
+                )
+
             # Store the diff summary in metadata for quick querying
             # (full diff object is recoverable by re-running the diff engine)
             step.prompt = diff.summary()   # re-using prompt field for diff log
 
             CaptureSession.add_step(step)
             return result
+
 
         except Exception as exc:
             latency = (time.perf_counter() - start_time) * 1000.0

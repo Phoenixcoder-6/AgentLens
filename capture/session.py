@@ -12,6 +12,36 @@ class CaptureSession:
     Acts as a singleton to collect AgentSteps during execution.
     """
     _current_trace: Optional[RunTrace] = None
+    _pending_tokens: Optional[tuple] = None  # (prompt, completion) set by node, read by tracer
+
+    @classmethod
+    def set_step_tokens(cls, prompt: int, completion: int) -> None:
+        """
+        Stage token counts for the step currently being traced.
+
+        Call this inside a pipeline node right after the LLM response:
+            response = llm.invoke(messages)
+            if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                CaptureSession.set_step_tokens(
+                    prompt=response.usage_metadata.get('input_tokens', 0),
+                    completion=response.usage_metadata.get('output_tokens', 0),
+                )
+
+        The @trace_step decorator reads and clears this slot when it builds
+        the AgentStep — ensuring the correct step gets the correct tokens.
+        """
+        cls._pending_tokens = (prompt, completion)
+
+    @classmethod
+    def consume_pending_tokens(cls) -> Optional[tuple]:
+        """
+        Read and clear the pending token slot.
+        Called by @trace_step after the node function returns.
+        Returns (prompt, completion) or None if no tokens were staged.
+        """
+        tokens = cls._pending_tokens
+        cls._pending_tokens = None
+        return tokens
     
     @classmethod
     def start_trace(cls, workflow: str, run_id: Optional[str] = None) -> RunTrace:
@@ -31,7 +61,9 @@ class CaptureSession:
     def add_step(cls, step: AgentStep):
         if cls._current_trace:
             cls._current_trace.steps.append(step)
-            
+
+
+    
     @classmethod
     def end_trace(cls, status: StepStatus = StepStatus.SUCCESS, error: Optional[str] = None) -> Optional[RunTrace]:
         if not cls._current_trace:

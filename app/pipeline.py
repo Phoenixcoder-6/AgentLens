@@ -33,6 +33,7 @@ from langgraph.graph import END, START, StateGraph
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config.config_loader import get
 from capture.tracer import trace_step
+from capture.session import CaptureSession
 
 load_dotenv()
 
@@ -126,6 +127,13 @@ def researcher_node(state: PipelineState) -> dict:
 
     findings = response.content
 
+    # Capture real token counts from Groq's usage metadata
+    if hasattr(response, "usage_metadata") and response.usage_metadata:
+        CaptureSession.set_step_tokens(
+            prompt=response.usage_metadata.get("input_tokens", 0),
+            completion=response.usage_metadata.get("output_tokens", 0),
+        )
+
     # Count sources and entities from the structured response
     source_count = findings.count("\n- ", 0, findings.find("ENTITIES")) if "ENTITIES" in findings else findings.count("\n- ")
     entity_lines = findings[findings.find("ENTITIES"):findings.find("KEY FINDINGS")] if "ENTITIES" in findings and "KEY FINDINGS" in findings else ""
@@ -179,6 +187,13 @@ def writer_node(state: PipelineState) -> dict:
             )
         ),
     ])
+
+    # Capture real token counts from Groq's usage metadata
+    if hasattr(response, "usage_metadata") and response.usage_metadata:
+        CaptureSession.set_step_tokens(
+            prompt=response.usage_metadata.get("input_tokens", 0),
+            completion=response.usage_metadata.get("output_tokens", 0),
+        )
 
     return {
         "written_report": response.content,
@@ -242,6 +257,13 @@ def verifier_node(state: PipelineState) -> dict:
 
     result = response.content.strip()
     approved = result.upper().startswith("APPROVED")
+
+    # Capture real token counts from Groq's usage metadata
+    if hasattr(response, "usage_metadata") and response.usage_metadata:
+        CaptureSession.set_step_tokens(
+            prompt=response.usage_metadata.get("input_tokens", 0),
+            completion=response.usage_metadata.get("output_tokens", 0),
+        )
 
     return {
         "verification_result": result,
