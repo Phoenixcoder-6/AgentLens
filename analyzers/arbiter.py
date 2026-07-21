@@ -38,100 +38,26 @@ GROUNDED FLAG:
     The dashboard always shows this flag. Heuristic verdicts use hedged language.
 
 ─────────────────────────────────────────────────────────────────────────────
-PSEUDOCODE — determine_primary_cause(evidence_list)
+Day 12 MVP: P2 (rule match) + P5 (unknown fallback) only.
+P1 → Day 17 | P3 → Day 18a | P4 → Day 27
 ─────────────────────────────────────────────────────────────────────────────
-
-    FUNCTION determine_primary_cause(evidence: list[EvidenceRecord]) → AnalysisBundle:
-
-        IF evidence is empty:
-            RETURN AnalysisBundle(primary_cause=UNKNOWN, priority=P5, grounded=False)
-
-        # Step 1: Check P1 — ground truth mismatch (highest priority)
-        p1_evidence = [e for e in evidence if e.source == GROUND_TRUTH]
-        IF p1_evidence is not empty:
-            best = p1_evidence[0]   # only one ground truth per run
-            RETURN AnalysisBundle(
-                primary_cause = best.rule_match.category,
-                priority      = P1,
-                grounded      = True,
-                evidence      = evidence,
-                primary_agent = best.agent
-            )
-
-        # Step 2: Check P2 — rule match (deterministic rules fired)
-        p2_evidence = [e for e in evidence if e.source == RULE_ENGINE]
-        IF p2_evidence is not empty:
-            best = sort(p2_evidence, by=rule_id ascending)[0]  # tie-break
-            RETURN AnalysisBundle(
-                primary_cause = best.rule_match.category,
-                priority      = P2,
-                grounded      = False,
-                evidence      = evidence,
-                primary_agent = best.agent
-            )
-
-        # Step 3: Check P3 — workflow violation (workflow/consistency validators)
-        p3_evidence = [e for e in evidence
-                       if e.source in (WORKFLOW_VALIDATOR, CONSISTENCY_VALIDATOR)]
-        IF p3_evidence is not empty:
-            best = sort(p3_evidence, by=rule_id ascending)[0]  # tie-break
-            RETURN AnalysisBundle(
-                primary_cause = best.rule_match.category,
-                priority      = P3,
-                grounded      = False,
-                evidence      = evidence,
-                primary_agent = best.agent
-            )
-
-        # Step 4: Check P4 — statistical anomaly (metrics analyzer)
-        p4_evidence = [e for e in evidence if e.source == METRICS_ANALYZER]
-        IF p4_evidence is not empty:
-            best = sort(p4_evidence, by=confidence descending)[0]  # highest confidence
-            RETURN AnalysisBundle(
-                primary_cause = EXECUTION,   # anomalies default to execution category
-                priority      = P4,
-                grounded      = False,
-                evidence      = evidence,
-                primary_agent = best.agent
-            )
-
-        # Step 5: P5 fallback — nothing matched
-        RETURN AnalysisBundle(
-            primary_cause = UNKNOWN,
-            priority      = P5,
-            grounded      = False,
-            evidence      = evidence,
-            primary_agent = None
-        )
-
-─────────────────────────────────────────────────────────────────────────────
-NOTE ON DAY 18a (from the build plan):
-─────────────────────────────────────────────────────────────────────────────
-    The P3 tier (workflow_violation) is wired explicitly in this pseudocode.
-    When implementing determine_primary_cause() on Day 12, P3 must be a
-    distinct code path — not merged into P2 — or workflow violations will
-    never surface as secondary causes, even when no rule fires.
-
-    Unit test required (Day 18a):
-        A workflow violation with no rule match still surfaces as P3,
-        correctly ranked below P1/P2 and above P4.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Optional
 
-from schema import (
+from schema.models import (
     AnalysisBundle,
     EvidenceRecord,
     EvidenceSource,
     FailureCategory,
     PriorityLevel,
-    RunTrace,
+    RuleMatch,
+    RuleSeverity,
+    SCHEMA_VERSION,
 )
-
-if TYPE_CHECKING:
-    pass
+from analyzers.detection.information_loss import InformationLossResult
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -139,7 +65,6 @@ if TYPE_CHECKING:
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Maps EvidenceSource → PriorityLevel for the Arbiter's decision logic.
-# This table is the authoritative source — config.yaml mirrors it for display.
 SOURCE_TO_PRIORITY: dict[EvidenceSource, PriorityLevel] = {
     EvidenceSource.GROUND_TRUTH:             PriorityLevel.P1,
     EvidenceSource.RULE_ENGINE:              PriorityLevel.P2,
@@ -177,7 +102,61 @@ def _tiebreak_key(evidence: EvidenceRecord) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Arbiter — stub (implementation on Day 12, P3 wiring on Day 18a)
+# Evidence conversion helper
+# ─────────────────────────────────────────────────────────────────────────────
+
+def evidence_from_information_loss(result: InformationLossResult) -> Optional[EvidenceRecord]:
+    """
+    Convert an InformationLossResult (Day 10) into an EvidenceRecord for the Arbiter.
+
+    Returns None if:
+        - The rule was skipped (extraction_failed)
+        - The verdict is PASS (nothing to report)
+    """
+    if result.rule_failed or result.verdict == "PASS":
+        return None
+
+    # Map verdict → failure category + severity
+    if result.verdict == "FAIL":
+        category = FailureCategory.WORKFLOW
+        severity = RuleSeverity.HIGH
+        description = (
+            f"Information loss detected: sources or entities were dropped "
+            f"in the Researcher → Writer handoff. "
+            f"source: {result.source_diff.researcher_value}→{result.source_diff.writer_value}, "
+            f"entity: {result.entity_diff.researcher_value}→{result.entity_diff.writer_value}"
+        )
+    else:  # WARNING
+        category = FailureCategory.REASONING
+        severity = RuleSeverity.MEDIUM
+        description = (
+            f"Information gain detected: Writer introduced sources or entities "
+            f"not present in research findings (hallucination risk). "
+            f"source: {result.source_diff.researcher_value}→{result.source_diff.writer_value}, "
+            f"entity: {result.entity_diff.researcher_value}→{result.entity_diff.writer_value}"
+        )
+
+    rule = RuleMatch(
+        rule_id=result.rule_id,
+        category=category,
+        description=description,
+        severity=severity,
+        agent="writer",
+        evidence_detail=result.summary,
+    )
+
+    return EvidenceRecord(
+        source=EvidenceSource.RULE_ENGINE,
+        description=description,
+        value=result.verdict,
+        rule_match=rule,
+        agent="writer",
+        confidence=result.confidence,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# determine_primary_cause — Day 12 MVP: P2 + P5 only
 # ─────────────────────────────────────────────────────────────────────────────
 
 def determine_primary_cause(
@@ -187,69 +166,157 @@ def determine_primary_cause(
     """
     Resolve a list of EvidenceRecords into a single deterministic verdict.
 
-    Priority order: P1 → P2 → P3 → P4 → P5 (fallback)
-    Tie-break: same priority → lowest rule_id ascending
+    Day 12 MVP: P2 (rule match) and P5 (unknown fallback) only.
+    P1/P3/P4 slots are explicit reserved no-ops — separate code paths,
+    ready to be filled without restructuring on future days.
 
-    Args:
-        evidence : All EvidenceRecords collected from all analyzers for this run.
-        run_id   : The run this analysis belongs to.
-
-    Returns:
-        AnalysisBundle with primary_cause, priority_level, grounded flag,
-        and the full evidence list attached.
+    Priority order (Day 12): P2 → P5
+    Tie-break: same priority → lowest rule_id ascending (alphabetical)
 
     Guarantees:
         - Always returns an AnalysisBundle (never raises)
-        - Same input always produces same output (deterministic)
-        - P5 is returned when evidence is empty or nothing matches
-
-    Implementation: Day 12 (MVP: P2 + P5 only)
-                    Day 17 (add P1)
-                    Day 18a (wire P3 explicitly — separate code path, not merged into P2)
-                    Day 27 (wire P4)
+        - Same evidence list → same output, every time (deterministic)
+        - P5 is returned when evidence is empty or nothing matches P2
     """
-    # ── STUB ─────────────────────────────────────────────────────────────────
-    # Full implementation begins Day 12.
-    # Pseudocode is documented in the module docstring above.
-    # Do NOT implement logic here yet — Day 3 is contracts only.
-    raise NotImplementedError(
-        "determine_primary_cause() is a stub. "
-        "Implementation begins on Day 12. "
-        "See module docstring for full pseudocode."
+    # ── P5 immediate fallback for empty evidence ──────────────────────────────
+    if not evidence:
+        return _make_bundle(
+            run_id=run_id,
+            primary_cause=FailureCategory.UNKNOWN,
+            priority=PriorityLevel.P5,
+            grounded=False,
+            evidence=[],
+            primary_agent=None,
+            verdict_reason="No evidence collected — P5 fallback.",
+        )
+
+    # ── P1: ground truth mismatch (reserved — Day 17) ────────────────────────
+    # p1_evidence = [e for e in evidence if e.source == EvidenceSource.GROUND_TRUTH]
+    # → Day 17
+
+    # ── P2: rule match (deterministic rules fired) ────────────────────────────
+    p2_evidence = [
+        e for e in evidence if e.source == EvidenceSource.RULE_ENGINE
+    ]
+    if p2_evidence:
+        # Tie-break: sort by rule_id ascending — guarantees determinism
+        best = sorted(p2_evidence, key=_tiebreak_key)[0]
+        category = (
+            best.rule_match.category
+            if best.rule_match
+            else FailureCategory.UNKNOWN
+        )
+        return _make_bundle(
+            run_id=run_id,
+            primary_cause=category,
+            priority=PriorityLevel.P2,
+            grounded=False,
+            evidence=evidence,
+            primary_agent=best.agent,
+            verdict_reason=(
+                f"P2 rule match: {best.rule_match.rule_id if best.rule_match else 'unknown'} "
+                f"(confidence={best.confidence:.0%})"
+            ),
+        )
+
+    # ── P3: workflow violation (reserved — Day 18a) ───────────────────────────
+    # Kept as explicit separate block per architecture note in module docstring.
+    # p3_evidence = [e for e in evidence if e.source in (
+    #     EvidenceSource.WORKFLOW_VALIDATOR, EvidenceSource.CONSISTENCY_VALIDATOR)]
+    # → Day 18a
+
+    # ── P4: statistical anomaly (reserved — Day 27) ───────────────────────────
+    # p4_evidence = [e for e in evidence if e.source == EvidenceSource.METRICS_ANALYZER]
+    # → Day 27
+
+    # ── P5: fallback — evidence present but nothing matched ───────────────────
+    return _make_bundle(
+        run_id=run_id,
+        primary_cause=FailureCategory.UNKNOWN,
+        priority=PriorityLevel.P5,
+        grounded=False,
+        evidence=evidence,
+        primary_agent=None,
+        verdict_reason="No P2 rule matched — P5 fallback.",
     )
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Arbiter class
+# ─────────────────────────────────────────────────────────────────────────────
+
 class Arbiter:
     """
-    The Arbiter orchestrates all analyzers and produces the final verdict.
+    The Arbiter resolves EvidenceRecords into a final deterministic verdict.
 
-    Usage (Day 12+):
-        arbiter = Arbiter(analyzers=[evidence_extractor, rule_engine, metrics_analyzer])
-        bundle = arbiter.run(trace)
+    Day 12 MVP: accepts evidence directly via run().
+    Evidence conversion helpers (e.g. evidence_from_information_loss) translate
+    analyzer results into EvidenceRecord format before calling run().
 
-    Implementation: Day 12
+    Usage:
+        from analyzers.arbiter import Arbiter, evidence_from_information_loss
+
+        loss_ev = evidence_from_information_loss(loss_result)
+        evidence = [ev for ev in [loss_ev] if ev is not None]
+
+        bundle = Arbiter().run(run_id="run_abc", evidence=evidence)
+        print(bundle.primary_cause)    # FailureCategory.REASONING
+        print(bundle.priority_level)   # PriorityLevel.P2
+        print(bundle.grounded)         # False
     """
 
-    def __init__(self, analyzers: list) -> None:
+    def run(
+        self,
+        run_id: str,
+        evidence: list[EvidenceRecord],
+    ) -> AnalysisBundle:
         """
+        Resolve evidence into a final verdict.
+
+        Input evidence is sorted before processing to guarantee that the
+        outcome is independent of the order in which evidence was collected.
+
         Args:
-            analyzers: List of objects implementing the Analyzer interface.
-                       Order does not matter — priority table determines precedence.
-        """
-        self.analyzers = analyzers
+            run_id:   The pipeline run ID.
+            evidence: EvidenceRecords from all analyzers for this run.
 
-    def run(self, trace: RunTrace) -> AnalysisBundle:
+        Returns:
+            AnalysisBundle — always (never raises).
         """
-        Run all registered analyzers on the trace and return the verdict.
+        # Sort for determinism: priority first, then rule_id tie-break
+        # This ensures input ordering NEVER affects the output verdict
+        sorted_evidence = sorted(
+            evidence,
+            key=lambda e: (
+                _priority_rank(SOURCE_TO_PRIORITY.get(e.source, PriorityLevel.P5)),
+                _tiebreak_key(e),
+            ),
+        )
+        return determine_primary_cause(sorted_evidence, run_id)
 
-        Steps:
-            1. Call analyzer.analyze(trace) for each registered analyzer
-            2. Collect all EvidenceRecords from all AnalysisResults
-            3. Skip any analyzer that returned skipped=True (log the skip)
-            4. Pass the full evidence list to determine_primary_cause()
-            5. Return the AnalysisBundle
 
-        Implementation: Day 12
-        """
-        # ── STUB ─────────────────────────────────────────────────────────────
-        raise NotImplementedError("Arbiter.run() implementation begins Day 12.")
+# ─────────────────────────────────────────────────────────────────────────────
+# Internal helper
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _make_bundle(
+    run_id: str,
+    primary_cause: FailureCategory,
+    priority: PriorityLevel,
+    grounded: bool,
+    evidence: list[EvidenceRecord],
+    primary_agent: Optional[str],
+    verdict_reason: str,
+) -> AnalysisBundle:
+    """Build a complete AnalysisBundle with all fields populated."""
+    rule_matches = [e.rule_match for e in evidence if e.rule_match is not None]
+    return AnalysisBundle(
+        run_id=run_id,
+        primary_cause=primary_cause,
+        priority_level=priority,
+        grounded=grounded,
+        evidence=evidence,
+        rule_matches=rule_matches,
+        primary_agent=primary_agent,
+        summary=verdict_reason,
+    )

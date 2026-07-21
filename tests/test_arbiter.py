@@ -1,135 +1,386 @@
-# tests/test_arbiter.py
 """
-Tests for analyzers/arbiter.py — Arbiter priority table and pseudocode contracts.
+tests/test_arbiter.py — Day 12: Arbiter MVP tests
+==================================================
+Tests for determine_primary_cause() and Arbiter.run().
 
-Covers:
-  - P1–P5 priority table correctness
-  - Priority ordering (P1 highest, P5 lowest)
-  - SOURCE_TO_PRIORITY mapping for every EvidenceSource
-  - Stub raises NotImplementedError (implementation begins Day 12)
-  - Tie-break key function
-  - P3 is a distinct entry (not merged into P2) — Day 18a requirement
+Day 12 requirement: "Unit test determinism: same evidence in, same output out, every time."
+
+Test structure:
+    TestDeterminism         — core requirement: same input → same output
+    TestP2RuleMatch         — P2 evidence fires correct verdict
+    TestP5Fallback          — P5 when nothing matches
+    TestTieBreak            — multiple P2 rules → tie-break by rule_id ascending
+    TestEvidenceConversion  — evidence_from_information_loss() helper
+    TestArbiterClass        — Arbiter.run() sorts before deciding
 """
 
+from __future__ import annotations
+
+import random
 import pytest
+from copy import deepcopy
+
+from schema.models import (
+    AnalysisBundle,
+    EvidenceRecord,
+    EvidenceSource,
+    FailureCategory,
+    PriorityLevel,
+    RuleMatch,
+    RuleSeverity,
+    SCHEMA_VERSION,
+)
 from analyzers.arbiter import (
-    SOURCE_TO_PRIORITY,
-    PRIORITY_ORDER,
-    determine_primary_cause,
     Arbiter,
-    _priority_rank,
+    determine_primary_cause,
+    evidence_from_information_loss,
     _tiebreak_key,
 )
-from schema import PriorityLevel, EvidenceSource, EvidenceRecord, RuleMatch, FailureCategory, RuleSeverity
+from analyzers.detection.information_loss import InformationLossResult, FieldDiff
 
 
-# ── Priority table completeness ───────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
 
-def test_all_five_priority_levels_exist():
-    assert len(PRIORITY_ORDER) == 5
-    for level in [PriorityLevel.P1, PriorityLevel.P2, PriorityLevel.P3,
-                  PriorityLevel.P4, PriorityLevel.P5]:
-        assert level in PRIORITY_ORDER
+RUN_ID = "run_test_arbiter"
 
 
-def test_p1_is_highest_priority():
-    assert PRIORITY_ORDER[0] == PriorityLevel.P1
-
-
-def test_p5_is_lowest_priority():
-    assert PRIORITY_ORDER[4] == PriorityLevel.P5
-
-
-def test_priority_rank_ordering():
-    """Lower rank = higher priority."""
-    assert _priority_rank(PriorityLevel.P1) < _priority_rank(PriorityLevel.P2)
-    assert _priority_rank(PriorityLevel.P2) < _priority_rank(PriorityLevel.P3)
-    assert _priority_rank(PriorityLevel.P3) < _priority_rank(PriorityLevel.P4)
-    assert _priority_rank(PriorityLevel.P4) < _priority_rank(PriorityLevel.P5)
-
-
-# ── SOURCE_TO_PRIORITY mapping ────────────────────────────────────────────────
-
-def test_ground_truth_maps_to_p1():
-    assert SOURCE_TO_PRIORITY[EvidenceSource.GROUND_TRUTH] == PriorityLevel.P1
-
-
-def test_rule_engine_maps_to_p2():
-    assert SOURCE_TO_PRIORITY[EvidenceSource.RULE_ENGINE] == PriorityLevel.P2
-
-
-def test_workflow_validator_maps_to_p3():
-    """P3 must be a distinct mapping — Day 18a requirement."""
-    assert SOURCE_TO_PRIORITY[EvidenceSource.WORKFLOW_VALIDATOR] == PriorityLevel.P3
-
-
-def test_consistency_validator_maps_to_p3():
-    """Consistency validator is also P3 — secondary cause tier."""
-    assert SOURCE_TO_PRIORITY[EvidenceSource.CONSISTENCY_VALIDATOR] == PriorityLevel.P3
-
-
-def test_metrics_analyzer_maps_to_p4():
-    assert SOURCE_TO_PRIORITY[EvidenceSource.METRICS_ANALYZER] == PriorityLevel.P4
-
-
-def test_p3_is_distinct_from_p2():
-    """
-    Critical Day 18a requirement:
-    P3 (workflow_violation) must be a separate priority from P2 (rule_match).
-    They must NOT map to the same PriorityLevel.
-    """
-    p2 = SOURCE_TO_PRIORITY[EvidenceSource.RULE_ENGINE]
-    p3 = SOURCE_TO_PRIORITY[EvidenceSource.WORKFLOW_VALIDATOR]
-    assert p2 != p3, "P3 must be distinct from P2 — see Day 18a build plan note"
-
-
-# ── Tie-break key ─────────────────────────────────────────────────────────────
-
-def test_tiebreak_key_uses_rule_id():
+def make_rule_evidence(
+    rule_id: str = "information_loss_v1",
+    category: FailureCategory = FailureCategory.REASONING,
+    confidence: float = 0.65,
+    agent: str = "writer",
+) -> EvidenceRecord:
     rule = RuleMatch(
-        rule_id="R-WF-001",
-        category=FailureCategory.WORKFLOW,
-        description="test",
+        rule_id=rule_id,
+        category=category,
+        description=f"Test rule {rule_id}",
+        severity=RuleSeverity.MEDIUM,
+        agent=agent,
     )
-    ev = EvidenceRecord(
+    return EvidenceRecord(
         source=EvidenceSource.RULE_ENGINE,
-        description="test",
+        description=f"Test P2 evidence for {rule_id}",
+        value="WARNING",
         rule_match=rule,
+        agent=agent,
+        confidence=confidence,
     )
-    assert _tiebreak_key(ev) == "R-WF-001"
 
 
-def test_tiebreak_key_sorts_ascending():
-    """Lower rule_id should sort before higher rule_id (tie-break rule)."""
-    rule_a = RuleMatch(rule_id="R-WF-001", category=FailureCategory.WORKFLOW, description="a")
-    rule_b = RuleMatch(rule_id="R-WF-005", category=FailureCategory.WORKFLOW, description="b")
-    ev_a = EvidenceRecord(source=EvidenceSource.RULE_ENGINE, description="a", rule_match=rule_a)
-    ev_b = EvidenceRecord(source=EvidenceSource.RULE_ENGINE, description="b", rule_match=rule_b)
-    assert _tiebreak_key(ev_a) < _tiebreak_key(ev_b)
+def make_loss_result(
+    verdict: str = "WARNING",
+    confidence: float = 0.65,
+    src_researcher: int = 8,
+    src_writer: int = 11,
+    ent_researcher: int = 16,
+    ent_writer: int = 17,
+    rule_failed: bool = False,
+) -> InformationLossResult:
+    def _signal(r, w):
+        if w > r: return "ADDED"
+        if w < r: return "DROPPED"
+        return "PRESERVED"
+
+    def _severity(delta):
+        if delta == 0: return "NONE"
+        if delta >= 3: return "HIGH"
+        if delta >= 1: return "MEDIUM"
+        return "LOW"
+
+    source_diff = FieldDiff(
+        field_name="source_count",
+        researcher_value=src_researcher,
+        writer_value=src_writer,
+        delta=src_writer - src_researcher,
+        signal=_signal(src_researcher, src_writer),
+        severity=_severity(abs(src_writer - src_researcher)),
+    )
+    entity_diff = FieldDiff(
+        field_name="entity_count",
+        researcher_value=ent_researcher,
+        writer_value=ent_writer,
+        delta=ent_writer - ent_researcher,
+        signal=_signal(ent_researcher, ent_writer),
+        severity=_severity(abs(ent_writer - ent_researcher)),
+    )
+    return InformationLossResult(
+        schema_version=SCHEMA_VERSION,
+        run_id=RUN_ID,
+        verdict=verdict,
+        confidence=confidence,
+        source_diff=source_diff,
+        entity_diff=entity_diff,
+        has_information_gain=(verdict == "WARNING" and src_writer > src_researcher),
+        has_information_loss=(verdict == "FAIL"),
+        rule_failed=rule_failed,
+        summary=(
+            f"Verdict: {verdict}\n"
+            f"  source_count: {src_researcher}→{src_writer}\n"
+            f"  entity_count: {ent_researcher}→{ent_writer}"
+        ),
+    )
 
 
-def test_tiebreak_key_no_rule_sorts_last():
-    ev = EvidenceRecord(source=EvidenceSource.METRICS_ANALYZER, description="latency spike")
-    key = _tiebreak_key(ev)
-    assert key == "zzz"  # no rule_id → sorts to end
+# ─────────────────────────────────────────────────────────────────────────────
+# TestDeterminism — core Day 12 requirement
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestDeterminism:
+    """
+    CORE REQUIREMENT: same evidence in → same output out, every time.
+    Each scenario runs 10 times; all results must be identical.
+    """
+
+    def _assert_deterministic(self, evidence: list, runs: int = 10):
+        results = [determine_primary_cause(deepcopy(evidence), RUN_ID) for _ in range(runs)]
+        first = results[0]
+        for i, r in enumerate(results[1:], start=2):
+            assert r.primary_cause   == first.primary_cause,   f"Run {i}: primary_cause differs"
+            assert r.priority_level  == first.priority_level,  f"Run {i}: priority_level differs"
+            assert r.grounded        == first.grounded,         f"Run {i}: grounded differs"
+            assert r.primary_agent   == first.primary_agent,    f"Run {i}: primary_agent differs"
+
+    def test_deterministic_empty_evidence(self):
+        self._assert_deterministic([])
+
+    def test_deterministic_single_p2(self):
+        self._assert_deterministic([make_rule_evidence("information_loss_v1")])
+
+    def test_deterministic_multiple_p2_rules(self):
+        self._assert_deterministic([
+            make_rule_evidence("rule_b"),
+            make_rule_evidence("rule_a"),
+            make_rule_evidence("rule_c"),
+        ])
+
+    def test_deterministic_regardless_of_input_order(self):
+        """Shuffling input must not change verdict."""
+        ev_a = make_rule_evidence("rule_alpha", confidence=0.9)
+        ev_b = make_rule_evidence("rule_beta",  confidence=0.5)
+
+        result_ab = determine_primary_cause([ev_a, ev_b], RUN_ID)
+        result_ba = determine_primary_cause([ev_b, ev_a], RUN_ID)
+
+        assert result_ab.primary_cause  == result_ba.primary_cause
+        assert result_ab.priority_level == result_ba.priority_level
+        assert result_ab.primary_agent  == result_ba.primary_agent
+
+    def test_arbiter_run_deterministic_with_shuffled_input(self):
+        arbiter = Arbiter()
+        evidence = [
+            make_rule_evidence("rule_c"),
+            make_rule_evidence("rule_a"),
+            make_rule_evidence("rule_b"),
+        ]
+        results = []
+        for _ in range(10):
+            shuffled = evidence[:]
+            random.shuffle(shuffled)
+            results.append(arbiter.run(RUN_ID, shuffled))
+
+        first = results[0]
+        for r in results[1:]:
+            assert r.primary_cause  == first.primary_cause
+            assert r.priority_level == first.priority_level
+            assert r.primary_agent  == first.primary_agent
 
 
-# ── Stubs raise NotImplementedError ──────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# TestP2RuleMatch
+# ─────────────────────────────────────────────────────────────────────────────
 
-def test_determine_primary_cause_is_stub():
-    """Implementation begins Day 12 — stub must raise NotImplementedError."""
-    with pytest.raises(NotImplementedError):
-        determine_primary_cause([], "run_test")
+class TestP2RuleMatch:
+
+    def test_p2_priority_on_rule_engine_evidence(self):
+        bundle = determine_primary_cause([make_rule_evidence()], RUN_ID)
+        assert bundle.priority_level == PriorityLevel.P2
+
+    def test_p2_reasoning_category(self):
+        bundle = determine_primary_cause(
+            [make_rule_evidence(category=FailureCategory.REASONING)], RUN_ID)
+        assert bundle.primary_cause == FailureCategory.REASONING
+
+    def test_p2_workflow_category(self):
+        bundle = determine_primary_cause(
+            [make_rule_evidence(category=FailureCategory.WORKFLOW)], RUN_ID)
+        assert bundle.primary_cause == FailureCategory.WORKFLOW
+
+    def test_p2_not_grounded(self):
+        bundle = determine_primary_cause([make_rule_evidence()], RUN_ID)
+        assert bundle.grounded is False
+
+    def test_p2_agent_attributed(self):
+        bundle = determine_primary_cause([make_rule_evidence(agent="writer")], RUN_ID)
+        assert bundle.primary_agent == "writer"
+
+    def test_p2_all_evidence_attached(self):
+        bundle = determine_primary_cause(
+            [make_rule_evidence("r1"), make_rule_evidence("r2")], RUN_ID)
+        assert len(bundle.evidence) == 2
+
+    def test_p2_rule_matches_populated(self):
+        bundle = determine_primary_cause([make_rule_evidence()], RUN_ID)
+        assert len(bundle.rule_matches) == 1
+
+    def test_p2_run_id_preserved(self):
+        bundle = determine_primary_cause([make_rule_evidence()], RUN_ID)
+        assert bundle.run_id == RUN_ID
+
+    def test_p2_summary_contains_rule_id(self):
+        bundle = determine_primary_cause(
+            [make_rule_evidence("information_loss_v1")], RUN_ID)
+        assert "information_loss_v1" in bundle.summary
 
 
-def test_arbiter_run_is_stub():
-    """Arbiter.run() implementation begins Day 12."""
-    arbiter = Arbiter(analyzers=[])
-    with pytest.raises(NotImplementedError):
-        arbiter.run(None)
+# ─────────────────────────────────────────────────────────────────────────────
+# TestP5Fallback
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestP5Fallback:
+
+    def test_p5_on_empty_evidence(self):
+        assert determine_primary_cause([], RUN_ID).priority_level == PriorityLevel.P5
+
+    def test_p5_cause_is_unknown(self):
+        assert determine_primary_cause([], RUN_ID).primary_cause == FailureCategory.UNKNOWN
+
+    def test_p5_not_grounded(self):
+        assert determine_primary_cause([], RUN_ID).grounded is False
+
+    def test_p5_no_primary_agent(self):
+        assert determine_primary_cause([], RUN_ID).primary_agent is None
+
+    def test_p5_on_metrics_only_evidence(self):
+        """Day 12 MVP: METRICS_ANALYZER evidence falls through to P5."""
+        ev = EvidenceRecord(
+            source=EvidenceSource.METRICS_ANALYZER,
+            description="latency spike",
+            confidence=0.9,
+        )
+        bundle = determine_primary_cause([ev], RUN_ID)
+        assert bundle.priority_level == PriorityLevel.P5
+
+    def test_p5_always_returns_bundle(self):
+        bundle = determine_primary_cause([], RUN_ID)
+        assert isinstance(bundle, AnalysisBundle)
 
 
-def test_arbiter_stores_analyzers():
-    """Arbiter accepts and stores the analyzers list even before implementation."""
-    arbiter = Arbiter(analyzers=["fake_analyzer_1", "fake_analyzer_2"])
-    assert len(arbiter.analyzers) == 2
+# ─────────────────────────────────────────────────────────────────────────────
+# TestTieBreak
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestTieBreak:
+
+    def test_lowest_rule_id_wins(self):
+        evidence = [
+            make_rule_evidence("rule_c"),
+            make_rule_evidence("rule_a"),   # ← wins (alphabetically first)
+            make_rule_evidence("rule_b"),
+        ]
+        bundle = determine_primary_cause(evidence, RUN_ID)
+        assert "rule_a" in bundle.summary
+
+    def test_tiebreak_key_no_rule_sorts_last(self):
+        ev = EvidenceRecord(
+            source=EvidenceSource.RULE_ENGINE,
+            description="no rule",
+            confidence=0.9,
+        )
+        assert _tiebreak_key(ev) == "zzz"
+
+    def test_tiebreak_key_with_rule_id(self):
+        assert _tiebreak_key(make_rule_evidence("rule_aaa")) == "rule_aaa"
+
+    def test_tiebreak_alphabetical_not_by_confidence(self):
+        """Higher confidence must NOT override rule_id tie-break."""
+        ev_high = make_rule_evidence("rule_z", confidence=0.99)
+        ev_low  = make_rule_evidence("rule_a", confidence=0.10)
+        bundle = determine_primary_cause([ev_high, ev_low], RUN_ID)
+        assert "rule_a" in bundle.summary   # rule_a wins despite lower confidence
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestEvidenceConversion
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestEvidenceConversion:
+
+    def test_warning_produces_evidence(self):
+        ev = evidence_from_information_loss(make_loss_result("WARNING"))
+        assert ev is not None and isinstance(ev, EvidenceRecord)
+
+    def test_fail_produces_evidence(self):
+        ev = evidence_from_information_loss(make_loss_result("FAIL", src_writer=2))
+        assert ev is not None
+
+    def test_pass_produces_none(self):
+        assert evidence_from_information_loss(make_loss_result("PASS")) is None
+
+    def test_rule_failed_produces_none(self):
+        assert evidence_from_information_loss(make_loss_result(rule_failed=True)) is None
+
+    def test_warning_source_is_rule_engine(self):
+        ev = evidence_from_information_loss(make_loss_result("WARNING"))
+        assert ev.source == EvidenceSource.RULE_ENGINE
+
+    def test_warning_category_is_reasoning(self):
+        ev = evidence_from_information_loss(make_loss_result("WARNING"))
+        assert ev.rule_match.category == FailureCategory.REASONING
+
+    def test_fail_category_is_workflow(self):
+        ev = evidence_from_information_loss(make_loss_result("FAIL", src_writer=2))
+        assert ev.rule_match.category == FailureCategory.WORKFLOW
+
+    def test_confidence_preserved(self):
+        ev = evidence_from_information_loss(make_loss_result("WARNING", confidence=0.65))
+        assert ev.confidence == 0.65
+
+    def test_rule_id_preserved(self):
+        ev = evidence_from_information_loss(make_loss_result("WARNING"))
+        assert ev.rule_match.rule_id == "information_loss_v1"
+
+    def test_agent_is_writer(self):
+        ev = evidence_from_information_loss(make_loss_result("WARNING"))
+        assert ev.agent == "writer"
+
+    def test_end_to_end_warning_reaches_p2_reasoning(self):
+        ev = evidence_from_information_loss(make_loss_result("WARNING"))
+        bundle = Arbiter().run(RUN_ID, [ev])
+        assert bundle.priority_level == PriorityLevel.P2
+        assert bundle.primary_cause  == FailureCategory.REASONING
+
+    def test_end_to_end_fail_reaches_p2_workflow(self):
+        ev = evidence_from_information_loss(make_loss_result("FAIL", src_writer=2))
+        bundle = Arbiter().run(RUN_ID, [ev])
+        assert bundle.priority_level == PriorityLevel.P2
+        assert bundle.primary_cause  == FailureCategory.WORKFLOW
+
+    def test_end_to_end_pass_reaches_p5(self):
+        ev = evidence_from_information_loss(make_loss_result("PASS"))
+        bundle = Arbiter().run(RUN_ID, [e for e in [ev] if e is not None])
+        assert bundle.priority_level == PriorityLevel.P5
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestArbiterClass
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestArbiterClass:
+
+    def test_run_returns_bundle(self):
+        assert isinstance(Arbiter().run(RUN_ID, []), AnalysisBundle)
+
+    def test_run_empty_is_p5(self):
+        assert Arbiter().run(RUN_ID, []).priority_level == PriorityLevel.P5
+
+    def test_run_with_p2_gives_p2(self):
+        assert Arbiter().run(RUN_ID, [make_rule_evidence()]).priority_level == PriorityLevel.P2
+
+    def test_run_sorts_for_determinism(self):
+        evidence = [make_rule_evidence("rule_c"), make_rule_evidence("rule_a")]
+        b1 = Arbiter().run(RUN_ID, evidence)
+        b2 = Arbiter().run(RUN_ID, list(reversed(evidence)))
+        assert b1.primary_cause  == b2.primary_cause
+        assert b1.priority_level == b2.priority_level
