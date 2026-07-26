@@ -79,21 +79,36 @@ def get_db() -> DatabaseManager:
 
 
 def _extract_topic(trace_json_str: str) -> str:
-    """Pull topic from the first step's input state."""
+    """Pull topic from the trace JSON, trying multiple paths."""
+    if not trace_json_str:
+        return ""
     try:
         data = json.loads(trace_json_str)
-        steps = data.get("steps", [])
-        if steps:
-            hs = steps[0].get("handoff", {})
-            inp = hs.get("input_state", {})
-            if isinstance(inp, str):
-                inp = json.loads(inp)
-            topic = inp.get("topic", "")
-            if topic:
-                return topic[:60]
-        return ""
+        # Path 1: steps[0].handoff.input_state.topic
+        for step in data.get("steps", []):
+            handoff = step.get("handoff", {})
+            if isinstance(handoff, str):
+                try: handoff = json.loads(handoff)
+                except: continue
+            for key in ("input_state", "output_state", "filtered_state"):
+                state_val = handoff.get(key, {})
+                if isinstance(state_val, str):
+                    try: state_val = json.loads(state_val)
+                    except: continue
+                topic = state_val.get("topic", "")
+                if topic:
+                    return str(topic)[:60]
+        # Path 2: top-level initial_state
+        init = data.get("initial_state", {})
+        if isinstance(init, str):
+            try: init = json.loads(init)
+            except: init = {}
+        topic = init.get("topic", "")
+        if topic:
+            return str(topic)[:60]
     except Exception:
-        return ""
+        pass
+    return ""
 
 
 def _total_tokens(run_id: str) -> int:
@@ -109,19 +124,22 @@ def list_runs(limit: int = 50) -> list[RunRow]:
     rows = db.list_runs(limit=limit)
     result = []
     for r in rows:
-        steps  = db.get_steps_for_run(r["run_id"])
+        run_id = r["run_id"]
+        steps  = db.get_steps_for_run(run_id)
         tokens = sum(s.get("tokens_total", 0) or 0 for s in steps)
         lat    = sum(s.get("latency_ms",   0) or 0 for s in steps)
-        topic  = _extract_topic(r.get("trace_json", ""))
+        # Must call get_run() — list_runs() does not return trace_json
+        full   = db.get_run(run_id)
+        topic  = _extract_topic(full.get("trace_json", "") if full else "")
         result.append(RunRow(
-            run_id    = r["run_id"],
-            workflow  = r.get("workflow", "unknown"),
-            topic     = topic or r.get("workflow", "unknown"),
-            timestamp = (r.get("timestamp", "")[:19] or "").replace("T", " "),
-            status    = r.get("status", "unknown"),
-            latency_ms= lat,
+            run_id      = run_id,
+            workflow    = r.get("workflow", "unknown"),
+            topic       = topic or r.get("workflow", "unknown"),
+            timestamp   = (r.get("timestamp", "")[:19] or "").replace("T", " "),
+            status      = r.get("status", "unknown"),
+            latency_ms  = lat,
             tokens_total= tokens,
-            step_count= len(steps),
+            step_count  = len(steps),
         ))
     return result
 
@@ -199,6 +217,64 @@ def run_full_analysis(run_id: str) -> AnalysisState:
 
 def run_explanation(bundle: AnalysisBundle) -> AnalysisBundle:
     return LLMExplainer().explain(bundle)
+
+def explain_agent_evidence(agent, evidence, bundle):
+    """Focused LLM explanation for one agent's extracted evidence metrics."""
+    import os
+    from langchain_groq import ChatGroq
+    from langchain_core.messages import SystemMessage, HumanMessage
+    from config.config_loader import get
+
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return "GROQ_API_KEY not set."
+
+    is_blamed = bundle and (bundle.primary_agent or "").lower() == agent.lower()
+    if bundle:
+        arbiter_note = (
+            f"Arbiter verdict: '{bundle.primary_agent}' caused a {bundle.primary_cause.value} "
+            f"failure ({bundle.priority_level.value}). "
+            + ("THIS is the blamed agent." if is_blamed else "This agent is not blamed.")
+        )
+    else:
+        arbiter_note = "No arbiter verdict available yet."
+
+    prompt = "\n".join([
+        f"AGENT: {agent}",
+        f"SOURCES CITED: {evidence.source_count}",
+        f"NAMED ENTITIES EXTRACTED: {evidence.entity_count}",
+        f"TOOL CALLS MADE: {len(evidence.tool_calls)}",
+        "",
+        f"ARBITER CONTEXT: {arbiter_note}",
+        "",
+        f"In 3-4 sentences explain:",
+        f"1. What do these numbers reveal about what the {agent} agent did in the pipeline?",
+        f"2. Are these source/entity counts high, low, or normal for this agent role?",
+        f"3. How does this agent relate to the overall pipeline verdict?",
+        f"4. What should an engineer inspect first when debugging this agent?",
+        "",
+        "Be specific and technical. Use hedged language (this is heuristic analysis). No bullet points.",
+    ])
+
+    try:
+        llm = ChatGroq(
+            model=get("llm", "model"),
+            temperature=0.0,
+            max_tokens=512,
+            api_key=api_key,
+        )
+        resp = llm.invoke([
+            SystemMessage(content=(
+                "You are an AI observability analyst. Explain extracted evidence metrics "
+                "for a single agent in a multi-agent research pipeline. "
+                "Be concise, technical, and actionable. Write in flowing prose — no bullet points."
+            )),
+            HumanMessage(content=prompt),
+        ])
+        return str(resp.content)
+    except Exception as exc:
+        return f"LLM error: {exc}"
+
 
 
 def get_cached(run_id: str) -> Optional[AnalysisState]:

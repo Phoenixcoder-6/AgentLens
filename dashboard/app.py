@@ -208,7 +208,8 @@ def _run_row(r: state.RunRow, cols: str):
             ui.html(f'<span style="font-size:13px;">{fmt_ms(r.latency_ms)}</span>')
 
     # Inline expansion panel (hidden by default)
-    expansion = ui.element("div").classes("al-expansion").style("display:none;")
+    expansion = ui.element("div").classes("al-expansion")
+    expansion.set_visibility(False)
 
     with expansion:
         if bundle:
@@ -217,17 +218,7 @@ def _run_row(r: state.RunRow, cols: str):
             _inline_analyze_panel(r.run_id, expansion, row_el, cols)
 
     # Click row → toggle expansion
-    def toggle(e, exp=expansion):
-        exp.style(
-            remove="display:none;" if "display:none" in (exp._style or "") else "",
-        )
-        is_hidden = "display:none" in (exp._props.get("style", "") or exp._style or "")
-        exp.style("display:none;" if not is_hidden else "display:block;")
-        # simpler: just toggle
-        exp.set_visibility(not exp.is_deleted)
-
-    # Use a simpler toggle via JS
-    row_el.on("click", lambda e, exp=expansion: _toggle(exp))
+    row_el.on("click", lambda e, exp=expansion: exp.set_visibility(not exp.visible))
 
 
 def _toggle(el):
@@ -237,50 +228,67 @@ def _toggle(el):
 
 
 def _inline_verdict_panel(bundle, loss, run_id: str):
-    p_col = PRIORITY_COLOR.get(bundle.priority_level.value, GRAY)
-    c_col = CAUSE_COLOR.get(bundle.primary_cause.value, GRAY)
-    conf  = f"{loss.confidence:.0%}" if loss else "—"
+    conf        = f"{loss.confidence:.0%}" if loss else "—"
     verdict_str = loss.verdict if loss else "UNKNOWN"
 
-    ui.html(f"""
-    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
-      <div>
-        <div class="al-section" style="margin-bottom:6px;">Priority</div>
-        {priority_badge(bundle.priority_level.value)}
-      </div>
-      <div>
-        <div class="al-section" style="margin-bottom:6px;">Cause</div>
-        {cause_badge(bundle.primary_cause.value)}
-      </div>
-      <div>
-        <div class="al-section" style="margin-bottom:6px;">Agent</div>
-        <span style="font-size:13px;font-weight:500;color:{STEP_COLOR.get(bundle.primary_agent or '', GRAY)};">
-          {bundle.primary_agent or 'N/A'}
-        </span>
-      </div>
-      <div>
-        <div class="al-section" style="margin-bottom:6px;">Confidence</div>
-        <span style="font-size:13px;font-weight:600;">{conf}</span>
-      </div>
-      <div>
-        <div class="al-section" style="margin-bottom:6px;">Grounded</div>
-        <span style="color:{"#22c55e" if bundle.grounded else TEXT_MUTED};">
-          {"✓ Yes" if bundle.grounded else "✗ No (heuristic)"}
-        </span>
-      </div>
-      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
-        <button class="al-copy" onclick="navigator.clipboard.writeText(`**Run:** {run_id}\\n**Verdict:** {verdict_str} ({bundle.priority_level.value})\\n**Cause:** {bundle.primary_cause.value}\\n**Agent:** {bundle.primary_agent or 'N/A'}\\n**Confidence:** {conf}`)">
-          📋 Copy verdict
-        </button>
-        <a href="/run/{run_id}" style="font-size:12px;color:{PURPLE};text-decoration:none;padding:4px 10px;border:1px solid {PURPLE}44;border-radius:6px;">
-          Open trace →
-        </a>
-        <a href="/run/{run_id}/explain" style="font-size:12px;color:{CYAN};text-decoration:none;padding:4px 10px;border:1px solid {CYAN}44;border-radius:6px;">
-          ✦ Explain
-        </a>
-      </div>
-    </div>
-    """)
+    # Build markdown in Python so it can be passed safely via json.dumps
+    import json as _j
+    md = (
+        f"## AgentLens Verdict\n"
+        f"**Run:** `{run_id}`\n"
+        f"**Verdict:** {verdict_str} ({bundle.priority_level.value})\n"
+        f"**Cause:** {bundle.primary_cause.value}\n"
+        f"**Agent:** {bundle.primary_agent or 'N/A'}\n"
+        f"**Confidence:** {conf}\n"
+        f"**Grounded:** {'Yes' if bundle.grounded else 'No'}"
+    )
+
+    with ui.element("div").style(
+        "display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;"
+    ):
+        for label, html_val in [
+            ("Priority",   priority_badge(bundle.priority_level.value)),
+            ("Cause",      cause_badge(bundle.primary_cause.value)),
+        ]:
+            with ui.element("div"):
+                ui.html(f'<div class="al-section" style="margin-bottom:6px;">{label}</div>')
+                ui.html(html_val)
+
+        ag_color = STEP_COLOR.get(bundle.primary_agent or "", GRAY)
+        grnd_color = "#22c55e" if bundle.grounded else TEXT_MUTED
+        grnd_txt   = "\u2713 Yes" if bundle.grounded else "\u2717 No (heuristic)"
+
+        with ui.element("div"):
+            ui.html('<div class="al-section" style="margin-bottom:6px;">Agent</div>')
+            ui.html(f'<span style="font-size:13px;font-weight:500;color:{ag_color};">{bundle.primary_agent or "N/A"}</span>')
+
+        with ui.element("div"):
+            ui.html('<div class="al-section" style="margin-bottom:6px;">Confidence</div>')
+            ui.html(f'<span style="font-size:13px;font-weight:600;">{conf}</span>')
+
+        with ui.element("div"):
+            ui.html('<div class="al-section" style="margin-bottom:6px;">Grounded</div>')
+            ui.html(f'<span style="color:{grnd_color};">{grnd_txt}</span>')
+
+        # Action buttons
+        with ui.element("div").style("margin-left:auto;display:flex;gap:8px;align-items:center;"):
+
+            async def _copy(text=md):
+                await ui.run_javascript(f"navigator.clipboard.writeText({_j.dumps(text)})")
+                ui.notify("\u2713 Copied!", type="positive", position="top", timeout=1500)
+
+            ui.button("\U0001f4cb Copy verdict", on_click=_copy).props("flat dense").style(
+                f"color:{TEXT_MUTED};font-size:11px;border:1px solid {BORDER};"
+                "border-radius:6px;padding:4px 10px;"
+            )
+            ui.html(
+                f'<a href="/run/{run_id}" style="font-size:12px;color:{PURPLE};text-decoration:none;'
+                f'padding:4px 10px;border:1px solid {PURPLE}44;border-radius:6px;">Open trace \u2192</a>'
+            )
+            ui.html(
+                f'<a href="/run/{run_id}/explain" style="font-size:12px;color:{CYAN};text-decoration:none;'
+                f'padding:4px 10px;border:1px solid {CYAN}44;border-radius:6px;">\u2726 Explain</a>'
+            )
 
 
 def _inline_analyze_panel(run_id: str, expansion, row_el, cols: str):
@@ -510,34 +518,83 @@ def evidence_page(run_id: str):
                 with ui.element("div").style(
                     f"background:{CARD};border:1px solid {BORDER};border-radius:10px;overflow:hidden;margin-bottom:20px;"
                 ):
-                    for agent, ev in result.extracted.items():
-                        col = STEP_COLOR.get(agent, GRAY)
-                        ui.html(f"""
-                        <div style="padding:14px 20px;border-bottom:1px solid {BORDER};
-                                    display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-                          <div style="min-width:100px;">
-                            <span style="font-size:12px;font-weight:600;color:{col};text-transform:capitalize;">{agent}</span>
-                          </div>
-                          <div style="display:flex;gap:24px;flex:1;">
-                            <div>
-                              <div class="al-section" style="margin-bottom:4px;">Sources</div>
-                              <span style="font-size:18px;font-weight:700;color:{TEXT};">{ev.source_count}</span>
+                    for _ag, _ev in result.extracted.items():
+                        _ag_col = STEP_COLOR.get(_ag, GRAY)
+                        with ui.element("div").style(
+                            f"padding:14px 20px;border-bottom:1px solid {BORDER};"
+                            "display:flex;align-items:center;gap:16px;flex-wrap:wrap;"
+                        ):
+                            ui.html(f"""
+                            <div style="min-width:100px;">
+                              <span style="font-size:12px;font-weight:600;color:{_ag_col};text-transform:capitalize;">{_ag}</span>
                             </div>
-                            <div>
-                              <div class="al-section" style="margin-bottom:4px;">Entities</div>
-                              <span style="font-size:18px;font-weight:700;color:{TEXT};">{ev.entity_count}</span>
+                            <div style="display:flex;gap:24px;flex:1;">
+                              <div>
+                                <div class="al-section" style="margin-bottom:4px;">Sources</div>
+                                <span style="font-size:18px;font-weight:700;color:{TEXT};">{_ev.source_count}</span>
+                              </div>
+                              <div>
+                                <div class="al-section" style="margin-bottom:4px;">Entities</div>
+                                <span style="font-size:18px;font-weight:700;color:{TEXT};">{_ev.entity_count}</span>
+                              </div>
+                              <div>
+                                <div class="al-section" style="margin-bottom:4px;">Tool Calls</div>
+                                <span style="font-size:18px;font-weight:700;color:{TEXT};">{len(_ev.tool_calls)}</span>
+                              </div>
                             </div>
-                            <div>
-                              <div class="al-section" style="margin-bottom:4px;">Tool Calls</div>
-                              <span style="font-size:18px;font-weight:700;color:{TEXT};">{len(ev.tool_calls)}</span>
-                            </div>
-                          </div>
-                          <button class="al-copy" onclick="alert('Explain feature coming in Day 18')">
-                            Explain this →
-                          </button>
-                        </div>
-                        """)
+                            """)
 
+                            def _mk_btn(ag=_ag, ev=_ev, bndl=result.bundle):
+                                async def _click():
+                                    ag_col = STEP_COLOR.get(ag, GRAY)
+                                    dlg = ui.dialog()
+                                    with dlg, ui.card().style(
+                                        f"background:{CARD};border:1px solid {BORDER};"
+                                        "min-width:520px;max-width:680px;padding:24px;"
+                                    ):
+                                        ui.html(f"""
+                                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+                                          <span style="color:{ag_col};font-size:14px;">●</span>
+                                          <span style="font-size:13px;font-weight:600;color:{TEXT};text-transform:capitalize;">{ag}</span>
+                                          <span class="al-section" style="margin-left:8px;">Evidence Explanation</span>
+                                        </div>
+                                        <div style="display:flex;gap:16px;margin-bottom:16px;">
+                                          <div class="al-stat" style="flex:1;">
+                                            <div class="al-stat-label">Sources</div>
+                                            <div class="al-stat-value" style="color:{CYAN};">{ev.source_count}</div>
+                                          </div>
+                                          <div class="al-stat" style="flex:1;">
+                                            <div class="al-stat-label">Entities</div>
+                                            <div class="al-stat-value" style="color:{PURPLE};">{ev.entity_count}</div>
+                                          </div>
+                                          <div class="al-stat" style="flex:1;">
+                                            <div class="al-stat-label">Tool Calls</div>
+                                            <div class="al-stat-value">{len(ev.tool_calls)}</div>
+                                          </div>
+                                        </div>
+                                        """)
+                                        status_lbl = ui.html(
+                                            f'<div style="color:{TEXT_MUTED};padding:8px 0;">'
+                                            f'<span style="color:{PURPLE};">⟳</span>  Generating explanation…</div>'
+                                        )
+                                        with ui.row().style("justify-content:flex-end;margin-top:12px;"):
+                                            ui.button("Close", on_click=dlg.close).props("flat").style(f"color:{TEXT_MUTED};")
+                                    dlg.open()
+                                    text = await run.io_bound(state.explain_agent_evidence, ag, ev, bndl)
+                                    status_lbl.set_content(f"""
+                                    <div style="background:{BG_SIDEBAR};border-left:3px solid {STEP_COLOR.get(ag, GRAY)};
+                                                border-radius:6px;padding:14px 16px;">
+                                      <div class="al-section" style="color:{STEP_COLOR.get(ag, GRAY)};margin-bottom:8px;">LLM Explanation</div>
+                                      <div style="font-size:14px;line-height:1.75;color:{TEXT};">{text}</div>
+                                    </div>
+                                    """)
+
+                                ui.button("Explain this →", on_click=_click).props("flat dense").style(
+                                    f"color:{TEXT_MUTED};font-size:11px;border:1px solid {BORDER};"
+                                    "border-radius:6px;padding:4px 12px;white-space:nowrap;"
+                                )
+
+                            _mk_btn()
                 # ── Section: Information Loss Detail ──────────────────────────
                 if loss:
                     ui.html(f'<div class="al-section" style="margin-bottom:12px;">Information Loss Delta (Researcher → Writer)</div>')
@@ -824,15 +881,17 @@ def _render_explanation(bundle, analysis):
     hedge_note  = "heuristic — hedged language" if not is_grounded else "grounded — confident language"
 
     # Copy verdict markdown
+    # Build markdown string as a proper Python variable (not embedded in onclick HTML)
     md_verdict = (
-        f"**Run:** {bundle.run_id}\\n"
-        f"**Verdict:** {verdict} ({bundle.priority_level.value})\\n"
-        f"**Cause:** {bundle.primary_cause.value}\\n"
-        f"**Agent:** {bundle.primary_agent or 'N/A'}\\n"
-        f"**Confidence:** {conf}\\n"
-        f"**Grounded:** {'Yes' if is_grounded else 'No'}\\n"
-        f"**Summary:** {(bundle.summary or '').replace(chr(10), ' ')}\\n"
-        f"**Fix:** {(bundle.suggested_fix or '').replace(chr(10), ' ')}"
+        f"## AgentLens Verdict\n"
+        f"**Run:** `{bundle.run_id}`\n"
+        f"**Verdict:** {verdict} ({bundle.priority_level.value})\n"
+        f"**Cause:** {bundle.primary_cause.value}\n"
+        f"**Agent:** {bundle.primary_agent or 'N/A'}\n"
+        f"**Confidence:** {conf}\n"
+        f"**Grounded:** {'Yes' if is_grounded else 'No'}\n\n"
+        f"### Root Cause\n{bundle.summary or ''}\n\n"
+        f"### Suggested Fix\n{bundle.suggested_fix or ''}"
     )
 
     # ── Verdict row ───────────────────────────────────────────────────────────
@@ -866,11 +925,18 @@ def _render_explanation(bundle, analysis):
               </span>
             </div>
             """)
-            ui.html(f"""
-            <button class="al-copy" onclick="navigator.clipboard.writeText(`{md_verdict}`).then(()=>this.textContent='✓ Copied!').catch(()=>this.textContent='Error')">
-              📋 Copy verdict as markdown
-            </button>
-            """)
+            # Use NiceGUI button + async JS for clipboard — HTML onclick breaks with special chars
+            async def copy_to_clipboard(md=md_verdict):
+                import json as _json
+                await ui.run_javascript(
+                    f"navigator.clipboard.writeText({_json.dumps(md)})"
+                )
+                ui.notify("✓ Copied to clipboard", type="positive", position="top", timeout=2000)
+
+            ui.button("📋 Copy verdict", on_click=copy_to_clipboard).props("flat dense").style(
+                f"color:{TEXT_MUTED};font-size:11px;border:1px solid {BORDER};"
+                f"border-radius:6px;padding:4px 10px;"
+            )
 
         if bundle.summary:
             ui.html(f"""

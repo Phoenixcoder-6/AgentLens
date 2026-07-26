@@ -61,13 +61,19 @@ class ExplanationOutput(BaseModel):
     """Schema for the LLM's structured explanation output."""
     summary: str = Field(
         description=(
-            "2–3 sentence root cause explanation. "
+            "A detailed root cause analysis in 4-6 sentences covering: "
+            "(1) what was detected and which rule fired, "
+            "(2) what the specific evidence numbers mean (e.g. source count changes), "
+            "(3) why this matters for output quality, "
+            "(4) which agent is responsible and how the failure likely occurred. "
             "Use hedged language ('may indicate', 'suggests') when grounded=False."
         )
     )
     suggested_fix: str = Field(
         description=(
-            "1–2 sentence actionable recommendation for fixing the detected issue."
+            "2-3 concrete, actionable steps to fix the detected issue. "
+            "Be specific about what to check, what to change in the prompt or pipeline, "
+            "and how to verify the fix worked."
         )
     )
 
@@ -93,20 +99,27 @@ class LLMExplainer:
     """
 
     SYSTEM_PROMPT = textwrap.dedent("""\
-        You are an AI observability analyst. Your job is to explain the output
-        of a deterministic analysis system that monitors multi-agent AI pipelines.
+        You are an expert AI observability analyst reviewing multi-agent pipeline failures.
+        Your job is to write a detailed, insightful explanation of a deterministic analysis verdict.
 
-        You will receive a structured analysis verdict. Explain:
-        1. What was detected and why it matters (2-3 sentences)
-        2. A concrete, actionable fix (1-2 sentences)
+        Structure your response as follows:
+        1. summary: A thorough root cause analysis (4-6 sentences) that covers:
+           - WHAT was detected: name the specific rule that fired and the evidence numbers
+           - WHY this is a problem: explain what information gain/loss means for output quality
+           - HOW it likely happened: describe the mechanism (e.g. hallucination, context drop)
+           - WHO is responsible: name the specific agent and their role in the failure
+           - IMPACT: what downstream effect this could have on the final output
+
+        2. suggested_fix: 2-3 specific, actionable steps to diagnose and fix the issue.
+           Reference concrete things to check (prompts, context windows, temperature settings).
 
         IMPORTANT RULES:
         - You only explain what the analysis detected. You do NOT re-analyze.
-        - If grounded=False, use hedged language: "may indicate", "suggests", "possible".
+        - If grounded=False, use hedged language throughout: "may indicate", "suggests", "could mean".
         - If grounded=True, you may use confident language.
-        - Be specific: mention the rule ID, agent name, and failure category.
-        - Keep the summary under 80 words.
-        - Keep the suggested_fix under 40 words.
+        - Be specific: always mention the rule ID, the exact evidence numbers, and the agent name.
+        - Write for a senior ML engineer who wants actionable insight, not a general audience.
+        - Do NOT add bullet points or headers inside the summary — write in flowing prose.
     """)
 
     def __init__(self) -> None:
@@ -120,8 +133,8 @@ class LLMExplainer:
             )
         return ChatGroq(
             model=get("llm", "model"),
-            temperature=0.0,          # deterministic output
-            max_tokens=512,           # explanations are short
+            temperature=0.0,
+            max_tokens=1024,
             api_key=api_key,
         )
 
