@@ -32,11 +32,16 @@ def inject_css():
 
 
 def _logo_html() -> str:
-    return f"""
-    <div style="width:30px;height:30px;background:linear-gradient(135deg,{PURPLE},{CYAN});
-                border-radius:7px;display:flex;align-items:center;justify-content:center;
+    return """
+    <img src="/assets/logo.png"
+         style="width:30px;height:30px;border-radius:7px;object-fit:cover;flex-shrink:0;"
+         alt="AgentLens logo"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+    <div style="display:none;width:30px;height:30px;
+                background:linear-gradient(135deg,#8b5cf6,#06b6d4);
+                border-radius:7px;align-items:center;justify-content:center;
                 font-weight:700;font-size:12px;color:#fff;flex-shrink:0;">AL</div>
-    <span style="font-size:15px;font-weight:700;color:{TEXT};">AgentLens</span>
+    <span style="font-size:15px;font-weight:700;color:#e2e8f0;">AgentLens</span>
     """
 
 
@@ -827,20 +832,25 @@ def explain_page(run_id: str):
         </div>
         """)
 
-        # Pipeline flow banner
-        days = [("Day 9","Evidence",CYAN), ("Day 10","Info Loss",AMBER),
-                ("Day 12","Arbiter",PURPLE), ("Day 13","Explain",GREEN)]
+        # Pipeline analysis flow banner — descriptive steps, no day labels
+        steps = [
+            ("Evidence",   "Extract sources & entities from each agent's output",  CYAN),
+            ("Info Loss",  "Compare researcher → writer handoff for dropped facts", AMBER),
+            ("Arbiter",    "Score evidence, assign priority (P2/P5), root cause",   PURPLE),
+            ("Explain",    "LLM generates actionable root-cause explanation",        GREEN),
+        ]
         with ui.element("div").style("display:flex;align-items:center;gap:0;margin-bottom:24px;flex-wrap:wrap;"):
-            for i, (day, lbl, col) in enumerate(days):
+            for i, (lbl, desc, col) in enumerate(steps):
                 ui.html(f"""
                 <div style="background:{col}18;border:1px solid {col}44;border-radius:8px;
-                            padding:9px 16px;text-align:center;min-width:100px;">
-                  <div style="font-size:9px;font-weight:600;color:{col};letter-spacing:1px;">{day}</div>
-                  <div style="font-size:12px;font-weight:500;color:{TEXT};margin-top:2px;">{lbl}</div>
+                            padding:10px 16px;text-align:center;min-width:120px;max-width:180px;"
+                     title="{desc}">
+                  <div style="font-size:12px;font-weight:700;color:{col};">{lbl}</div>
+                  <div style="font-size:10px;color:{TEXT_MUTED};margin-top:4px;line-height:1.4;">{desc}</div>
                 </div>
                 """)
-                if i < len(days) - 1:
-                    ui.html(f'<span style="color:{TEXT_DIM};font-size:16px;padding:0 6px;">→</span>')
+                if i < len(steps) - 1:
+                    ui.html(f'<span style="color:{TEXT_DIM};font-size:16px;padding:0 6px;flex-shrink:0;">→</span>')
 
         content = ui.element("div")
         spinner = ui.element("div")
@@ -980,11 +990,16 @@ def _render_explanation(bundle, analysis):
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ in {"__main__", "__mp_main__"}:
+    import os
+    # Serve dashboard/assets/ at /assets so logo.png is reachable
+    assets_dir = os.path.join(os.path.dirname(__file__), "assets")
+    app.add_static_files("/assets", assets_dir)
+
     ui.run(
         title="AgentLens",
         host="127.0.0.1",
         port=8080,
         reload=False,
         dark=True,
-        favicon="🔬",
+        favicon=os.path.join(assets_dir, "logo.png") if os.path.exists(os.path.join(assets_dir, "logo.png")) else "🔬",
     )
