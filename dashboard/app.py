@@ -205,10 +205,11 @@ def _run_row(r: state.RunRow, cols: str):
               <div class="al-mono" style="font-size:10px;color:{TEXT_MUTED};margin-top:3px;">{r.run_id}</div>
             </div>
             """)
+        # Keep references so we can update after on-demand analysis
         with ui.element("div").classes("al-tcell"):
-            ui.html(f'<div style="font-size:13px;line-height:1.5;">{cause_disp}</div>')
+            cause_el = ui.html(f'<div style="font-size:13px;line-height:1.5;">{cause_disp}</div>')
         with ui.element("div").classes("al-tcell"):
-            ui.html(verdict_disp)
+            verdict_el = ui.html(verdict_disp)
         with ui.element("div").classes("al-tcell"):
             ui.html(f'<span style="font-size:13px;">{fmt_ms(r.latency_ms)}</span>')
 
@@ -220,7 +221,7 @@ def _run_row(r: state.RunRow, cols: str):
         if bundle:
             _inline_verdict_panel(bundle, loss, r.run_id)
         else:
-            _inline_analyze_panel(r.run_id, expansion, row_el, cols)
+            _inline_analyze_panel(r.run_id, expansion, row_el, cols, cause_el, verdict_el)
 
     # Click row → toggle expansion
     row_el.on("click", lambda e, exp=expansion: exp.set_visibility(not exp.visible))
@@ -296,7 +297,7 @@ def _inline_verdict_panel(bundle, loss, run_id: str):
             )
 
 
-def _inline_analyze_panel(run_id: str, expansion, row_el, cols: str):
+def _inline_analyze_panel(run_id: str, expansion, row_el, cols: str, cause_el=None, verdict_el=None):
     content_area = ui.element("div")
 
     async def analyze():
@@ -314,6 +315,31 @@ def _inline_analyze_panel(run_id: str, expansion, row_el, cols: str):
                 ui.html(f'<span style="color:{RED};">{result.error or "Analysis failed"}</span>')
             else:
                 _inline_verdict_panel(result.bundle, result.loss_result, run_id)
+
+                # ── Update the row cells so the table reflects the verdict ──
+                bundle = result.bundle
+                loss   = result.loss_result
+                verdict = loss.verdict if loss else ("PASS" if bundle.priority_level.value == "P5" else "UNKNOWN")
+
+                # Update cause cell
+                if cause_el is not None:
+                    cause_str = bundle.primary_cause.value
+                    agent_str = bundle.primary_agent or ""
+                    new_cause = (
+                        f'{cause_str.capitalize()} {"in handoff" if "workflow" in cause_str else ""}'
+                        f'<br><span style="font-size:11px;color:{TEXT_MUTED};font-family:monospace;">({agent_str})</span>'
+                    )
+                    cause_el.set_content(f'<div style="font-size:13px;line-height:1.5;">{new_cause}</div>')
+
+                # Update verdict cell
+                if verdict_el is not None:
+                    verdict_el.set_content(verdict_badge(verdict, bundle.grounded))
+
+                # Update row background tint
+                new_bg = row_bg(verdict)
+                row_el.style(
+                    f"background:{new_bg};grid-template-columns:{cols};"
+                )
 
     with content_area:
         ui.button("▶  Analyze this run", on_click=analyze).style(
