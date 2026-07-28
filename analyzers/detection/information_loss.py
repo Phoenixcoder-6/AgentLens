@@ -22,12 +22,10 @@ Design:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from analyzers.evidence_extraction.extractor import ExtractedEvidence
 from schema.models import SCHEMA_VERSION
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Result model
@@ -57,8 +55,8 @@ class InformationLossResult:
     rule_category: str = "workflow"
 
     # Per-field diffs
-    source_diff: Optional[FieldDiff] = None
-    entity_diff: Optional[FieldDiff] = None
+    source_diff: FieldDiff | None = None
+    entity_diff: FieldDiff | None = None
 
     # Overall verdict
     verdict: str = "PASS"          # "PASS" | "WARNING" | "FAIL"
@@ -69,10 +67,10 @@ class InformationLossResult:
     has_information_loss: bool = False
     has_information_gain: bool = False
     rule_failed: bool = False
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
 
 

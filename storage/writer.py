@@ -14,13 +14,10 @@ analysis table is left empty here — it will be populated by future analyzers
 
 from __future__ import annotations
 
-import json
-from datetime import timezone
-from typing import Optional
+from datetime import UTC
 
-from schema.models import SCHEMA_VERSION
 from normalizer.normalizer import NormalizedRun, NormalizedStep
-from normalizer.serializer import to_serializable
+from schema.models import SCHEMA_VERSION
 from storage.db import DatabaseManager
 
 
@@ -41,8 +38,8 @@ class StorageWriter:
     def write_run(
         self,
         run: NormalizedRun,
-        trace_json: Optional[str] = None,
-        trace_path: Optional[str] = None,
+        trace_json: str | None = None,
+        trace_path: str | None = None,
     ) -> None:
         """
         Write a complete NormalizedRun to the database.
@@ -139,6 +136,6 @@ def _iso(value) -> str:
     """Convert any timestamp to ISO string, ensuring UTC-aware."""
     if hasattr(value, "isoformat"):
         if hasattr(value, "tzinfo") and value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
+            value = value.replace(tzinfo=UTC)
         return value.isoformat()
     return str(value)

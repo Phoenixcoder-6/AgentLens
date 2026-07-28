@@ -45,8 +45,7 @@ P1 → Day 17 | P3 → Day 18a | P4 → Day 27
 
 from __future__ import annotations
 
-from typing import Optional
-
+from analyzers.detection.information_loss import InformationLossResult
 from schema.models import (
     AnalysisBundle,
     EvidenceRecord,
@@ -55,10 +54,7 @@ from schema.models import (
     PriorityLevel,
     RuleMatch,
     RuleSeverity,
-    SCHEMA_VERSION,
 )
-from analyzers.detection.information_loss import InformationLossResult
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Priority resolution helpers (locked — no changes after Day 3)
@@ -105,7 +101,7 @@ def _tiebreak_key(evidence: EvidenceRecord) -> str:
 # Evidence conversion helper
 # ─────────────────────────────────────────────────────────────────────────────
 
-def evidence_from_information_loss(result: InformationLossResult) -> Optional[EvidenceRecord]:
+def evidence_from_information_loss(result: InformationLossResult) -> EvidenceRecord | None:
     """
     Convert an InformationLossResult (Day 10) into an EvidenceRecord for the Arbiter.
 
@@ -120,20 +116,28 @@ def evidence_from_information_loss(result: InformationLossResult) -> Optional[Ev
     if result.verdict == "FAIL":
         category = FailureCategory.WORKFLOW
         severity = RuleSeverity.HIGH
+        src_r = result.source_diff.researcher_value if result.source_diff else "N/A"
+        src_w = result.source_diff.writer_value if result.source_diff else "N/A"
+        ent_r = result.entity_diff.researcher_value if result.entity_diff else "N/A"
+        ent_w = result.entity_diff.writer_value if result.entity_diff else "N/A"
         description = (
             f"Information loss detected: sources or entities were dropped "
             f"in the Researcher → Writer handoff. "
-            f"source: {result.source_diff.researcher_value}→{result.source_diff.writer_value}, "
-            f"entity: {result.entity_diff.researcher_value}→{result.entity_diff.writer_value}"
+            f"source: {src_r}→{src_w}, "
+            f"entity: {ent_r}→{ent_w}"
         )
     else:  # WARNING
         category = FailureCategory.REASONING
         severity = RuleSeverity.MEDIUM
+        src_r = result.source_diff.researcher_value if result.source_diff else "N/A"
+        src_w = result.source_diff.writer_value if result.source_diff else "N/A"
+        ent_r = result.entity_diff.researcher_value if result.entity_diff else "N/A"
+        ent_w = result.entity_diff.writer_value if result.entity_diff else "N/A"
         description = (
             f"Information gain detected: Writer introduced sources or entities "
             f"not present in research findings (hallucination risk). "
-            f"source: {result.source_diff.researcher_value}→{result.source_diff.writer_value}, "
-            f"entity: {result.entity_diff.researcher_value}→{result.entity_diff.writer_value}"
+            f"source: {src_r}→{src_w}, "
+            f"entity: {ent_r}→{ent_w}"
         )
 
     rule = RuleMatch(
@@ -305,7 +309,7 @@ def _make_bundle(
     priority: PriorityLevel,
     grounded: bool,
     evidence: list[EvidenceRecord],
-    primary_agent: Optional[str],
+    primary_agent: str | None,
     verdict_reason: str,
 ) -> AnalysisBundle:
     """Build a complete AnalysisBundle with all fields populated."""

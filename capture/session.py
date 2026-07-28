@@ -1,18 +1,17 @@
 import os
 import uuid
-import json
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
-from schema.models import RunTrace, AgentStep, StepStatus
+from schema.models import AgentStep, RunTrace, StepStatus
+
 
 class CaptureSession:
     """
     Manages the active RunTrace for the current pipeline run.
     Acts as a singleton to collect AgentSteps during execution.
     """
-    _current_trace: Optional[RunTrace] = None
-    _pending_tokens: Optional[tuple] = None  # (prompt, completion) set by node, read by tracer
+    _current_trace: RunTrace | None = None
+    _pending_tokens: tuple | None = None  # (prompt, completion) set by node, read by tracer
 
     @classmethod
     def set_step_tokens(cls, prompt: int, completion: int) -> None:
@@ -33,7 +32,7 @@ class CaptureSession:
         cls._pending_tokens = (prompt, completion)
 
     @classmethod
-    def consume_pending_tokens(cls) -> Optional[tuple]:
+    def consume_pending_tokens(cls) -> tuple | None:
         """
         Read and clear the pending token slot.
         Called by @trace_step after the node function returns.
@@ -42,37 +41,37 @@ class CaptureSession:
         tokens = cls._pending_tokens
         cls._pending_tokens = None
         return tokens
-    
+
     @classmethod
-    def start_trace(cls, workflow: str, run_id: Optional[str] = None) -> RunTrace:
+    def start_trace(cls, workflow: str, run_id: str | None = None) -> RunTrace:
         cls._current_trace = RunTrace(
             run_id=run_id or f"run_{uuid.uuid4().hex[:8]}",
             workflow=workflow,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             status=StepStatus.SUCCESS
         )
         return cls._current_trace
-        
+
     @classmethod
-    def get_current_trace(cls) -> Optional[RunTrace]:
+    def get_current_trace(cls) -> RunTrace | None:
         return cls._current_trace
-        
+
     @classmethod
     def add_step(cls, step: AgentStep):
         if cls._current_trace:
             cls._current_trace.steps.append(step)
 
 
-    
+
     @classmethod
-    def end_trace(cls, status: StepStatus = StepStatus.SUCCESS, error: Optional[str] = None) -> Optional[RunTrace]:
+    def end_trace(cls, status: StepStatus = StepStatus.SUCCESS, error: str | None = None) -> RunTrace | None:
         if not cls._current_trace:
             return None
-            
+
         trace = cls._current_trace
         if status != StepStatus.SUCCESS:
             trace.status = status
-            
+
         # Calculate aggregate metrics
         total_latency = 0.0
         total_tokens = 0
@@ -83,16 +82,16 @@ class CaptureSession:
                 trace.status = step.status
                 if step.error and not error:
                     error = step.error
-                    
+
         trace.total_latency_ms = total_latency
         trace.total_tokens = total_tokens
-        
+
         # 1. Save full JSON trace to disk
         cls._save_trace_to_disk(trace)
-        
+
         # 2. Normalize and persist to SQLite
         cls._save_trace_to_db(trace)
-        
+
         cls._current_trace = None
         return trace
 
@@ -100,9 +99,9 @@ class CaptureSession:
     def _save_trace_to_disk(cls, trace: RunTrace):
         traces_dir = "data/traces"
         os.makedirs(traces_dir, exist_ok=True)
-        
+
         trace.trace_path = f"{traces_dir}/{trace.run_id}.json"
-        
+
         with open(trace.trace_path, "w", encoding="utf-8") as f:
             f.write(trace.model_dump_json(indent=2))
 
@@ -120,9 +119,9 @@ class CaptureSession:
             normalized = Normalizer().normalize_run(trace)
 
             # Read the JSON blob we just saved to disk
-            trace_json: Optional[str] = None
+            trace_json: str | None = None
             if trace.trace_path and os.path.exists(trace.trace_path):
-                with open(trace.trace_path, "r", encoding="utf-8") as f:
+                with open(trace.trace_path, encoding="utf-8") as f:
                     trace_json = f.read()
 
             writer = StorageWriter(db)

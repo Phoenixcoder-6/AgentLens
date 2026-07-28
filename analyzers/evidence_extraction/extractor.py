@@ -24,16 +24,14 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Optional
 
-from pydantic import BaseModel, Field
-from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_groq import ChatGroq
+from pydantic import BaseModel, Field
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 from config.config_loader import get
 from schema.models import SCHEMA_VERSION
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ExtractedEvidence — the schema the LLM must return
@@ -68,7 +66,7 @@ class ExtractedEvidence(BaseModel):
         default=False,
         description="True if extraction fell back to defaults due to LLM error"
     )
-    error_message: Optional[str] = Field(
+    error_message: str | None = Field(
         default=None,
         description="Error details if extraction_failed is True"
     )
@@ -86,7 +84,7 @@ Return ONLY the structured fields — no explanation, no extra text.
 Rules:
 - source_count: count distinct sources, citations, books, reports, or URLs explicitly listed
 - entity_count: count distinct named entities (people, organizations, cities, technologies, programs)
-- tool_calls: list the name of any tool explicitly called (e.g. "web_search", "calculator"). 
+- tool_calls: list the name of any tool explicitly called (e.g. "web_search", "calculator").
   If no tools were called, return an empty list [].
 
 Be precise. Count carefully. When in doubt, undercount rather than overcount."""

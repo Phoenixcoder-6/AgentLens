@@ -1,0 +1,119 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "agentlens"
+version = "0.15.0"
+description = "Multi-Agent Failure Attribution, Trace Diffing & Explainability Platform"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+dependencies = [
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-groq>=0.2.0",
+    "nicegui>=1.4.0",
+    "pydantic>=2.7.0",
+    "pyyaml>=6.0.1",
+    "python-dotenv>=1.0.0",
+    "numpy>=1.26.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+    "pre-commit>=3.7.0",
+]
+
+[project.scripts]
+agentlens = "app.main:main"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Ruff — linting & formatting
+# ─────────────────────────────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = [
+    ".venv", ".git", "__pycache__",
+    "_patch_*.py", "_diag_*.py", "check_*.py",  # scratch scripts
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long — handled by formatter
+    "B008",  # function calls in default args (NiceGUI pattern)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "F841"]
+"scripts/*" = ["T201"]  # allow print() in scripts
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mypy — type checking
+# ─────────────────────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.12"  # numpy stubs use `type` keyword (PEP 695, requires 3.12)
+strict = false
+ignore_missing_imports = true
+exclude = [
+    "\\.venv",
+    "_patch_.*\\.py",
+    "_diag_.*\\.py",
+    "check_.*\\.py",
+]
+
+# Silence errors in third-party stubs we don't control
+[[tool.mypy.overrides]]
+module = [
+    "numpy.*",
+    "langchain.*",
+    "langchain_groq.*",
+    "langchain_core.*",
+    "langgraph.*",
+    "nicegui.*",
+    "sentence_transformers.*",
+]
+ignore_errors = true
+ignore_missing_imports = true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Pytest
+# ─────────────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+addopts = [
+    "--tb=short",
+    "--strict-markers",
+    "-q",
+]
+
+[tool.coverage.run]
+source = ["analyzers", "storage", "normalizer", "capture"]
+omit = ["tests/*", "scripts/*", "_patch_*.py", "check_*.py", ".venv/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+show_missing = true

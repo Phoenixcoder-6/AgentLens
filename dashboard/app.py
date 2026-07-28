@@ -9,18 +9,38 @@ Run: python -m dashboard.app
 from __future__ import annotations
 
 import json
-import asyncio
-from nicegui import ui, app, run
+
+from nicegui import app, run, ui
 
 import dashboard.state as state
 from dashboard.theme import (
-    GLOBAL_CSS, BG, BG_SIDEBAR, CARD, BORDER, TEXT, TEXT_MUTED, TEXT_DIM,
-    PURPLE, CYAN, GREEN, AMBER, RED, GRAY,
-    VERDICT_COLOR, PRIORITY_COLOR, CAUSE_COLOR, STEP_COLOR,
-    badge, verdict_badge, priority_badge, cause_badge, rule_badge,
-    row_bg, fmt_ms, bar_html,
+    AMBER,
+    BG,
+    BG_SIDEBAR,
+    BORDER,
+    CARD,
+    CAUSE_COLOR,
+    CYAN,
+    GLOBAL_CSS,
+    GRAY,
+    GREEN,
+    PRIORITY_COLOR,
+    PURPLE,
+    RED,
+    STEP_COLOR,
+    TEXT,
+    TEXT_DIM,
+    TEXT_MUTED,
+    VERDICT_COLOR,
+    badge,
+    bar_html,
+    cause_badge,
+    fmt_ms,
+    priority_badge,
+    row_bg,
+    rule_badge,
+    verdict_badge,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared layout helpers
@@ -86,7 +106,7 @@ def nav_bar(active: str, run_id: str = ""):
         tabs_html += f'<a href="{href}" class="{cls}">{icon} {label}</a>'
 
     if run_tabs:
-        tabs_html += f'<div class="al-nav-divider"></div>'
+        tabs_html += '<div class="al-nav-divider"></div>'
         tabs_html += f'<span style="font-size:10px;color:{TEXT_DIM};padding:0 6px;font-family:monospace;">{run_id[:14]}…</span>'
         for icon, label, key, href in run_tabs:
             cls = "al-nav-tab active" if active == key else "al-nav-tab"
@@ -109,10 +129,10 @@ def runs_page():
         runs = state.list_runs(limit=50)
 
         # ── Filter bar ────────────────────────────────────────────────────────
-        with ui.element("div").style(f"display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;"):
-            ui.html(f'<div class="al-section">Run Explorer</div>')
+        with ui.element("div").style("display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;"):
+            ui.html('<div class="al-section">Run Explorer</div>')
             # (filters are cosmetic for MVP; full filtering = Day 22)
-            ui.html(f"""
+            ui.html("""
             <div style="display:flex;gap:8px;">
               <select class="al-select"><option>All agents</option><option>researcher</option><option>writer</option><option>verifier</option></select>
               <select class="al-select"><option>All time</option><option>Last 7 days</option><option>Last 30 days</option></select>
@@ -378,9 +398,9 @@ def trace_page(run_id: str):
             return
 
         max_lat = max((s.latency_ms for s in steps_db), default=1)
-        max_tok = max((s.tokens_total for s in steps_db), default=1)
+        _ = max((s.tokens_total for s in steps_db), default=1)  # reserved for token chart
 
-        ui.html(f'<div class="al-section" style="margin-bottom:16px;">Step-by-step pipeline execution</div>')
+        ui.html('<div class="al-section" style="margin-bottom:16px;">Step-by-step pipeline execution</div>')
 
         # ── Node flow ─────────────────────────────────────────────────────────
         with ui.element("div").style("display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding-bottom:8px;"):
@@ -408,7 +428,7 @@ def trace_page(run_id: str):
                       {s.tokens_total:,} tokens
                     </div>
                     """)
-                    bar_el = ui.html(bar_html(s.latency_ms, max_lat, color))
+                    ui.html(bar_html(s.latency_ms, max_lat, color))
                     ui.html(f"""
                     <div style="font-size:10px;color:{TEXT_MUTED};margin-top:6px;display:flex;gap:8px;">
                       <span>↑ {s.tokens_prompt:,}</span>
@@ -424,8 +444,10 @@ def trace_page(run_id: str):
                         tabs_data = {}
                         handoff = t_data.get("handoff", {})
                         if isinstance(handoff, str):
-                            try: handoff = json.loads(handoff)
-                            except: handoff = {}
+                            try:
+                                handoff = json.loads(handoff)
+                            except Exception:
+                                handoff = {}
 
                         tabs_data["Input"]    = handoff.get("input_state", {})
                         tabs_data["Filtered"] = handoff.get("filtered_state", {})
@@ -450,7 +472,7 @@ def trace_page(run_id: str):
                     ui.html(f'<div style="font-size:22px;color:{TEXT_DIM};padding:20px 8px;flex-shrink:0;">→</div>')
 
         # ── Summary card ──────────────────────────────────────────────────────
-        ui.html(f'<div class="al-section" style="margin:24px 0 12px;">Run Summary</div>')
+        ui.html('<div class="al-section" style="margin:24px 0 12px;">Run Summary</div>')
         total_lat = sum(s.latency_ms for s in steps_db)
         total_tok = sum(s.tokens_total for s in steps_db)
         with ui.element("div").style(
@@ -628,7 +650,7 @@ def evidence_page(run_id: str):
                             _mk_btn()
                 # ── Section: Information Loss Detail ──────────────────────────
                 if loss:
-                    ui.html(f'<div class="al-section" style="margin-bottom:12px;">Information Loss Delta (Researcher → Writer)</div>')
+                    ui.html('<div class="al-section" style="margin-bottom:12px;">Information Loss Delta (Researcher → Writer)</div>')
                     v_col = VERDICT_COLOR.get(loss.verdict, GRAY)
                     with ui.element("div").style(
                         f"background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:16px 20px;margin-bottom:20px;"
@@ -674,7 +696,7 @@ def diff_page():
     nav_bar("diff")
 
     with ui.element("div").classes("al-content"):
-        ui.html(f'<div class="al-section" style="margin-bottom:16px;">Diff Viewer — compare two runs</div>')
+        ui.html('<div class="al-section" style="margin-bottom:16px;">Diff Viewer — compare two runs</div>')
 
         runs    = state.list_runs(limit=50)
         run_ids = [r.run_id for r in runs]
@@ -777,7 +799,7 @@ def metrics_page():
     nav_bar("metrics")
 
     with ui.element("div").classes("al-content"):
-        ui.html(f'<div class="al-section" style="margin-bottom:16px;">Aggregate Metrics — no LLM, pure DB reads</div>')
+        ui.html('<div class="al-section" style="margin-bottom:16px;">Aggregate Metrics — no LLM, pure DB reads</div>')
 
         data = state.get_metrics_data()
         if not data:
@@ -785,7 +807,7 @@ def metrics_page():
             return
 
         agents = list(data.keys())
-        colors = [STEP_COLOR.get(ag, GRAY) for ag in agents]
+        # colors reserved for future chart coloring: [STEP_COLOR.get(ag, GRAY) for ag in agents]
 
         # ── Stat cards ────────────────────────────────────────────────────────
         with ui.element("div").style("display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;"):
@@ -801,8 +823,8 @@ def metrics_page():
                 """)
 
         # ── Latency bar chart ─────────────────────────────────────────────────
-        ui.html(f'<div class="al-section" style="margin-bottom:12px;">Avg Latency per Agent</div>')
-        lat_chart = ui.echart({
+        ui.html('<div class="al-section" style="margin-bottom:12px;">Avg Latency per Agent</div>')
+        ui.echart({
             "backgroundColor": "transparent",
             "tooltip": {"trigger": "axis", "backgroundColor": CARD, "borderColor": BORDER, "textStyle": {"color": TEXT}},
             "xAxis": {"type": "category", "data": agents, "axisLabel": {"color": TEXT_MUTED},
@@ -819,7 +841,7 @@ def metrics_page():
         }).style(f"height:260px;background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:12px;margin-bottom:16px;")
 
         # ── Token usage chart ─────────────────────────────────────────────────
-        ui.html(f'<div class="al-section" style="margin-bottom:12px;">Total Tokens per Agent</div>')
+        ui.html('<div class="al-section" style="margin-bottom:12px;">Total Tokens per Agent</div>')
         ui.echart({
             "backgroundColor": "transparent",
             "tooltip": {"trigger": "axis", "backgroundColor": CARD, "borderColor": BORDER, "textStyle": {"color": TEXT}},
@@ -908,8 +930,8 @@ def explain_page(run_id: str):
 
 
 def _render_explanation(bundle, analysis):
-    p_col = PRIORITY_COLOR.get(bundle.priority_level.value, GRAY)
-    c_col = CAUSE_COLOR.get(bundle.primary_cause.value, GRAY)
+    # p_col / c_col reserved for future per-cause color coding
+    _ = (PRIORITY_COLOR.get(bundle.priority_level.value, GRAY), CAUSE_COLOR.get(bundle.primary_cause.value, GRAY))
     verdict = (analysis.loss_result.verdict if analysis.loss_result else "UNKNOWN")
     conf    = f"{analysis.loss_result.confidence:.0%}" if analysis.loss_result else "—"
 

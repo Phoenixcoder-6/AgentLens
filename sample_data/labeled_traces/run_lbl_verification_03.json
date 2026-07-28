@@ -1,0 +1,185 @@
+{
+  "schema_version": "1.0",
+  "run_id": "run_lbl_verification_03",
+  "workflow": "research_report_pipeline",
+  "timestamp": "2026-07-27T19:11:50.387477+00:00",
+  "steps": [
+    {
+      "schema_version": "1.0",
+      "run_id": "run_lbl_verification_03",
+      "step": 1,
+      "agent": "researcher",
+      "node_type": "llm",
+      "input": "{\"topic\": \"Future of autonomous vehicles\", \"research_findings\": \"\", \"source_count\": 0, \"entity_count\": 0, \"written_report\": \"\", \"verification_result\": \"\", \"verified\": false, \"revision_notes\": \"\"}",
+      "output": "{\"source_count\": 7, \"entity_count\": 10, \"research_findings\": \"SOURCES:\\n- Source 1 on Future of autonomous vehicles\\n- Source 2 on Future of autonomous vehicles\\n- Source 3 on Future of autonomous vehicles\\n- Source 4 on Future of autonomous vehicles\\n- Source 5 on Future of autonomous vehicles\\n- Source 6 on Future of autonomous vehicles\\n- Source 7 on Future of autonomous vehicles\\n\\nENTITIES:\\n- Entity_1\\n- Entity_2\\n- Entity_3\\n- Entity_4\\n- Entity_5\\n- Entity_6\\n- Entity_7\\n- Entity_8\\n- Entity_9\\n- Entity_10\\n\\nKEY FINDINGS:\\nResearch findings for Future of autonomous vehicles.\"}",
+      "expected_output": null,
+      "prompt": "added=['source_count', 'entity_count', 'research_findings']",
+      "system_prompt": "",
+      "model": "llama3-8b-8192",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 1200.0,
+      "tokens": {
+        "prompt": 200,
+        "completion": 400,
+        "total": 600
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "Future of autonomous vehicles",
+          "research_findings": "",
+          "source_count": 0,
+          "entity_count": 0,
+          "written_report": "",
+          "verification_result": "",
+          "verified": false,
+          "revision_notes": ""
+        },
+        "filtered_state": {
+          "source_count": 7,
+          "entity_count": 10,
+          "research_findings": "SOURCES:\n- Source 1 on Future of autonomous vehicles\n- Source 2 on Future of autonomous vehicles\n- Source 3 on Future of autonomous vehicles\n- Source 4 on Future of autonomous vehicles\n- Source 5 on Future of autonomous vehicles\n- Source 6 on Future of autonomous vehicles\n- Source 7 on Future of autonomous vehicles\n\nENTITIES:\n- Entity_1\n- Entity_2\n- Entity_3\n- Entity_4\n- Entity_5\n- Entity_6\n- Entity_7\n- Entity_8\n- Entity_9\n- Entity_10\n\nKEY FINDINGS:\nResearch findings for Future of autonomous vehicles."
+        },
+        "output_state": {
+          "topic": "Future of autonomous vehicles",
+          "research_findings": "SOURCES:\n- Source 1 on Future of autonomous vehicles\n- Source 2 on Future of autonomous vehicles\n- Source 3 on Future of autonomous vehicles\n- Source 4 on Future of autonomous vehicles\n- Source 5 on Future of autonomous vehicles\n- Source 6 on Future of autonomous vehicles\n- Source 7 on Future of autonomous vehicles\n\nENTITIES:\n- Entity_1\n- Entity_2\n- Entity_3\n- Entity_4\n- Entity_5\n- Entity_6\n- Entity_7\n- Entity_8\n- Entity_9\n- Entity_10\n\nKEY FINDINGS:\nResearch findings for Future of autonomous vehicles.",
+          "source_count": 7,
+          "entity_count": 10,
+          "written_report": "",
+          "verification_result": "",
+          "verified": false,
+          "revision_notes": ""
+        }
+      },
+      "parent_step": null,
+      "child_step": 2,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-07-27T19:11:50.387477+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "run_lbl_verification_03",
+      "step": 2,
+      "agent": "writer",
+      "node_type": "llm",
+      "input": "{\"topic\": \"Future of autonomous vehicles\", \"research_findings\": \"\", \"source_count\": 0, \"entity_count\": 0, \"written_report\": \"\", \"verification_result\": \"\", \"verified\": false, \"revision_notes\": \"\"}",
+      "output": "{\"source_count\": 12, \"entity_count\": 25, \"written_report\": \"**Report on Future of autonomous vehicles**\\n\\nBased on 12 sources and 25 entities, this report covers the key aspects of Future of autonomous vehicles.\\n\\n**Conclusion**: The analysis shows significant findings about Future of autonomous vehicles.\"}",
+      "expected_output": null,
+      "prompt": "added=['source_count', 'entity_count', 'written_report']",
+      "system_prompt": "",
+      "model": "llama3-8b-8192",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 2000.0,
+      "tokens": {
+        "prompt": 200,
+        "completion": 400,
+        "total": 600
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "Future of autonomous vehicles",
+          "research_findings": "",
+          "source_count": 0,
+          "entity_count": 0,
+          "written_report": "",
+          "verification_result": "",
+          "verified": false,
+          "revision_notes": ""
+        },
+        "filtered_state": {
+          "source_count": 12,
+          "entity_count": 25,
+          "written_report": "**Report on Future of autonomous vehicles**\n\nBased on 12 sources and 25 entities, this report covers the key aspects of Future of autonomous vehicles.\n\n**Conclusion**: The analysis shows significant findings about Future of autonomous vehicles."
+        },
+        "output_state": {
+          "topic": "Future of autonomous vehicles",
+          "research_findings": "",
+          "source_count": 12,
+          "entity_count": 25,
+          "written_report": "**Report on Future of autonomous vehicles**\n\nBased on 12 sources and 25 entities, this report covers the key aspects of Future of autonomous vehicles.\n\n**Conclusion**: The analysis shows significant findings about Future of autonomous vehicles.",
+          "verification_result": "",
+          "verified": false,
+          "revision_notes": ""
+        }
+      },
+      "parent_step": 1,
+      "child_step": 3,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-07-27T19:11:50.387477+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "run_lbl_verification_03",
+      "step": 3,
+      "agent": "verifier",
+      "node_type": "llm",
+      "input": "{\"topic\": \"Future of autonomous vehicles\", \"research_findings\": \"\", \"source_count\": 0, \"entity_count\": 0, \"written_report\": \"\", \"verification_result\": \"APPROVED\", \"verified\": true, \"revision_notes\": \"\"}",
+      "output": "{\"source_count\": 12, \"entity_count\": 25, \"verification_result\": \"APPROVED\", \"verified\": true}",
+      "expected_output": null,
+      "prompt": "added=['source_count', 'entity_count', 'verification_result', 'verified']",
+      "system_prompt": "",
+      "model": "llama3-8b-8192",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 800.0,
+      "tokens": {
+        "prompt": 200,
+        "completion": 400,
+        "total": 600
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "Future of autonomous vehicles",
+          "research_findings": "",
+          "source_count": 0,
+          "entity_count": 0,
+          "written_report": "",
+          "verification_result": "APPROVED",
+          "verified": true,
+          "revision_notes": ""
+        },
+        "filtered_state": {
+          "source_count": 12,
+          "entity_count": 25,
+          "verification_result": "APPROVED",
+          "verified": true
+        },
+        "output_state": {
+          "topic": "Future of autonomous vehicles",
+          "research_findings": "",
+          "source_count": 12,
+          "entity_count": 25,
+          "written_report": "",
+          "verification_result": "APPROVED",
+          "verified": true,
+          "revision_notes": ""
+        }
+      },
+      "parent_step": 2,
+      "child_step": 4,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-07-27T19:11:50.387477+00:00"
+    }
+  ],
+  "total_latency_ms": 4000.0,
+  "total_tokens": 1800
+}

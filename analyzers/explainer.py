@@ -40,15 +40,15 @@ from __future__ import annotations
 
 import os
 import textwrap
-from typing import Optional
+from typing import cast
 
 from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
-from langchain_core.messages import SystemMessage, HumanMessage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
-from schema.models import AnalysisBundle, SCHEMA_VERSION
 from config.config_loader import get
+from schema.models import AnalysisBundle
 
 load_dotenv()
 
@@ -128,14 +128,14 @@ class LLMExplainer:
     def _build_llm(self) -> ChatGroq:
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
-            raise EnvironmentError(
+            raise OSError(
                 "GROQ_API_KEY not found. Copy .env.example to .env and set your key."
             )
         return ChatGroq(
             model=get("llm", "model"),
             temperature=0.0,
             max_tokens=1024,
-            api_key=api_key,
+            api_key=SecretStr(api_key),
         )
 
     def explain(self, bundle: AnalysisBundle) -> AnalysisBundle:
@@ -153,13 +153,13 @@ class LLMExplainer:
         prompt = self._build_prompt(bundle)
         try:
             structured_llm = self._llm.with_structured_output(ExplanationOutput)
-            result: ExplanationOutput = structured_llm.invoke([
+            result = cast(ExplanationOutput, structured_llm.invoke([
                 SystemMessage(content=self.SYSTEM_PROMPT),
                 HumanMessage(content=prompt),
-            ])
+            ]))
             bundle.summary       = result.summary
             bundle.suggested_fix = result.suggested_fix
-        except Exception as exc:
+        except Exception:
             # Never crash the pipeline — fall back to rule-based explanation
             bundle.summary       = self._fallback_summary(bundle)
             bundle.suggested_fix = self._fallback_fix(bundle)
@@ -247,7 +247,7 @@ class LLMExplainer:
             "reasoning":     f"Review {agent}'s output for hallucinated facts not present in the research.",
             "workflow":      f"Check the handoff from the previous agent to {agent} for dropped context.",
             "execution":     f"Investigate {agent} for tool errors, timeouts, or missing outputs.",
-            "verification":  f"Review the verifier's approval criteria — it may have passed a flawed output.",
+            "verification":  "Review the verifier's approval criteria — it may have passed a flawed output.",
             "unknown":       "Inspect the pipeline trace manually — no specific rule matched.",
         }
         return fixes.get(cause, "Inspect the pipeline trace for anomalies.")

@@ -20,14 +20,13 @@ Output: MetricsReport — structured per-step and run-level metrics.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
+from config.config_loader import get
 from schema.models import SCHEMA_VERSION
 from storage.db import DatabaseManager
-from config.config_loader import get
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data models
@@ -79,15 +78,15 @@ class RunMetrics:
     agent_latency: dict[str, float] = field(default_factory=dict)
 
     # Slowest and fastest steps
-    slowest_step: Optional[str] = None   # agent name
-    fastest_step: Optional[str] = None   # agent name
+    slowest_step: str | None = None   # agent name
+    fastest_step: str | None = None   # agent name
 
     # Anomaly summary
     anomalous_steps: list[str] = field(default_factory=list)
     has_anomalies: bool = False
 
     timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
 
 
@@ -112,7 +111,7 @@ class MetricsAnalyzer:
         self._token_stddev_mult = float(get("metrics", "token_stddev_multiplier", 2.5))
         self._latency_stddev_mult = float(get("metrics", "latency_stddev_multiplier", 2.5))
 
-    def analyze_run(self, run_id: str) -> Optional[RunMetrics]:
+    def analyze_run(self, run_id: str) -> RunMetrics | None:
         """
         Compute metrics for one run.
 
@@ -142,7 +141,7 @@ class MetricsAnalyzer:
 
         return self._build_run_metrics(run_row, step_metrics)
 
-    def analyze_latest_run(self) -> Optional[RunMetrics]:
+    def analyze_latest_run(self) -> RunMetrics | None:
         """Convenience: analyze the most recent run in the database."""
         runs = self.db.list_runs(limit=1)
         if not runs:
@@ -266,11 +265,12 @@ class MetricsAnalyzer:
 # Stats helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _mean(values: list[float]) -> float:
+
+def _mean(values: Sequence[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
-def _stddev(values: list[float]) -> float:
+def _stddev(values: Sequence[float]) -> float:
     if len(values) < 2:
         return 0.0
     m = _mean(values)

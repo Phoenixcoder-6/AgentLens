@@ -25,10 +25,9 @@ from __future__ import annotations
 
 import base64
 import json
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 from enum import Enum
 from typing import Any
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Optional imports — these are all soft dependencies.
@@ -85,7 +84,7 @@ def to_serializable(value: Any) -> Any:
     if isinstance(value, datetime):
         if value.tzinfo is None:
             # Treat naive datetimes as UTC
-            value = value.replace(tzinfo=timezone.utc)
+            value = value.replace(tzinfo=UTC)
         return value.isoformat()
 
     # ── date / time ──────────────────────────────────────────────────────────
@@ -171,7 +170,7 @@ def safe_loads(text: Any) -> Any:
 # Convenience: safe_dumps — serialize any value to a JSON string
 # ─────────────────────────────────────────────────────────────────────────────
 
-def safe_dumps(value: Any, indent: int = None) -> str:
+def safe_dumps(value: Any, indent: int | None = None) -> str:
     """
     Serialize any value to a JSON string using to_serializable as the encoder.
     Never raises — falls back to str(value) on total failure.

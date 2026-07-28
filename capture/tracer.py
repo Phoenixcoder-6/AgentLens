@@ -8,15 +8,15 @@ Day 6: Properly computes the three-state handoff snapshot using HandoffCapture:
     - output_state   = full merged state AFTER LangGraph applies agent's return
 """
 
-import time
 import functools
 import json
-from datetime import datetime, timezone
-from typing import Callable
+import time
+from collections.abc import Callable
+from datetime import UTC, datetime
 
-from schema.models import AgentStep, StepStatus
-from capture.session import CaptureSession
 from capture.handoff import HandoffCapture
+from capture.session import CaptureSession
+from schema.models import AgentStep, StepStatus
 
 
 def trace_step(func: Callable) -> Callable:
@@ -56,7 +56,7 @@ def trace_step(func: Callable) -> Callable:
             step=step_idx,
             agent=agent_name,
             input=json.dumps(state_in, default=str),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         start_time = time.perf_counter()

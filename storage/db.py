@@ -21,8 +21,9 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Default DB path
@@ -157,8 +158,8 @@ class DatabaseManager:
         total_latency_ms: float,
         total_tokens: int,
         schema_version: str,
-        trace_path: Optional[str] = None,
-        trace_json: Optional[str] = None,
+        trace_path: str | None = None,
+        trace_json: str | None = None,
     ) -> None:
         """Insert or replace a run record."""
         with self.connection() as conn:
@@ -175,7 +176,7 @@ class DatabaseManager:
                  trace_path, trace_json),
             )
 
-    def get_run(self, run_id: str) -> Optional[dict[str, Any]]:
+    def get_run(self, run_id: str) -> dict[str, Any] | None:
         """Fetch a run row by run_id. Returns None if not found."""
         with self.connection() as conn:
             row = conn.execute(
@@ -186,8 +187,8 @@ class DatabaseManager:
     def list_runs(
         self,
         limit: int = 50,
-        status_filter: Optional[str] = None,
-        workflow_filter: Optional[str] = None,
+        status_filter: str | None = None,
+        workflow_filter: str | None = None,
     ) -> list[dict[str, Any]]:
         """List run summaries, newest first."""
         query = "SELECT run_id, workflow, timestamp, status, total_latency_ms, total_tokens FROM runs"
@@ -223,7 +224,7 @@ class DatabaseManager:
         diff_summary: str,
         timestamp: str,
         schema_version: str,
-        error: Optional[str] = None,
+        error: str | None = None,
     ) -> None:
         """Insert or replace a step record."""
         with self.connection() as conn:
@@ -257,11 +258,11 @@ class DatabaseManager:
         analyzer: str,
         timestamp: str,
         schema_version: str,
-        step: Optional[int] = None,
-        category: Optional[str] = None,
-        verdict: Optional[str] = None,
+        step: int | None = None,
+        category: str | None = None,
+        verdict: str | None = None,
         confidence: float = 0.0,
-        details: Optional[dict] = None,
+        details: dict | None = None,
     ) -> None:
         """Insert an analysis result row."""
         with self.connection() as conn:
@@ -285,8 +286,8 @@ class DatabaseManager:
         metric_value: float,
         timestamp: str,
         schema_version: str,
-        step: Optional[int] = None,
-        agent: Optional[str] = None,
+        step: int | None = None,
+        agent: str | None = None,
         metric_unit: str = "",
     ) -> None:
         """Insert a named metric row."""

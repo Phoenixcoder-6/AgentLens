@@ -6,21 +6,18 @@ All DB access, pipeline execution, and caching.
 from __future__ import annotations
 
 import json
-import textwrap
 from dataclasses import dataclass, field
-from typing import Optional
 
-from storage.db import DatabaseManager
-from normalizer.normalizer import Normalizer
-from schema.models import RunTrace, AnalysisBundle, SCHEMA_VERSION
-from analyzers.evidence_extraction.extractor import EvidenceExtractor, ExtractedEvidence
-from analyzers.detection.information_loss import InformationLossResult, InformationLossRule
 from analyzers.arbiter import Arbiter, evidence_from_information_loss
+from analyzers.detection.information_loss import InformationLossResult, InformationLossRule
+from analyzers.evidence_extraction.extractor import EvidenceExtractor, ExtractedEvidence
 from analyzers.explainer import LLMExplainer
-
+from normalizer.normalizer import Normalizer
+from schema.models import AnalysisBundle, RunTrace
+from storage.db import DatabaseManager
 
 # ── Module-level analysis cache (process lifetime) ────────────────────────────
-_analysis_cache: dict[str, "AnalysisState"] = {}
+_analysis_cache: dict[str, AnalysisState] = {}
 
 # Estimated cost per token (GPT-4o proxy for display)
 COST_PER_TOKEN = 0.000005  # $0.005 per 1K tokens
@@ -52,9 +49,9 @@ class RunRow:
 @dataclass
 class AnalysisState:
     extracted: dict[str, ExtractedEvidence] = field(default_factory=dict)
-    loss_result: Optional[InformationLossResult] = None
-    bundle: Optional[AnalysisBundle] = None
-    error: Optional[str] = None
+    loss_result: InformationLossResult | None = None
+    bundle: AnalysisBundle | None = None
+    error: str | None = None
     done: bool = False
 
 
@@ -67,7 +64,7 @@ class DiffResult:
     overall_similarity: float
 
 
-_db: Optional[DatabaseManager] = None
+_db: DatabaseManager | None = None
 
 
 def get_db() -> DatabaseManager:
@@ -88,21 +85,27 @@ def _extract_topic(trace_json_str: str) -> str:
         for step in data.get("steps", []):
             handoff = step.get("handoff", {})
             if isinstance(handoff, str):
-                try: handoff = json.loads(handoff)
-                except: continue
+                try:
+                    handoff = json.loads(handoff)
+                except Exception:
+                    continue
             for key in ("input_state", "output_state", "filtered_state"):
                 state_val = handoff.get(key, {})
                 if isinstance(state_val, str):
-                    try: state_val = json.loads(state_val)
-                    except: continue
+                    try:
+                        state_val = json.loads(state_val)
+                    except Exception:
+                        continue
                 topic = state_val.get("topic", "")
                 if topic:
                     return str(topic)[:60]
         # Path 2: top-level initial_state
         init = data.get("initial_state", {})
         if isinstance(init, str):
-            try: init = json.loads(init)
-            except: init = {}
+            try:
+                init = json.loads(init)
+            except Exception:
+                init = {}
         topic = init.get("topic", "")
         if topic:
             return str(topic)[:60]
@@ -221,8 +224,10 @@ def run_explanation(bundle: AnalysisBundle) -> AnalysisBundle:
 def explain_agent_evidence(agent, evidence, bundle):
     """Focused LLM explanation for one agent's extracted evidence metrics."""
     import os
+
+    from langchain_core.messages import HumanMessage, SystemMessage
     from langchain_groq import ChatGroq
-    from langchain_core.messages import SystemMessage, HumanMessage
+
     from config.config_loader import get
 
     api_key = os.getenv("GROQ_API_KEY")
@@ -247,11 +252,11 @@ def explain_agent_evidence(agent, evidence, bundle):
         "",
         f"ARBITER CONTEXT: {arbiter_note}",
         "",
-        f"In 3-4 sentences explain:",
+        "In 3-4 sentences explain:",
         f"1. What do these numbers reveal about what the {agent} agent did in the pipeline?",
-        f"2. Are these source/entity counts high, low, or normal for this agent role?",
-        f"3. How does this agent relate to the overall pipeline verdict?",
-        f"4. What should an engineer inspect first when debugging this agent?",
+        "2. Are these source/entity counts high, low, or normal for this agent role?",
+        "3. How does this agent relate to the overall pipeline verdict?",
+        "4. What should an engineer inspect first when debugging this agent?",
         "",
         "Be specific and technical. Use hedged language (this is heuristic analysis). No bullet points.",
     ])
@@ -277,7 +282,7 @@ def explain_agent_evidence(agent, evidence, bundle):
 
 
 
-def get_cached(run_id: str) -> Optional[AnalysisState]:
+def get_cached(run_id: str) -> AnalysisState | None:
     return _analysis_cache.get(run_id)
 
 
@@ -319,9 +324,11 @@ def compute_diff(run_id_a: str, run_id_b: str) -> DiffResult:
     agents  = list(steps_a.keys())
 
     def _sim(a: str, b: str) -> float:
-        if not a or not b: return 0.0
+        if not a or not b:
+            return 0.0
         s1, s2 = set(a.split()), set(b.split())
-        if not s1 and not s2: return 1.0
+        if not s1 and not s2:
+            return 1.0
         return len(s1 & s2) / max(len(s1 | s2), 1)
 
     rows = []
@@ -361,7 +368,7 @@ def total_cost_estimate() -> float:
     return total * COST_PER_TOKEN
 
 
-def verdict_for_bundle(bundle: Optional[AnalysisBundle]) -> str:
+def verdict_for_bundle(bundle: AnalysisBundle | None) -> str:
     if bundle is None:
         return "UNKNOWN"
     v = bundle.priority_level.value

@@ -1,0 +1,185 @@
+{
+  "schema_version": "1.0",
+  "run_id": "run_lbl_pass_01",
+  "workflow": "research_report_pipeline",
+  "timestamp": "2026-07-27T19:11:49.942086+00:00",
+  "steps": [
+    {
+      "schema_version": "1.0",
+      "run_id": "run_lbl_pass_01",
+      "step": 1,
+      "agent": "researcher",
+      "node_type": "llm",
+      "input": "{\"topic\": \"History of the Eiffel Tower\", \"research_findings\": \"\", \"source_count\": 0, \"entity_count\": 0, \"written_report\": \"\", \"verification_result\": \"\", \"verified\": false, \"revision_notes\": \"\"}",
+      "output": "{\"source_count\": 8, \"entity_count\": 10, \"research_findings\": \"SOURCES:\\n- Source 1 on History of the Eiffel Tower\\n- Source 2 on History of the Eiffel Tower\\n- Source 3 on History of the Eiffel Tower\\n- Source 4 on History of the Eiffel Tower\\n- Source 5 on History of the Eiffel Tower\\n- Source 6 on History of the Eiffel Tower\\n- Source 7 on History of the Eiffel Tower\\n- Source 8 on History of the Eiffel Tower\\n\\nENTITIES:\\n- Entity_1\\n- Entity_2\\n- Entity_3\\n- Entity_4\\n- Entity_5\\n- Entity_6\\n- Entity_7\\n- Entity_8\\n- Entity_9\\n- Entity_10\\n\\nKEY FINDINGS:\\nResearch findings for History of the Eiffel Tower.\"}",
+      "expected_output": null,
+      "prompt": "added=['source_count', 'entity_count', 'research_findings']",
+      "system_prompt": "",
+      "model": "llama3-8b-8192",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 1200.0,
+      "tokens": {
+        "prompt": 200,
+        "completion": 400,
+        "total": 600
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "History of the Eiffel Tower",
+          "research_findings": "",
+          "source_count": 0,
+          "entity_count": 0,
+          "written_report": "",
+          "verification_result": "",
+          "verified": false,
+          "revision_notes": ""
+        },
+        "filtered_state": {
+          "source_count": 8,
+          "entity_count": 10,
+          "research_findings": "SOURCES:\n- Source 1 on History of the Eiffel Tower\n- Source 2 on History of the Eiffel Tower\n- Source 3 on History of the Eiffel Tower\n- Source 4 on History of the Eiffel Tower\n- Source 5 on History of the Eiffel Tower\n- Source 6 on History of the Eiffel Tower\n- Source 7 on History of the Eiffel Tower\n- Source 8 on History of the Eiffel Tower\n\nENTITIES:\n- Entity_1\n- Entity_2\n- Entity_3\n- Entity_4\n- Entity_5\n- Entity_6\n- Entity_7\n- Entity_8\n- Entity_9\n- Entity_10\n\nKEY FINDINGS:\nResearch findings for History of the Eiffel Tower."
+        },
+        "output_state": {
+          "topic": "History of the Eiffel Tower",
+          "research_findings": "SOURCES:\n- Source 1 on History of the Eiffel Tower\n- Source 2 on History of the Eiffel Tower\n- Source 3 on History of the Eiffel Tower\n- Source 4 on History of the Eiffel Tower\n- Source 5 on History of the Eiffel Tower\n- Source 6 on History of the Eiffel Tower\n- Source 7 on History of the Eiffel Tower\n- Source 8 on History of the Eiffel Tower\n\nENTITIES:\n- Entity_1\n- Entity_2\n- Entity_3\n- Entity_4\n- Entity_5\n- Entity_6\n- Entity_7\n- Entity_8\n- Entity_9\n- Entity_10\n\nKEY FINDINGS:\nResearch findings for History of the Eiffel Tower.",
+          "source_count": 8,
+          "entity_count": 10,
+          "written_report": "",
+          "verification_result": "",
+          "verified": false,
+          "revision_notes": ""
+        }
+      },
+      "parent_step": null,
+      "child_step": 2,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-07-27T19:11:49.942086+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "run_lbl_pass_01",
+      "step": 2,
+      "agent": "writer",
+      "node_type": "llm",
+      "input": "{\"topic\": \"History of the Eiffel Tower\", \"research_findings\": \"\", \"source_count\": 0, \"entity_count\": 0, \"written_report\": \"\", \"verification_result\": \"\", \"verified\": false, \"revision_notes\": \"\"}",
+      "output": "{\"source_count\": 8, \"entity_count\": 10, \"written_report\": \"**Report on History of the Eiffel Tower**\\n\\nBased on 8 sources and 10 entities, this report covers the key aspects of History of the Eiffel Tower.\\n\\n**Conclusion**: The analysis shows significant findings about History of the Eiffel Tower.\"}",
+      "expected_output": null,
+      "prompt": "added=['source_count', 'entity_count', 'written_report']",
+      "system_prompt": "",
+      "model": "llama3-8b-8192",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 2000.0,
+      "tokens": {
+        "prompt": 200,
+        "completion": 400,
+        "total": 600
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "History of the Eiffel Tower",
+          "research_findings": "",
+          "source_count": 0,
+          "entity_count": 0,
+          "written_report": "",
+          "verification_result": "",
+          "verified": false,
+          "revision_notes": ""
+        },
+        "filtered_state": {
+          "source_count": 8,
+          "entity_count": 10,
+          "written_report": "**Report on History of the Eiffel Tower**\n\nBased on 8 sources and 10 entities, this report covers the key aspects of History of the Eiffel Tower.\n\n**Conclusion**: The analysis shows significant findings about History of the Eiffel Tower."
+        },
+        "output_state": {
+          "topic": "History of the Eiffel Tower",
+          "research_findings": "",
+          "source_count": 8,
+          "entity_count": 10,
+          "written_report": "**Report on History of the Eiffel Tower**\n\nBased on 8 sources and 10 entities, this report covers the key aspects of History of the Eiffel Tower.\n\n**Conclusion**: The analysis shows significant findings about History of the Eiffel Tower.",
+          "verification_result": "",
+          "verified": false,
+          "revision_notes": ""
+        }
+      },
+      "parent_step": 1,
+      "child_step": 3,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-07-27T19:11:49.942086+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "run_lbl_pass_01",
+      "step": 3,
+      "agent": "verifier",
+      "node_type": "llm",
+      "input": "{\"topic\": \"History of the Eiffel Tower\", \"research_findings\": \"\", \"source_count\": 0, \"entity_count\": 0, \"written_report\": \"\", \"verification_result\": \"APPROVED\", \"verified\": true, \"revision_notes\": \"\"}",
+      "output": "{\"source_count\": 8, \"entity_count\": 10, \"verification_result\": \"APPROVED\", \"verified\": true}",
+      "expected_output": null,
+      "prompt": "added=['source_count', 'entity_count', 'verification_result', 'verified']",
+      "system_prompt": "",
+      "model": "llama3-8b-8192",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 800.0,
+      "tokens": {
+        "prompt": 200,
+        "completion": 400,
+        "total": 600
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "History of the Eiffel Tower",
+          "research_findings": "",
+          "source_count": 0,
+          "entity_count": 0,
+          "written_report": "",
+          "verification_result": "APPROVED",
+          "verified": true,
+          "revision_notes": ""
+        },
+        "filtered_state": {
+          "source_count": 8,
+          "entity_count": 10,
+          "verification_result": "APPROVED",
+          "verified": true
+        },
+        "output_state": {
+          "topic": "History of the Eiffel Tower",
+          "research_findings": "",
+          "source_count": 8,
+          "entity_count": 10,
+          "written_report": "",
+          "verification_result": "APPROVED",
+          "verified": true,
+          "revision_notes": ""
+        }
+      },
+      "parent_step": 2,
+      "child_step": 4,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-07-27T19:11:49.942086+00:00"
+    }
+  ],
+  "total_latency_ms": 4000.0,
+  "total_tokens": 1800
+}

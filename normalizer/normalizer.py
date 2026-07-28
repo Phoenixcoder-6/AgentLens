@@ -24,19 +24,17 @@ Every NormalizedStep produced here is guaranteed to:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
+from normalizer.serializer import safe_loads, to_serializable
 from schema.models import (
-    AgentStep,
-    HandoffState,
-    RunTrace,
     SCHEMA_VERSION,
+    AgentStep,
+    RunTrace,
     StepStatus,
     TokenUsage,
 )
-from normalizer.serializer import safe_loads, to_serializable
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # NormalizedStep — the canonical output of the Normalizer
@@ -70,7 +68,7 @@ class NormalizedStep:
 
     # Status
     status: StepStatus
-    error: Optional[str]
+    error: str | None
 
     # Timing — always UTC-aware datetime
     timestamp: datetime
@@ -211,20 +209,20 @@ class Normalizer:
         """
         if isinstance(value, datetime):
             if value.tzinfo is None:
-                return value.replace(tzinfo=timezone.utc)
+                return value.replace(tzinfo=UTC)
             return value
 
         if isinstance(value, str) and value:
             try:
                 dt = datetime.fromisoformat(value)
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
+                    dt = dt.replace(tzinfo=UTC)
                 return dt
             except ValueError:
                 pass
 
         # Fallback: use current UTC time
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
     @staticmethod
     def _normalize_status(value: Any) -> StepStatus:
