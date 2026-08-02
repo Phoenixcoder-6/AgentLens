@@ -96,6 +96,7 @@ class NormalizedRun:
     status: StepStatus
     total_latency_ms: float
     total_tokens: int
+    expected_output: str | None = None
     steps: list[NormalizedStep] = field(default_factory=list)
 
 
@@ -181,6 +182,7 @@ class Normalizer:
             status           = status,
             total_latency_ms = float(run.total_latency_ms),
             total_tokens     = int(run.total_tokens),
+            expected_output  = run.expected_output,
             steps            = normalized_steps,
         )
 

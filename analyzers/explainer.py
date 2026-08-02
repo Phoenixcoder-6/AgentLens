@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import os
 import textwrap
+import time
 from typing import cast
 
 from dotenv import load_dotenv
@@ -49,6 +50,9 @@ from pydantic import BaseModel, Field, SecretStr
 
 from config.config_loader import get
 from schema.models import AnalysisBundle
+from config.logging_config import get_logger
+
+log = get_logger("explainer")
 
 load_dotenv()
 
@@ -153,13 +157,28 @@ class LLMExplainer:
         prompt = self._build_prompt(bundle)
         try:
             structured_llm = self._llm.with_structured_output(ExplanationOutput)
+            
+            start_t = time.time()
             result = cast(ExplanationOutput, structured_llm.invoke([
                 SystemMessage(content=self.SYSTEM_PROMPT),
                 HumanMessage(content=prompt),
             ]))
+            latency_ms = (time.time() - start_t) * 1000
+            
+            log.info("Explanation LLM call completed", extra={"extra_fields": {
+                "model": getattr(self._llm, "model_name", "unknown"),
+                "latency_ms": round(latency_ms, 2),
+                "run_id": bundle.run_id,
+                "cost_estimate": 0.0,
+            }})
+            
             bundle.summary       = result.summary
             bundle.suggested_fix = result.suggested_fix
-        except Exception:
+        except Exception as exc:
+            log.warning("Explanation LLM call failed, falling back to rule-based", extra={"extra_fields": {
+                "error": str(exc),
+                "run_id": bundle.run_id
+            }})
             # Never crash the pipeline — fall back to rule-based explanation
             bundle.summary       = self._fallback_summary(bundle)
             bundle.suggested_fix = self._fallback_fix(bundle)

@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS runs (
     total_tokens     INTEGER DEFAULT 0,
     schema_version   TEXT NOT NULL,
     trace_path       TEXT,
-    trace_json       TEXT
+    trace_json       TEXT,
+    expected_output  TEXT
 );
 """
 
@@ -146,6 +147,12 @@ class DatabaseManager:
         with self.connection() as conn:
             for ddl in _ALL_DDL:
                 conn.execute(ddl)
+            
+            # Migration: add expected_output if missing
+            try:
+                conn.execute("ALTER TABLE runs ADD COLUMN expected_output TEXT")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
 
     # ── Runs ──────────────────────────────────────────────────────────────────
 
@@ -160,6 +167,7 @@ class DatabaseManager:
         schema_version: str,
         trace_path: str | None = None,
         trace_json: str | None = None,
+        expected_output: str | None = None,
     ) -> None:
         """Insert or replace a run record."""
         with self.connection() as conn:
@@ -168,12 +176,12 @@ class DatabaseManager:
                 INSERT OR REPLACE INTO runs
                     (run_id, workflow, timestamp, status,
                      total_latency_ms, total_tokens, schema_version,
-                     trace_path, trace_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     trace_path, trace_json, expected_output)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (run_id, workflow, timestamp, status,
                  total_latency_ms, total_tokens, schema_version,
-                 trace_path, trace_json),
+                 trace_path, trace_json, expected_output),
             )
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:

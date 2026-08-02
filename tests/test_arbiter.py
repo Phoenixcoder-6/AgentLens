@@ -35,6 +35,7 @@ from analyzers.arbiter import (
     determine_primary_cause,
     evidence_from_information_loss,
     _tiebreak_key,
+    compute_grounded,
 )
 from analyzers.detection.information_loss import InformationLossResult, FieldDiff
 
@@ -384,3 +385,33 @@ class TestArbiterClass:
         b2 = Arbiter().run(RUN_ID, list(reversed(evidence)))
         assert b1.primary_cause  == b2.primary_cause
         assert b1.priority_level == b2.priority_level
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestGrounded
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestGrounded:
+    """Test compute_grounded function logic."""
+    
+    def test_compute_grounded_no_p1(self):
+        """No P1 evidence -> always False."""
+        evidence = [
+            make_rule_evidence(),  # P2
+            make_rule_evidence("another_rule")  # P2
+        ]
+        assert compute_grounded(evidence) is False
+        assert compute_grounded([]) is False
+
+    def test_compute_grounded_with_p1(self):
+        """P1 evidence present -> always True."""
+        p1_evidence = EvidenceRecord(
+            source=EvidenceSource.GROUND_TRUTH,
+            description="Mismatch",
+            value="expected != actual",
+            confidence=1.0,
+        )
+        evidence = [
+            make_rule_evidence(),  # P2
+            p1_evidence            # P1
+        ]
+        assert compute_grounded(evidence) is True

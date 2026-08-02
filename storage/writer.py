@@ -63,6 +63,7 @@ class StorageWriter:
             schema_version   = SCHEMA_VERSION,
             trace_path       = trace_path,
             trace_json       = trace_json,
+            expected_output  = run.expected_output,
         )
 
         # 2. Insert each step + its metrics

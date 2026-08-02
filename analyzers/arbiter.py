@@ -55,6 +55,9 @@ from schema.models import (
     RuleMatch,
     RuleSeverity,
 )
+from config.logging_config import get_logger
+
+log = get_logger("arbiter")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Priority resolution helpers (locked — no changes after Day 3)
@@ -160,6 +163,18 @@ def evidence_from_information_loss(result: InformationLossResult) -> EvidenceRec
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Grounded Check
+# ─────────────────────────────────────────────────────────────────────────────
+
+def compute_grounded(evidence: list[EvidenceRecord]) -> bool:
+    """
+    Returns True if at least one P1 (Ground Truth) evidence record exists.
+    Otherwise False.
+    """
+    return any(SOURCE_TO_PRIORITY.get(e.source) == PriorityLevel.P1 for e in evidence)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # determine_primary_cause — Day 12 MVP: P2 + P5 only
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -194,6 +209,8 @@ def determine_primary_cause(
             verdict_reason="No evidence collected — P5 fallback.",
         )
 
+    is_grounded = compute_grounded(evidence)
+
     # ── P1: ground truth mismatch (reserved — Day 17) ────────────────────────
     # p1_evidence = [e for e in evidence if e.source == EvidenceSource.GROUND_TRUTH]
     # → Day 17
@@ -214,7 +231,7 @@ def determine_primary_cause(
             run_id=run_id,
             primary_cause=category,
             priority=PriorityLevel.P2,
-            grounded=False,
+            grounded=is_grounded,
             evidence=evidence,
             primary_agent=best.agent,
             verdict_reason=(
@@ -238,7 +255,7 @@ def determine_primary_cause(
         run_id=run_id,
         primary_cause=FailureCategory.UNKNOWN,
         priority=PriorityLevel.P5,
-        grounded=False,
+        grounded=is_grounded,
         evidence=evidence,
         primary_agent=None,
         verdict_reason="No P2 rule matched — P5 fallback.",
@@ -296,7 +313,18 @@ class Arbiter:
                 _tiebreak_key(e),
             ),
         )
-        return determine_primary_cause(sorted_evidence, run_id)
+        bundle = determine_primary_cause(sorted_evidence, run_id)
+        
+        log.info("Analysis completed", extra={"extra_fields": {
+            "run_id": run_id,
+            "rules_fired": len(bundle.rule_matches),
+            "evidence_count": len(bundle.evidence),
+            "verdict": bundle.primary_cause.value if hasattr(bundle.primary_cause, "value") else str(bundle.primary_cause),
+            "primary_agent": bundle.primary_agent,
+            "grounded": bundle.grounded,
+        }})
+        
+        return bundle
 
 
 # ─────────────────────────────────────────────────────────────────────────────
