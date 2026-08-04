@@ -20,9 +20,9 @@ Models defined here:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Optional
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field, field_serializer
 
@@ -37,7 +37,7 @@ SCHEMA_VERSION = "1.0"
 # Enums
 # ─────────────────────────────────────────────────────────────────────────────
 
-class StepStatus(str, Enum):
+class StepStatus(str, StrEnum):
     """Execution outcome of a single agent step or overall run."""
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
@@ -45,7 +45,7 @@ class StepStatus(str, Enum):
     SKIPPED = "SKIPPED"
 
 
-class NodeType(str, Enum):
+class NodeType(str, StrEnum):
     """The type of node in the LangGraph pipeline."""
     LLM = "llm"
     TOOL = "tool"
@@ -53,7 +53,7 @@ class NodeType(str, Enum):
     HUMAN = "human"
 
 
-class FailureCategory(str, Enum):
+class FailureCategory(str, StrEnum):
     """
     Four-category failure taxonomy from the architecture spec.
     Every verdict maps to exactly one of these.
@@ -71,7 +71,7 @@ class FailureCategory(str, Enum):
     UNKNOWN = "unknown"
 
 
-class PriorityLevel(str, Enum):
+class PriorityLevel(str, StrEnum):
     """
     Arbiter priority levels — determines which evidence wins in a conflict.
     Tie-break: same-priority ties resolved by rule_id ascending.
@@ -89,7 +89,7 @@ class PriorityLevel(str, Enum):
     P5 = "P5"
 
 
-class EvidenceSource(str, Enum):
+class EvidenceSource(str, StrEnum):
     """Which analyzer produced an EvidenceRecord."""
     RULE_ENGINE = "rule_engine"
     WORKFLOW_VALIDATOR = "workflow_validator"
@@ -100,7 +100,7 @@ class EvidenceSource(str, Enum):
     GROUND_TRUTH = "ground_truth"
 
 
-class RuleSeverity(str, Enum):
+class RuleSeverity(str, StrEnum):
     """How serious a rule match is — used for dashboard display priority."""
     LOW = "low"
     MEDIUM = "medium"
@@ -129,7 +129,7 @@ class GenerationParams(BaseModel):
     temperature: float = 0.0
     top_p: float = 1.0
     max_tokens: int = 2048
-    seed: Optional[int] = None
+    seed: int | None = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -184,7 +184,7 @@ class WorkflowState(BaseModel):
         default_factory=dict,
         description="The full LangGraph state dict at this point in the pipeline"
     )
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -210,7 +210,7 @@ class AgentStep(BaseModel):
     # Input / output
     input: str = Field(default="", description="Raw input passed to this agent")
     output: str = Field(default="", description="Raw output produced by this agent")
-    expected_output: Optional[str] = Field(
+    expected_output: str | None = Field(
         default=None,
         description="Ground-truth expected output, if available (enables P1 grounded evaluation)"
     )
@@ -235,22 +235,22 @@ class AgentStep(BaseModel):
     handoff: HandoffState = Field(default_factory=HandoffState)
 
     # Graph relationships
-    parent_step: Optional[str] = Field(
+    parent_step: str | None = Field(
         default=None,
         description="Step ID of the agent that produced input to this step"
     )
-    child_step: Optional[str] = Field(
+    child_step: str | None = Field(
         default=None,
         description="Step ID of the agent that will receive this step's output"
     )
 
     # Status
     status: StepStatus = Field(default=StepStatus.SUCCESS)
-    error: Optional[str] = Field(
+    error: str | None = Field(
         default=None,
         description="Error message if status is FAILURE or ERROR"
     )
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @field_serializer('timestamp')
     def serialize_timestamp(self, v: datetime) -> str:
@@ -280,7 +280,7 @@ class RunTrace(BaseModel):
     )
     workflow: str = Field(description="Workflow name, e.g. 'research_report_pipeline'")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When this run started"
     )
 
@@ -296,13 +296,13 @@ class RunTrace(BaseModel):
     )
 
     # Ground truth (optional — enables P1 grounded evaluation in Arbiter)
-    expected_output: Optional[str] = Field(
+    expected_output: str | None = Field(
         default=None,
         description="Expected final output for this run, if labeled"
     )
 
     # Storage reference
-    trace_path: Optional[str] = Field(
+    trace_path: str | None = Field(
         default=None,
         description="Relative path to the full JSON trace blob in data/traces/"
     )
@@ -333,15 +333,15 @@ class RuleMatch(BaseModel):
     category: FailureCategory = Field(description="Which failure category this rule belongs to")
     description: str = Field(description="Human-readable description of what was detected")
     severity: RuleSeverity = Field(default=RuleSeverity.MEDIUM)
-    agent: Optional[str] = Field(
+    agent: str | None = Field(
         default=None,
         description="Which agent triggered this rule (if attributable)"
     )
-    step: Optional[int] = Field(
+    step: int | None = Field(
         default=None,
         description="Which step index triggered this rule"
     )
-    evidence_detail: Optional[str] = Field(
+    evidence_detail: str | None = Field(
         default=None,
         description="Specific detail about what was found, e.g. 'sources dropped: 10 → 3'"
     )
@@ -367,15 +367,15 @@ class EvidenceRecord(BaseModel):
         default=None,
         description="Numeric value, boolean, or string — the raw finding"
     )
-    rule_match: Optional[RuleMatch] = Field(
+    rule_match: RuleMatch | None = Field(
         default=None,
         description="Populated when source is rule_engine or a validator"
     )
-    agent: Optional[str] = Field(
+    agent: str | None = Field(
         default=None,
         description="Which agent this evidence is attributed to"
     )
-    step: Optional[int] = Field(
+    step: int | None = Field(
         default=None,
         description="Which step this evidence came from"
     )
@@ -429,22 +429,22 @@ class AnalysisBundle(BaseModel):
     )
 
     # Attribution
-    primary_agent: Optional[str] = Field(
+    primary_agent: str | None = Field(
         default=None,
         description="Which agent is most responsible for the primary cause"
     )
 
     # LLM Explainer output (populated after explanation step)
-    summary: Optional[str] = Field(
+    summary: str | None = Field(
         default=None,
         description="LLM-generated root cause summary (filled by explanation layer)"
     )
-    suggested_fix: Optional[str] = Field(
+    suggested_fix: str | None = Field(
         default=None,
         description="LLM-generated suggested fix (filled by explanation layer)"
     )
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @field_serializer('timestamp')
     def serialize_timestamp(self, v: datetime) -> str:

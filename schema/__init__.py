@@ -10,29 +10,25 @@ Usage:
 from schema.models import (
     # Version
     SCHEMA_VERSION,
-
-    # Enums
-    StepStatus,
-    NodeType,
-    FailureCategory,
-    PriorityLevel,
+    AgentStep,
+    AnalysisBundle,
+    EvidenceRecord,
     EvidenceSource,
-    RuleSeverity,
-
-    # Sub-models
-    TokenUsage,
+    FailureCategory,
     GenerationParams,
-
     # Core models
     HandoffState,
-    WorkflowState,
-    AgentStep,
-    RunTrace,
-
+    NodeType,
+    PriorityLevel,
     # Analysis models
     RuleMatch,
-    EvidenceRecord,
-    AnalysisBundle,
+    RuleSeverity,
+    RunTrace,
+    # Enums
+    StepStatus,
+    # Sub-models
+    TokenUsage,
+    WorkflowState,
 )
 
 __all__ = [

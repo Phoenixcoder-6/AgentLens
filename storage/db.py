@@ -147,7 +147,7 @@ class DatabaseManager:
         with self.connection() as conn:
             for ddl in _ALL_DDL:
                 conn.execute(ddl)
-            
+
             # Migration: add expected_output if missing
             try:
                 conn.execute("ALTER TABLE runs ADD COLUMN expected_output TEXT")

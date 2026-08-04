@@ -14,18 +14,14 @@ Verifies:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone, date, time
+from datetime import UTC, date, datetime, time
 from enum import Enum
 
 import pytest
 
-from normalizer.serializer import to_serializable, safe_loads, safe_dumps
-from normalizer.normalizer import Normalizer, NormalizedStep, NormalizedRun
-from schema.models import (
-    AgentStep, RunTrace, HandoffState, StepStatus,
-    TokenUsage, SCHEMA_VERSION
-)
-
+from normalizer.normalizer import Normalizer
+from normalizer.serializer import safe_loads, to_serializable
+from schema.models import SCHEMA_VERSION, AgentStep, HandoffState, RunTrace, StepStatus, TokenUsage
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Serializer — to_serializable
@@ -50,7 +46,7 @@ class TestToSerializable:
         assert to_serializable("hello") == "hello"
 
     def test_datetime_with_tz_to_iso(self):
-        dt = datetime(2026, 7, 17, 12, 0, 0, tzinfo=timezone.utc)
+        dt = datetime(2026, 7, 17, 12, 0, 0, tzinfo=UTC)
         result = to_serializable(dt)
         assert isinstance(result, str)
         assert "2026-07-17" in result
@@ -82,13 +78,13 @@ class TestToSerializable:
         assert result == base64.b64encode(b"hello").decode()
 
     def test_dict_recursive(self):
-        dt = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        dt = datetime(2026, 1, 1, tzinfo=UTC)
         result = to_serializable({"key": dt, "nested": {"val": 42}})
         assert isinstance(result["key"], str)
         assert result["nested"]["val"] == 42
 
     def test_list_recursive(self):
-        dt = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        dt = datetime(2026, 1, 1, tzinfo=UTC)
         result = to_serializable([dt, 42, "hello"])
         assert isinstance(result[0], str)
         assert result[1] == 42
@@ -121,7 +117,7 @@ class TestToSerializable:
 
     def test_result_is_json_serializable(self):
         """Final output must always be serializable by stdlib json."""
-        dt = datetime(2026, 7, 17, tzinfo=timezone.utc)
+        dt = datetime(2026, 7, 17, tzinfo=UTC)
         tokens = TokenUsage(prompt=5, completion=10, total=15)
         value = {
             "dt": dt,
@@ -258,7 +254,7 @@ def _make_agent_step(**overrides) -> AgentStep:
         latency_ms=1234.5,
         status=StepStatus.SUCCESS,
         prompt="added=['research_findings', 'source_count']",
-        timestamp=datetime(2026, 7, 17, 12, 0, 0, tzinfo=timezone.utc),
+        timestamp=datetime(2026, 7, 17, 12, 0, 0, tzinfo=UTC),
         handoff=HandoffState(
             input_state={"topic": "AI", "research_findings": "", "source_count": 0},
             filtered_state={"research_findings": "SOURCES:\\n- Book A", "source_count": 1},
@@ -367,7 +363,7 @@ class TestNormalizerRun:
         return RunTrace(
             run_id="run_fulltest",
             workflow="research_report_pipeline",
-            timestamp=datetime(2026, 7, 17, 12, 0, 0, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 7, 17, 12, 0, 0, tzinfo=UTC),
             steps=steps,
             total_latency_ms=3703.5,
             total_tokens=0,

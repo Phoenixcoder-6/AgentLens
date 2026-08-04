@@ -7,9 +7,7 @@ state change as added / modified / unchanged / dropped.
 These tests use no LLM — pure unit tests on the diff engine.
 """
 
-import pytest
-from capture.handoff import HandoffCapture, HandoffDiff, _is_empty
-
+from capture.handoff import HandoffCapture, _is_empty
 
 # ─────────────────────────────────────────────────────────────────────────────
 # _is_empty helper

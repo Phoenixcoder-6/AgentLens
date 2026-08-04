@@ -7,14 +7,16 @@ Integration test: real LLM call against a known sample output.
 Unit tests run without any API key. Integration test requires GROQ_API_KEY.
 """
 
+
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
+from pydantic import ValidationError
 
-from analyzers.evidence_extraction.extractor import ExtractedEvidence, EvidenceExtractor
+from analyzers.evidence_extraction.extractor import EvidenceExtractor, ExtractedEvidence
 from schema.models import SCHEMA_VERSION
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ExtractedEvidence model
@@ -35,12 +37,12 @@ class TestExtractedEvidence:
         assert ev.error_message is None
 
     def test_source_count_must_be_non_negative(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             ExtractedEvidence(source_count=-1)
 
     def test_entity_count_must_be_non_negative(self):
-        with pytest.raises(Exception):
-            ExtractedEvidence(entity_count=-1)
+        with pytest.raises(ValidationError):
+            ExtractedEvidence(source_count=-1)
 
     def test_tool_calls_is_list(self):
         ev = ExtractedEvidence(tool_calls=["web_search", "calculator"])

@@ -49,8 +49,8 @@ from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field, SecretStr
 
 from config.config_loader import get
-from schema.models import AnalysisBundle
 from config.logging_config import get_logger
+from schema.models import AnalysisBundle
 
 log = get_logger("explainer")
 
@@ -157,21 +157,21 @@ class LLMExplainer:
         prompt = self._build_prompt(bundle)
         try:
             structured_llm = self._llm.with_structured_output(ExplanationOutput)
-            
+
             start_t = time.time()
             result = cast(ExplanationOutput, structured_llm.invoke([
                 SystemMessage(content=self.SYSTEM_PROMPT),
                 HumanMessage(content=prompt),
             ]))
             latency_ms = (time.time() - start_t) * 1000
-            
+
             log.info("Explanation LLM call completed", extra={"extra_fields": {
                 "model": getattr(self._llm, "model_name", "unknown"),
                 "latency_ms": round(latency_ms, 2),
                 "run_id": bundle.run_id,
                 "cost_estimate": 0.0,
             }})
-            
+
             bundle.summary       = result.summary
             bundle.suggested_fix = result.suggested_fix
         except Exception as exc:

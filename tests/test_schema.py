@@ -12,15 +12,21 @@ Covers:
 """
 
 import pytest
+from pydantic import ValidationError
+
 from schema import (
     SCHEMA_VERSION,
-    RunTrace, AgentStep, WorkflowState, HandoffState,
-    AnalysisBundle, EvidenceRecord, RuleMatch,
-    FailureCategory, PriorityLevel, EvidenceSource,
-    StepStatus, NodeType, RuleSeverity,
-    TokenUsage, GenerationParams,
+    AnalysisBundle,
+    EvidenceRecord,
+    EvidenceSource,
+    FailureCategory,
+    PriorityLevel,
+    RuleSeverity,
+    RunTrace,
+    StepStatus,
+    TokenUsage,
+    WorkflowState,
 )
-
 
 # ── SCHEMA_VERSION ────────────────────────────────────────────────────────────
 
@@ -151,7 +157,7 @@ def test_evidence_record_rule_match_attached(sample_evidence_record):
 
 
 def test_evidence_record_confidence_bounds():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         EvidenceRecord(
             source=EvidenceSource.RULE_ENGINE,
             description="test",

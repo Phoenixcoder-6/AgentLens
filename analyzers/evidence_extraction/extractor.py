@@ -32,8 +32,8 @@ from pydantic import BaseModel, Field
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 from config.config_loader import get
-from schema.models import SCHEMA_VERSION
 from config.logging_config import get_logger
+from schema.models import SCHEMA_VERSION
 
 log = get_logger("extractor")
 
@@ -152,18 +152,18 @@ class EvidenceExtractor:
                 SystemMessage(content=_SYSTEM_PROMPT),
                 HumanMessage(content=_USER_PROMPT.format(output=truncated)),
             ]
-            
+
             start_t = time.time()
             result: ExtractedEvidence = self._llm.invoke(messages)
             latency_ms = (time.time() - start_t) * 1000
-            
+
             log.info("Extraction LLM call completed", extra={"extra_fields": {
                 "model": getattr(self._llm, "model_name", "unknown"),
                 "latency_ms": round(latency_ms, 2),
                 "agent": agent,
                 "cost_estimate": 0.0, # Groq token counting varies by model, stubbing for now
             }})
-            
+
             # Stamp schema_version (Pydantic default does this, but enforce it)
             result.schema_version = SCHEMA_VERSION
             return result

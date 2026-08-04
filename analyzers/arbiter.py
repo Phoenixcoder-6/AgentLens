@@ -46,6 +46,7 @@ P1 → Day 17 | P3 → Day 18a | P4 → Day 27
 from __future__ import annotations
 
 from analyzers.detection.information_loss import InformationLossResult
+from config.logging_config import get_logger
 from schema.models import (
     AnalysisBundle,
     EvidenceRecord,
@@ -55,7 +56,6 @@ from schema.models import (
     RuleMatch,
     RuleSeverity,
 )
-from config.logging_config import get_logger
 
 log = get_logger("arbiter")
 
@@ -314,7 +314,7 @@ class Arbiter:
             ),
         )
         bundle = determine_primary_cause(sorted_evidence, run_id)
-        
+
         log.info("Analysis completed", extra={"extra_fields": {
             "run_id": run_id,
             "rules_fired": len(bundle.rule_matches),
@@ -323,7 +323,7 @@ class Arbiter:
             "primary_agent": bundle.primary_agent,
             "grounded": bundle.grounded,
         }})
-        
+
         return bundle
 
 

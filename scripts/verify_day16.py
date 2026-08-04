@@ -1,17 +1,17 @@
-import os
-import sys
-import sqlite3
 import json
+import os
+import sqlite3
+import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from storage.db import DEFAULT_DB_PATH
 from analyzers.arbiter import Arbiter
-from schema.models import EvidenceRecord, EvidenceSource
+from storage.db import DEFAULT_DB_PATH
+
 
 def verify_day16():
     print("=== Day 16 Verification ===\n")
-    
+
     # 1. Check DB Schema
     print("[1/3] Checking SQLite Schema...")
     if not os.path.exists(DEFAULT_DB_PATH):
@@ -30,7 +30,7 @@ def verify_day16():
     # 2. Check Arbiter Logging & Grounded Logic
     print("\n[2/3] Checking Arbiter Logging & Grounded Logic...")
     arbiter = Arbiter()
-    
+
     # Send an empty run to trigger P5 fallback and logging
     print("  Triggering Arbiter analysis to generate logs...")
     bundle = arbiter.run("verify_run_001", [])
@@ -46,9 +46,9 @@ def verify_day16():
         print(f"  [FAIL] Log file {log_file} was not created.")
     else:
         print(f"  [PASS] Log file {log_file} exists.")
-        
+
         # Read the last line to confirm it's JSON
-        with open(log_file, "r", encoding="utf-8") as f:
+        with open(log_file, encoding="utf-8") as f:
             lines = f.readlines()
             if lines:
                 last_log = lines[-1].strip()

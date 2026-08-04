@@ -6,13 +6,11 @@ All modules import from here — never open config.yaml directly.
 
 from __future__ import annotations
 
-import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import yaml
-
 
 CONFIG_PATH = Path(__file__).parent / "config.yaml"
 
@@ -22,7 +20,7 @@ def load_config() -> dict[str, Any]:
     """Load and cache config.yaml. Returns the full config as a dict."""
     if not CONFIG_PATH.exists():
         raise FileNotFoundError(f"config.yaml not found at {CONFIG_PATH}")
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    with open(CONFIG_PATH, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 

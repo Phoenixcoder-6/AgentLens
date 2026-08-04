@@ -14,9 +14,11 @@ All prompt-inspection and fallback tests run without any LLM calls.
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from analyzers.explainer import ExplanationOutput, LLMExplainer
 from schema.models import (
     AnalysisBundle,
     EvidenceRecord,
@@ -25,10 +27,7 @@ from schema.models import (
     PriorityLevel,
     RuleMatch,
     RuleSeverity,
-    SCHEMA_VERSION,
 )
-from analyzers.explainer import LLMExplainer, ExplanationOutput
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures

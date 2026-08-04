@@ -31,9 +31,9 @@ from langchain_groq import ChatGroq
 from langgraph.graph import END, START, StateGraph
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from config.config_loader import get
-from capture.tracer import trace_step
 from capture.session import CaptureSession
+from capture.tracer import trace_step
+from config.config_loader import get
 
 load_dotenv()
 
@@ -68,7 +68,7 @@ def _build_llm() -> ChatGroq:
     """Build the LLM client from config.yaml settings."""
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise EnvironmentError(
+        raise OSError(
             "GROQ_API_KEY not found. "
             "Copy .env.example to .env and set your key."
         )

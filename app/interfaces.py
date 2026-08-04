@@ -21,22 +21,18 @@ every method listed here — no partial implementations allowed.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
-
-from schema import (
-    AgentStep,
-    AnalysisBundle,
-    EvidenceRecord,
-    RunTrace,
-)
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Return types used by interfaces
 # (lightweight dataclasses — not full Pydantic models, kept simple here)
 # ─────────────────────────────────────────────────────────────────────────────
-
 from dataclasses import dataclass, field
+from typing import Any, Protocol, runtime_checkable
+
+from schema import (
+    AnalysisBundle,
+    EvidenceRecord,
+    RunTrace,
+)
 
 
 @dataclass

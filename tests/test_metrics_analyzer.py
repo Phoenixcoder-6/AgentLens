@@ -10,12 +10,10 @@ No LLM calls — all data is built directly in the test DB.
 from __future__ import annotations
 
 import pytest
-from datetime import datetime, timezone
 
-from storage.db import DatabaseManager
-from analyzers.metrics_analyzer import MetricsAnalyzer, StepMetrics, RunMetrics, _mean, _stddev
+from analyzers.metrics_analyzer import MetricsAnalyzer, RunMetrics, StepMetrics, _mean, _stddev
 from schema.models import SCHEMA_VERSION
-
+from storage.db import DatabaseManager
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures

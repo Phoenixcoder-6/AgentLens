@@ -13,12 +13,12 @@ Covers:
 
 import os
 import sys
+
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.pipeline import build_pipeline, PipelineState
-
+from app.pipeline import PipelineState, build_pipeline
 
 # ── Pipeline structure tests (no API call needed) ─────────────────────────────
 

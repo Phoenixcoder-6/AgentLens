@@ -17,10 +17,18 @@ Test structure:
 from __future__ import annotations
 
 import random
-import pytest
 from copy import deepcopy
 
+from analyzers.arbiter import (
+    Arbiter,
+    _tiebreak_key,
+    compute_grounded,
+    determine_primary_cause,
+    evidence_from_information_loss,
+)
+from analyzers.detection.information_loss import FieldDiff, InformationLossResult
 from schema.models import (
+    SCHEMA_VERSION,
     AnalysisBundle,
     EvidenceRecord,
     EvidenceSource,
@@ -28,17 +36,7 @@ from schema.models import (
     PriorityLevel,
     RuleMatch,
     RuleSeverity,
-    SCHEMA_VERSION,
 )
-from analyzers.arbiter import (
-    Arbiter,
-    determine_primary_cause,
-    evidence_from_information_loss,
-    _tiebreak_key,
-    compute_grounded,
-)
-from analyzers.detection.information_loss import InformationLossResult, FieldDiff
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -80,15 +78,21 @@ def make_loss_result(
     rule_failed: bool = False,
 ) -> InformationLossResult:
     def _signal(r, w):
-        if w > r: return "ADDED"
-        if w < r: return "DROPPED"
+        if w > r:
+            return "ADDED"
+        if w < r:
+            return "DROPPED"
         return "PRESERVED"
 
     def _severity(delta):
-        if delta == 0: return "NONE"
-        if delta >= 3: return "HIGH"
-        if delta >= 1: return "MEDIUM"
-        return "LOW"
+        if delta == 0:
+            return "NONE"
+        if delta >= 3:
+            return "HIGH"
+        if delta >= 1:
+            return "MEDIUM"
+        else:
+            return "LOW"
 
     source_diff = FieldDiff(
         field_name="source_count",
@@ -392,7 +396,7 @@ class TestArbiterClass:
 
 class TestGrounded:
     """Test compute_grounded function logic."""
-    
+
     def test_compute_grounded_no_p1(self):
         """No P1 evidence -> always False."""
         evidence = [

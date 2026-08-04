@@ -9,20 +9,22 @@ Covers:
   - Protocol structure is correct (runtime_checkable)
 """
 
-import pytest
-from app.interfaces import (
-    Analyzer,
-    CaptureProvider,
-    StorageProvider,
-    LLMProvider,
-    AnalysisResult,
-    TraceEvent,
-    LLMProviderError,
-    ExtractionError,
-    StorageError,
-    CaptureError,
-)
+from datetime import UTC
 
+import pytest
+
+from app.interfaces import (
+    AnalysisResult,
+    Analyzer,
+    CaptureError,
+    CaptureProvider,
+    ExtractionError,
+    LLMProvider,
+    LLMProviderError,
+    StorageError,
+    StorageProvider,
+    TraceEvent,
+)
 
 # ── Import completeness ───────────────────────────────────────────────────────
 
@@ -99,13 +101,13 @@ def test_analysis_result_with_evidence(sample_evidence_record):
 # ── TraceEvent defaults ───────────────────────────────────────────────────────
 
 def test_trace_event_instantiation():
-    from datetime import datetime, timezone
+    from datetime import datetime
     event = TraceEvent(
         agent="researcher",
         raw_input="Summarize 10 sources",
         raw_output="Tesla was founded...",
         latency_ms=1400.0,
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
     )
     assert event.agent == "researcher"
     assert event.tool_calls == []
@@ -116,7 +118,6 @@ def test_trace_event_instantiation():
 
 def test_analyzer_is_runtime_checkable():
     """Analyzer is a runtime_checkable Protocol — isinstance() works on it."""
-    from typing import runtime_checkable, Protocol
 
     # A class that implements Analyzer correctly
     class FakeAnalyzer:

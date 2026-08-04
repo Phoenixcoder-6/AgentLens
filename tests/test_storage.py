@@ -10,19 +10,14 @@ Tests for:
 from __future__ import annotations
 
 import json
-import os
-import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
-from schema.models import (
-    AgentStep, HandoffState, RunTrace, StepStatus, SCHEMA_VERSION, TokenUsage
-)
-from normalizer.normalizer import Normalizer, NormalizedRun, NormalizedStep
+from normalizer.normalizer import NormalizedRun, Normalizer
+from schema.models import SCHEMA_VERSION, AgentStep, HandoffState, RunTrace, StepStatus, TokenUsage
 from storage.db import DatabaseManager
 from storage.writer import StorageWriter
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -50,7 +45,7 @@ def sample_run() -> RunTrace:
             latency_ms=float(n * 100),
             status=StepStatus.SUCCESS,
             prompt=f"added=['key_{n}']",
-            timestamp=datetime(2026, 7, 17, 12, 0, 0, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 7, 17, 12, 0, 0, tzinfo=UTC),
             tokens=TokenUsage(prompt=10, completion=20, total=30),
             handoff=HandoffState(
                 input_state={"topic": "AI"},
@@ -62,7 +57,7 @@ def sample_run() -> RunTrace:
     return RunTrace(
         run_id="run_test999",
         workflow="test_pipeline",
-        timestamp=datetime(2026, 7, 17, 12, 0, 0, tzinfo=timezone.utc),
+        timestamp=datetime(2026, 7, 17, 12, 0, 0, tzinfo=UTC),
         steps=[make_step(1, "researcher"), make_step(2, "writer"), make_step(3, "verifier")],
         total_latency_ms=600.0,
         total_tokens=90,

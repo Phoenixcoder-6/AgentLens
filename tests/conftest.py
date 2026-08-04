@@ -3,8 +3,8 @@
 Shared pytest fixtures for the AgentLens test suite.
 All tests import fixtures from here via pytest's automatic discovery.
 """
-import sys
 import os
+import sys
 
 import pytest
 
@@ -24,7 +24,7 @@ def sample_handoff_state():
 
 @pytest.fixture
 def sample_agent_step(sample_handoff_state):
-    from schema import AgentStep, TokenUsage, NodeType, StepStatus
+    from schema import AgentStep, NodeType, StepStatus, TokenUsage
     return AgentStep(
         run_id="run_test01",
         step=1,
@@ -50,7 +50,7 @@ def sample_run_trace(sample_agent_step):
 
 @pytest.fixture
 def sample_rule_match():
-    from schema import RuleMatch, FailureCategory, RuleSeverity
+    from schema import FailureCategory, RuleMatch, RuleSeverity
     return RuleMatch(
         rule_id="R-WF-001",
         category=FailureCategory.WORKFLOW,

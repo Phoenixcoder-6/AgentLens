@@ -7,16 +7,11 @@ No LLM calls here — all evidence is constructed directly.
 
 from __future__ import annotations
 
-import pytest
-
-from analyzers.evidence_extraction.extractor import ExtractedEvidence
 from analyzers.detection.information_loss import (
     InformationLossRule,
-    InformationLossResult,
-    FieldDiff,
 )
+from analyzers.evidence_extraction.extractor import ExtractedEvidence
 from schema.models import SCHEMA_VERSION
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
