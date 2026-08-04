@@ -37,7 +37,7 @@ SCHEMA_VERSION = "1.0"
 # Enums
 # ─────────────────────────────────────────────────────────────────────────────
 
-class StepStatus(str, StrEnum):
+class StepStatus(StrEnum):
     """Execution outcome of a single agent step or overall run."""
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
@@ -45,7 +45,7 @@ class StepStatus(str, StrEnum):
     SKIPPED = "SKIPPED"
 
 
-class NodeType(str, StrEnum):
+class NodeType(StrEnum):
     """The type of node in the LangGraph pipeline."""
     LLM = "llm"
     TOOL = "tool"
@@ -53,7 +53,7 @@ class NodeType(str, StrEnum):
     HUMAN = "human"
 
 
-class FailureCategory(str, StrEnum):
+class FailureCategory(StrEnum):
     """
     Four-category failure taxonomy from the architecture spec.
     Every verdict maps to exactly one of these.
@@ -71,7 +71,7 @@ class FailureCategory(str, StrEnum):
     UNKNOWN = "unknown"
 
 
-class PriorityLevel(str, StrEnum):
+class PriorityLevel(StrEnum):
     """
     Arbiter priority levels — determines which evidence wins in a conflict.
     Tie-break: same-priority ties resolved by rule_id ascending.
@@ -89,7 +89,7 @@ class PriorityLevel(str, StrEnum):
     P5 = "P5"
 
 
-class EvidenceSource(str, StrEnum):
+class EvidenceSource(StrEnum):
     """Which analyzer produced an EvidenceRecord."""
     RULE_ENGINE = "rule_engine"
     WORKFLOW_VALIDATOR = "workflow_validator"
@@ -100,7 +100,7 @@ class EvidenceSource(str, StrEnum):
     GROUND_TRUTH = "ground_truth"
 
 
-class RuleSeverity(str, StrEnum):
+class RuleSeverity(StrEnum):
     """How serious a rule match is — used for dashboard display priority."""
     LOW = "low"
     MEDIUM = "medium"
