@@ -349,4 +349,5 @@ def run_pipeline(topic: str) -> PipelineState:
 
     final_state = app.invoke(initial_state)
     from typing import cast
+
     return cast(PipelineState, final_state)

@@ -62,13 +62,34 @@ def _seed_run(
             SCHEMA_VERSION,
         )
         db.insert_metric(
-            run_id, "latency_ms", latency, TS, SCHEMA_VERSION, step=i + 1, agent=agent, metric_unit="ms"
+            run_id,
+            "latency_ms",
+            latency,
+            TS,
+            SCHEMA_VERSION,
+            step=i + 1,
+            agent=agent,
+            metric_unit="ms",
         )
         db.insert_metric(
-            run_id, "execution_time_ms", latency, TS, SCHEMA_VERSION, step=i + 1, agent=agent, metric_unit="ms"
+            run_id,
+            "execution_time_ms",
+            latency,
+            TS,
+            SCHEMA_VERSION,
+            step=i + 1,
+            agent=agent,
+            metric_unit="ms",
         )
         db.insert_metric(
-            run_id, "tokens_total", float(tok), TS, SCHEMA_VERSION, step=i + 1, agent=agent, metric_unit="tokens"
+            run_id,
+            "tokens_total",
+            float(tok),
+            TS,
+            SCHEMA_VERSION,
+            step=i + 1,
+            agent=agent,
+            metric_unit="tokens",
         )
 
 
