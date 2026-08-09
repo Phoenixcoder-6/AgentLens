@@ -65,13 +65,13 @@ log = get_logger("arbiter")
 
 # Maps EvidenceSource → PriorityLevel for the Arbiter's decision logic.
 SOURCE_TO_PRIORITY: dict[EvidenceSource, PriorityLevel] = {
-    EvidenceSource.GROUND_TRUTH:             PriorityLevel.P1,
-    EvidenceSource.RULE_ENGINE:              PriorityLevel.P2,
-    EvidenceSource.WORKFLOW_VALIDATOR:       PriorityLevel.P3,
-    EvidenceSource.CONSISTENCY_VALIDATOR:    PriorityLevel.P3,
-    EvidenceSource.METRICS_ANALYZER:         PriorityLevel.P4,
-    EvidenceSource.EVIDENCE_EXTRACTION:      PriorityLevel.P4,  # supporting evidence only
-    EvidenceSource.DIFF_ENGINE:              PriorityLevel.P4,  # supporting evidence only
+    EvidenceSource.GROUND_TRUTH: PriorityLevel.P1,
+    EvidenceSource.RULE_ENGINE: PriorityLevel.P2,
+    EvidenceSource.WORKFLOW_VALIDATOR: PriorityLevel.P3,
+    EvidenceSource.CONSISTENCY_VALIDATOR: PriorityLevel.P3,
+    EvidenceSource.METRICS_ANALYZER: PriorityLevel.P4,
+    EvidenceSource.EVIDENCE_EXTRACTION: PriorityLevel.P4,  # supporting evidence only
+    EvidenceSource.DIFF_ENGINE: PriorityLevel.P4,  # supporting evidence only
 }
 
 # Priority level ordering — lower index = higher priority
@@ -103,6 +103,7 @@ def _tiebreak_key(evidence: EvidenceRecord) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 # Evidence conversion helper
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def evidence_from_information_loss(result: InformationLossResult) -> EvidenceRecord | None:
     """
@@ -166,6 +167,7 @@ def evidence_from_information_loss(result: InformationLossResult) -> EvidenceRec
 # Grounded Check
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def compute_grounded(evidence: list[EvidenceRecord]) -> bool:
     """
     Returns True if at least one P1 (Ground Truth) evidence record exists.
@@ -177,6 +179,7 @@ def compute_grounded(evidence: list[EvidenceRecord]) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 # determine_primary_cause — Day 12 MVP: P2 + P5 only
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def determine_primary_cause(
     evidence: list[EvidenceRecord],
@@ -216,17 +219,11 @@ def determine_primary_cause(
     # → Day 17
 
     # ── P2: rule match (deterministic rules fired) ────────────────────────────
-    p2_evidence = [
-        e for e in evidence if e.source == EvidenceSource.RULE_ENGINE
-    ]
+    p2_evidence = [e for e in evidence if e.source == EvidenceSource.RULE_ENGINE]
     if p2_evidence:
         # Tie-break: sort by rule_id ascending — guarantees determinism
         best = sorted(p2_evidence, key=_tiebreak_key)[0]
-        category = (
-            best.rule_match.category
-            if best.rule_match
-            else FailureCategory.UNKNOWN
-        )
+        category = best.rule_match.category if best.rule_match else FailureCategory.UNKNOWN
         return _make_bundle(
             run_id=run_id,
             primary_cause=category,
@@ -265,6 +262,7 @@ def determine_primary_cause(
 # ─────────────────────────────────────────────────────────────────────────────
 # Arbiter class
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class Arbiter:
     """
@@ -315,14 +313,21 @@ class Arbiter:
         )
         bundle = determine_primary_cause(sorted_evidence, run_id)
 
-        log.info("Analysis completed", extra={"extra_fields": {
-            "run_id": run_id,
-            "rules_fired": len(bundle.rule_matches),
-            "evidence_count": len(bundle.evidence),
-            "verdict": bundle.primary_cause.value if hasattr(bundle.primary_cause, "value") else str(bundle.primary_cause),
-            "primary_agent": bundle.primary_agent,
-            "grounded": bundle.grounded,
-        }})
+        log.info(
+            "Analysis completed",
+            extra={
+                "extra_fields": {
+                    "run_id": run_id,
+                    "rules_fired": len(bundle.rule_matches),
+                    "evidence_count": len(bundle.evidence),
+                    "verdict": bundle.primary_cause.value
+                    if hasattr(bundle.primary_cause, "value")
+                    else str(bundle.primary_cause),
+                    "primary_agent": bundle.primary_agent,
+                    "grounded": bundle.grounded,
+                }
+            },
+        )
 
         return bundle
 
@@ -330,6 +335,7 @@ class Arbiter:
 # ─────────────────────────────────────────────────────────────────────────────
 # Internal helper
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _make_bundle(
     run_id: str,

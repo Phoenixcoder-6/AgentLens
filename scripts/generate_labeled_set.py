@@ -30,15 +30,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from storage.db import DatabaseManager
 
 SCHEMA_VERSION = "1.0"
-WORKFLOW       = "research_report_pipeline"
-TRACES_DIR     = "sample_data/labeled_traces"
-LABELS_PATH    = "sample_data/labels.json"
-DB_PATH        = "data/agentlens.db"
+WORKFLOW = "research_report_pipeline"
+TRACES_DIR = "sample_data/labeled_traces"
+LABELS_PATH = "sample_data/labels.json"
+DB_PATH = "data/agentlens.db"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Trace builder helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _ts(offset_seconds: float = 0.0) -> str:
     """ISO timestamp."""
@@ -119,8 +120,8 @@ def _make_step(
 
 
 def _make_research_text(topic: str, sources: int, entities: int) -> str:
-    src_lines = "\n".join(f"- Source {i+1} on {topic}" for i in range(sources))
-    ent_lines = "\n".join(f"- Entity_{i+1}" for i in range(entities))
+    src_lines = "\n".join(f"- Source {i + 1} on {topic}" for i in range(sources))
+    ent_lines = "\n".join(f"- Entity_{i + 1}" for i in range(entities))
     return f"SOURCES:\n{src_lines}\n\nENTITIES:\n{ent_lines}\n\nKEY FINDINGS:\nResearch findings for {topic}."
 
 
@@ -164,11 +165,17 @@ LABELED_SPECS = [
         "expected_verdict": "PASS",
         "expected_primary_agent": None,
         "notes": "Researcher and writer have identical source/entity counts. No rule should fire.",
-        "researcher_sources": 8, "researcher_entities": 10,
-        "writer_sources": 8,    "writer_entities": 10,
-        "include_verifier": True, "verified": True,
-        "verifier_sources": 8,  "verifier_entities": 10,
-        "tool_calls": [], "exec_failure": False, "skip_step": None,
+        "researcher_sources": 8,
+        "researcher_entities": 10,
+        "writer_sources": 8,
+        "writer_entities": 10,
+        "include_verifier": True,
+        "verified": True,
+        "verifier_sources": 8,
+        "verifier_entities": 10,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": None,
     },
     {
         "label_id": "lbl_pass_02",
@@ -177,11 +184,17 @@ LABELED_SPECS = [
         "expected_verdict": "PASS",
         "expected_primary_agent": None,
         "notes": "Minor 1-entity variation — within tolerance. Pipeline runs cleanly.",
-        "researcher_sources": 7, "researcher_entities": 9,
-        "writer_sources": 7,    "writer_entities": 9,
-        "include_verifier": True, "verified": True,
-        "verifier_sources": 7,  "verifier_entities": 9,
-        "tool_calls": [], "exec_failure": False, "skip_step": None,
+        "researcher_sources": 7,
+        "researcher_entities": 9,
+        "writer_sources": 7,
+        "writer_entities": 9,
+        "include_verifier": True,
+        "verified": True,
+        "verifier_sources": 7,
+        "verifier_entities": 9,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": None,
     },
     {
         "label_id": "lbl_pass_03",
@@ -190,11 +203,17 @@ LABELED_SPECS = [
         "expected_verdict": "PASS",
         "expected_primary_agent": None,
         "notes": "Low source/entity run — small topic, still balanced across agents.",
-        "researcher_sources": 4, "researcher_entities": 6,
-        "writer_sources": 4,    "writer_entities": 6,
-        "include_verifier": True, "verified": True,
-        "verifier_sources": 4,  "verifier_entities": 6,
-        "tool_calls": [], "exec_failure": False, "skip_step": None,
+        "researcher_sources": 4,
+        "researcher_entities": 6,
+        "writer_sources": 4,
+        "writer_entities": 6,
+        "include_verifier": True,
+        "verified": True,
+        "verifier_sources": 4,
+        "verifier_entities": 6,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": None,
     },
     {
         "label_id": "lbl_pass_04",
@@ -203,13 +222,18 @@ LABELED_SPECS = [
         "expected_verdict": "PASS",
         "expected_primary_agent": None,
         "notes": "High-source run, all agents faithful. Verifier flags nothing.",
-        "researcher_sources": 12, "researcher_entities": 18,
-        "writer_sources": 12,    "writer_entities": 18,
-        "include_verifier": True, "verified": True,
-        "verifier_sources": 12,  "verifier_entities": 18,
-        "tool_calls": [], "exec_failure": False, "skip_step": None,
+        "researcher_sources": 12,
+        "researcher_entities": 18,
+        "writer_sources": 12,
+        "writer_entities": 18,
+        "include_verifier": True,
+        "verified": True,
+        "verifier_sources": 12,
+        "verifier_entities": 18,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": None,
     },
-
     # ── 4× REASONING FAILURE (hallucination — writer adds entities) ──────────
     {
         "label_id": "lbl_reasoning_01",
@@ -218,11 +242,17 @@ LABELED_SPECS = [
         "expected_verdict": "WARNING",
         "expected_primary_agent": "writer",
         "notes": "Writer introduced 14 extra entities not in research (hallucination). Classic information_gain signal.",
-        "researcher_sources": 8, "researcher_entities": 10,
-        "writer_sources": 11,   "writer_entities": 24,
-        "include_verifier": True, "verified": True,
-        "verifier_sources": 11, "verifier_entities": 24,
-        "tool_calls": [], "exec_failure": False, "skip_step": None,
+        "researcher_sources": 8,
+        "researcher_entities": 10,
+        "writer_sources": 11,
+        "writer_entities": 24,
+        "include_verifier": True,
+        "verified": True,
+        "verifier_sources": 11,
+        "verifier_entities": 24,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": None,
     },
     {
         "label_id": "lbl_reasoning_02",
@@ -231,11 +261,17 @@ LABELED_SPECS = [
         "expected_verdict": "WARNING",
         "expected_primary_agent": "writer",
         "notes": "Writer nearly doubles entity count — large hallucination signal.",
-        "researcher_sources": 6, "researcher_entities": 8,
-        "writer_sources": 10,   "writer_entities": 18,
-        "include_verifier": True, "verified": True,
-        "verifier_sources": 10, "verifier_entities": 18,
-        "tool_calls": [], "exec_failure": False, "skip_step": None,
+        "researcher_sources": 6,
+        "researcher_entities": 8,
+        "writer_sources": 10,
+        "writer_entities": 18,
+        "include_verifier": True,
+        "verified": True,
+        "verifier_sources": 10,
+        "verifier_entities": 18,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": None,
     },
     {
         "label_id": "lbl_reasoning_03",
@@ -244,11 +280,17 @@ LABELED_SPECS = [
         "expected_verdict": "WARNING",
         "expected_primary_agent": "writer",
         "notes": "Moderate hallucination — writer adds 8 entities beyond research.",
-        "researcher_sources": 5, "researcher_entities": 7,
-        "writer_sources": 8,    "writer_entities": 15,
-        "include_verifier": True, "verified": True,
-        "verifier_sources": 8,  "verifier_entities": 15,
-        "tool_calls": [], "exec_failure": False, "skip_step": None,
+        "researcher_sources": 5,
+        "researcher_entities": 7,
+        "writer_sources": 8,
+        "writer_entities": 15,
+        "include_verifier": True,
+        "verified": True,
+        "verifier_sources": 8,
+        "verifier_entities": 15,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": None,
     },
     {
         "label_id": "lbl_reasoning_04",
@@ -257,13 +299,18 @@ LABELED_SPECS = [
         "expected_verdict": "WARNING",
         "expected_primary_agent": "writer",
         "notes": "Writer adds sources and entities — both dimensions inflated.",
-        "researcher_sources": 7, "researcher_entities": 9,
-        "writer_sources": 11,   "writer_entities": 20,
-        "include_verifier": True, "verified": True,
-        "verifier_sources": 11, "verifier_entities": 20,
-        "tool_calls": [], "exec_failure": False, "skip_step": None,
+        "researcher_sources": 7,
+        "researcher_entities": 9,
+        "writer_sources": 11,
+        "writer_entities": 20,
+        "include_verifier": True,
+        "verified": True,
+        "verifier_sources": 11,
+        "verifier_entities": 20,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": None,
     },
-
     # ── 4× EXECUTION FAILURE (tool call error / missing output) ─────────────
     {
         "label_id": "lbl_execution_01",
@@ -272,12 +319,24 @@ LABELED_SPECS = [
         "expected_verdict": "FAIL",
         "expected_primary_agent": "researcher",
         "notes": "Researcher tool call returns error — web search API timed out. Result: 0 sources found.",
-        "researcher_sources": 0, "researcher_entities": 0,
-        "writer_sources": 0,    "writer_entities": 0,
-        "include_verifier": False, "verified": False,
-        "verifier_sources": 0,  "verifier_entities": 0,
-        "tool_calls": [{"name": "web_search", "args": {"query": "stock market trends 2024"}, "result": None, "error": "TimeoutError: Request timed out after 30s"}],
-        "exec_failure": True, "skip_step": None,
+        "researcher_sources": 0,
+        "researcher_entities": 0,
+        "writer_sources": 0,
+        "writer_entities": 0,
+        "include_verifier": False,
+        "verified": False,
+        "verifier_sources": 0,
+        "verifier_entities": 0,
+        "tool_calls": [
+            {
+                "name": "web_search",
+                "args": {"query": "stock market trends 2024"},
+                "result": None,
+                "error": "TimeoutError: Request timed out after 30s",
+            }
+        ],
+        "exec_failure": True,
+        "skip_step": None,
     },
     {
         "label_id": "lbl_execution_02",
@@ -286,12 +345,19 @@ LABELED_SPECS = [
         "expected_verdict": "FAIL",
         "expected_primary_agent": "researcher",
         "notes": "Tool call made but returned empty result. Researcher step completes but no data captured.",
-        "researcher_sources": 0, "researcher_entities": 1,
-        "writer_sources": 0,    "writer_entities": 1,
-        "include_verifier": False, "verified": False,
-        "verifier_sources": 0,  "verifier_entities": 0,
-        "tool_calls": [{"name": "weather_api", "args": {"city": "Mumbai"}, "result": "", "error": None}],
-        "exec_failure": True, "skip_step": None,
+        "researcher_sources": 0,
+        "researcher_entities": 1,
+        "writer_sources": 0,
+        "writer_entities": 1,
+        "include_verifier": False,
+        "verified": False,
+        "verifier_sources": 0,
+        "verifier_entities": 0,
+        "tool_calls": [
+            {"name": "weather_api", "args": {"city": "Mumbai"}, "result": "", "error": None}
+        ],
+        "exec_failure": True,
+        "skip_step": None,
     },
     {
         "label_id": "lbl_execution_03",
@@ -300,15 +366,30 @@ LABELED_SPECS = [
         "expected_verdict": "FAIL",
         "expected_primary_agent": "researcher",
         "notes": "Multiple tool calls — all return auth error. API key expired.",
-        "researcher_sources": 0, "researcher_entities": 0,
-        "writer_sources": 0,    "writer_entities": 0,
-        "include_verifier": False, "verified": False,
-        "verifier_sources": 0,  "verifier_entities": 0,
+        "researcher_sources": 0,
+        "researcher_entities": 0,
+        "writer_sources": 0,
+        "writer_entities": 0,
+        "include_verifier": False,
+        "verified": False,
+        "verifier_sources": 0,
+        "verifier_entities": 0,
         "tool_calls": [
-            {"name": "crypto_api", "args": {"coin": "BTC"}, "result": None, "error": "AuthError: Invalid API key"},
-            {"name": "crypto_api", "args": {"coin": "ETH"}, "result": None, "error": "AuthError: Invalid API key"},
+            {
+                "name": "crypto_api",
+                "args": {"coin": "BTC"},
+                "result": None,
+                "error": "AuthError: Invalid API key",
+            },
+            {
+                "name": "crypto_api",
+                "args": {"coin": "ETH"},
+                "result": None,
+                "error": "AuthError: Invalid API key",
+            },
         ],
-        "exec_failure": True, "skip_step": None,
+        "exec_failure": True,
+        "skip_step": None,
     },
     {
         "label_id": "lbl_execution_04",
@@ -317,14 +398,20 @@ LABELED_SPECS = [
         "expected_verdict": "FAIL",
         "expected_primary_agent": "researcher",
         "notes": "Tool call declared but output field is null — capture failure, output state incomplete.",
-        "researcher_sources": 2, "researcher_entities": 3,
-        "writer_sources": 2,    "writer_entities": 3,
-        "include_verifier": False, "verified": False,
-        "verifier_sources": 0,  "verifier_entities": 0,
-        "tool_calls": [{"name": "sports_api", "args": {"league": "IPL"}, "result": None, "error": None}],
-        "exec_failure": True, "skip_step": None,
+        "researcher_sources": 2,
+        "researcher_entities": 3,
+        "writer_sources": 2,
+        "writer_entities": 3,
+        "include_verifier": False,
+        "verified": False,
+        "verifier_sources": 0,
+        "verifier_entities": 0,
+        "tool_calls": [
+            {"name": "sports_api", "args": {"league": "IPL"}, "result": None, "error": None}
+        ],
+        "exec_failure": True,
+        "skip_step": None,
     },
-
     # ── 4× WORKFLOW FAILURE (missing/wrong-order steps) ─────────────────────
     {
         "label_id": "lbl_workflow_01",
@@ -333,11 +420,17 @@ LABELED_SPECS = [
         "expected_verdict": "FAIL",
         "expected_primary_agent": "verifier",
         "notes": "Verifier step entirely absent from trace. Workflow incomplete.",
-        "researcher_sources": 8, "researcher_entities": 10,
-        "writer_sources": 8,    "writer_entities": 10,
-        "include_verifier": False, "verified": False,
-        "verifier_sources": 0,  "verifier_entities": 0,
-        "tool_calls": [], "exec_failure": False, "skip_step": "verifier",
+        "researcher_sources": 8,
+        "researcher_entities": 10,
+        "writer_sources": 8,
+        "writer_entities": 10,
+        "include_verifier": False,
+        "verified": False,
+        "verifier_sources": 0,
+        "verifier_entities": 0,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": "verifier",
     },
     {
         "label_id": "lbl_workflow_02",
@@ -346,11 +439,17 @@ LABELED_SPECS = [
         "expected_verdict": "FAIL",
         "expected_primary_agent": "verifier",
         "notes": "Verifier skipped — writer output never checked. High-risk for unverified claims.",
-        "researcher_sources": 10, "researcher_entities": 14,
-        "writer_sources": 10,    "writer_entities": 14,
-        "include_verifier": False, "verified": False,
-        "verifier_sources": 0,   "verifier_entities": 0,
-        "tool_calls": [], "exec_failure": False, "skip_step": "verifier",
+        "researcher_sources": 10,
+        "researcher_entities": 14,
+        "writer_sources": 10,
+        "writer_entities": 14,
+        "include_verifier": False,
+        "verified": False,
+        "verifier_sources": 0,
+        "verifier_entities": 0,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": "verifier",
     },
     {
         "label_id": "lbl_workflow_03",
@@ -359,11 +458,17 @@ LABELED_SPECS = [
         "expected_verdict": "FAIL",
         "expected_primary_agent": "researcher",
         "notes": "Researcher step absent — writer has no research input to work from.",
-        "researcher_sources": 0, "researcher_entities": 0,
-        "writer_sources": 5,    "writer_entities": 8,
-        "include_verifier": True, "verified": False,
-        "verifier_sources": 5,  "verifier_entities": 8,
-        "tool_calls": [], "exec_failure": False, "skip_step": "researcher",
+        "researcher_sources": 0,
+        "researcher_entities": 0,
+        "writer_sources": 5,
+        "writer_entities": 8,
+        "include_verifier": True,
+        "verified": False,
+        "verifier_sources": 5,
+        "verifier_entities": 8,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": "researcher",
     },
     {
         "label_id": "lbl_workflow_04",
@@ -372,13 +477,18 @@ LABELED_SPECS = [
         "expected_verdict": "FAIL",
         "expected_primary_agent": "verifier",
         "notes": "Pipeline terminates after writer — verifier never runs. Incomplete workflow.",
-        "researcher_sources": 6, "researcher_entities": 9,
-        "writer_sources": 6,    "writer_entities": 9,
-        "include_verifier": False, "verified": False,
-        "verifier_sources": 0,  "verifier_entities": 0,
-        "tool_calls": [], "exec_failure": False, "skip_step": "verifier",
+        "researcher_sources": 6,
+        "researcher_entities": 9,
+        "writer_sources": 6,
+        "writer_entities": 9,
+        "include_verifier": False,
+        "verified": False,
+        "verifier_sources": 0,
+        "verifier_entities": 0,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": "verifier",
     },
-
     # ── 4× VERIFICATION FAILURE (verifier passes hallucinated content) ───────
     {
         "label_id": "lbl_verification_01",
@@ -387,11 +497,17 @@ LABELED_SPECS = [
         "expected_verdict": "FAIL",
         "expected_primary_agent": "verifier",
         "notes": "Writer hallucinated 12 entities; verifier approved without catching any. Verifier entity count matches writer's inflated count.",
-        "researcher_sources": 6, "researcher_entities": 8,
-        "writer_sources": 9,    "writer_entities": 20,
-        "include_verifier": True, "verified": True,
-        "verifier_sources": 9,  "verifier_entities": 20,
-        "tool_calls": [], "exec_failure": False, "skip_step": None,
+        "researcher_sources": 6,
+        "researcher_entities": 8,
+        "writer_sources": 9,
+        "writer_entities": 20,
+        "include_verifier": True,
+        "verified": True,
+        "verifier_sources": 9,
+        "verifier_entities": 20,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": None,
     },
     {
         "label_id": "lbl_verification_02",
@@ -400,11 +516,17 @@ LABELED_SPECS = [
         "expected_verdict": "FAIL",
         "expected_primary_agent": "verifier",
         "notes": "Verifier rubber-stamps writer output — approved=True despite entity inflation of 15.",
-        "researcher_sources": 5, "researcher_entities": 7,
-        "writer_sources": 8,    "writer_entities": 22,
-        "include_verifier": True, "verified": True,
-        "verifier_sources": 8,  "verifier_entities": 22,
-        "tool_calls": [], "exec_failure": False, "skip_step": None,
+        "researcher_sources": 5,
+        "researcher_entities": 7,
+        "writer_sources": 8,
+        "writer_entities": 22,
+        "include_verifier": True,
+        "verified": True,
+        "verifier_sources": 8,
+        "verifier_entities": 22,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": None,
     },
     {
         "label_id": "lbl_verification_03",
@@ -413,11 +535,17 @@ LABELED_SPECS = [
         "expected_verdict": "FAIL",
         "expected_primary_agent": "verifier",
         "notes": "Always-approve verifier pattern — verifier never rejects anything regardless of content quality.",
-        "researcher_sources": 7, "researcher_entities": 10,
-        "writer_sources": 12,   "writer_entities": 25,
-        "include_verifier": True, "verified": True,
-        "verifier_sources": 12, "verifier_entities": 25,
-        "tool_calls": [], "exec_failure": False, "skip_step": None,
+        "researcher_sources": 7,
+        "researcher_entities": 10,
+        "writer_sources": 12,
+        "writer_entities": 25,
+        "include_verifier": True,
+        "verified": True,
+        "verifier_sources": 12,
+        "verifier_entities": 25,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": None,
     },
     {
         "label_id": "lbl_verification_04",
@@ -426,11 +554,17 @@ LABELED_SPECS = [
         "expected_verdict": "FAIL",
         "expected_primary_agent": "verifier",
         "notes": "Verifier accepts inflated source count without flagging the discrepancy from research.",
-        "researcher_sources": 4, "researcher_entities": 6,
-        "writer_sources": 11,   "writer_entities": 18,
-        "include_verifier": True, "verified": True,
-        "verifier_sources": 11, "verifier_entities": 18,
-        "tool_calls": [], "exec_failure": False, "skip_step": None,
+        "researcher_sources": 4,
+        "researcher_entities": 6,
+        "writer_sources": 11,
+        "writer_entities": 18,
+        "include_verifier": True,
+        "verified": True,
+        "verifier_sources": 11,
+        "verifier_entities": 18,
+        "tool_calls": [],
+        "exec_failure": False,
+        "skip_step": None,
     },
 ]
 
@@ -439,11 +573,12 @@ LABELED_SPECS = [
 # Build traces from specs
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def build_trace(spec: dict) -> tuple[str, dict]:
     """Build a full trace dict from a spec. Returns (run_id, trace_dict)."""
     run_id = f"run_{spec['label_id']}"
-    topic  = spec["topic"]
-    steps  = []
+    topic = spec["topic"]
+    steps = []
     latency_total = 0.0
 
     skip = spec.get("skip_step")
@@ -451,11 +586,13 @@ def build_trace(spec: dict) -> tuple[str, dict]:
     # ── Researcher step ───────────────────────────────────────────────────────
     if skip != "researcher":
         exec_fail = spec.get("exec_failure", False)
-        r_status  = "ERROR" if exec_fail else "SUCCESS"
-        r_error   = "ToolExecutionError: tool call failed or returned empty" if exec_fail else None
+        r_status = "ERROR" if exec_fail else "SUCCESS"
+        r_error = "ToolExecutionError: tool call failed or returned empty" if exec_fail else None
 
         step = _make_step(
-            run_id=run_id, step=1, agent="researcher",
+            run_id=run_id,
+            step=1,
+            agent="researcher",
             topic=topic,
             source_count=spec["researcher_sources"],
             entity_count=spec["researcher_entities"],
@@ -469,7 +606,9 @@ def build_trace(spec: dict) -> tuple[str, dict]:
 
     # ── Writer step ───────────────────────────────────────────────────────────
     step = _make_step(
-        run_id=run_id, step=len(steps) + 1, agent="writer",
+        run_id=run_id,
+        step=len(steps) + 1,
+        agent="writer",
         topic=topic,
         source_count=spec["writer_sources"],
         entity_count=spec["writer_entities"],
@@ -482,7 +621,9 @@ def build_trace(spec: dict) -> tuple[str, dict]:
     if spec.get("include_verifier", True) and skip != "verifier":
         v_result = "APPROVED" if spec.get("verified") else "NEEDS_REVISION"
         step = _make_step(
-            run_id=run_id, step=len(steps) + 1, agent="verifier",
+            run_id=run_id,
+            step=len(steps) + 1,
+            agent="verifier",
             topic=topic,
             source_count=spec.get("verifier_sources", spec["writer_sources"]),
             entity_count=spec.get("verifier_entities", spec["writer_entities"]),
@@ -501,6 +642,7 @@ def build_trace(spec: dict) -> tuple[str, dict]:
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def main():
     os.makedirs(TRACES_DIR, exist_ok=True)
     db = DatabaseManager(DB_PATH)
@@ -509,9 +651,9 @@ def main():
     labels = []
     generated = 0
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("AgentLens — Day 15: Labeled Test Set Generator")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     for spec in LABELED_SPECS:
         run_id, trace = build_trace(spec)
@@ -523,8 +665,8 @@ def main():
 
         # Insert into DB
         total_latency = trace["total_latency_ms"]
-        total_tokens  = trace["total_tokens"]
-        trace_json    = json.dumps(trace)
+        total_tokens = trace["total_tokens"]
+        trace_json = json.dumps(trace)
 
         db.insert_run(
             run_id=run_id,
@@ -556,26 +698,36 @@ def main():
             )
 
         # Build label record
-        labels.append({
-            "run_id": run_id,
-            "label_id": spec["label_id"],
-            "topic": spec["topic"],
-            "category": spec["category"],
-            "expected_verdict": spec["expected_verdict"],
-            "expected_primary_agent": spec["expected_primary_agent"],
-            "notes": spec["notes"],
-            "researcher_sources": spec["researcher_sources"],
-            "researcher_entities": spec["researcher_entities"],
-            "writer_sources": spec["writer_sources"],
-            "writer_entities": spec["writer_entities"],
-            "include_verifier": spec.get("include_verifier", True),
-            "has_tool_calls": len(spec.get("tool_calls", [])) > 0,
-            "skip_step": spec.get("skip_step"),
-            "frozen": True,  # never regenerate — used as fixed validation baseline
-        })
+        labels.append(
+            {
+                "run_id": run_id,
+                "label_id": spec["label_id"],
+                "topic": spec["topic"],
+                "category": spec["category"],
+                "expected_verdict": spec["expected_verdict"],
+                "expected_primary_agent": spec["expected_primary_agent"],
+                "notes": spec["notes"],
+                "researcher_sources": spec["researcher_sources"],
+                "researcher_entities": spec["researcher_entities"],
+                "writer_sources": spec["writer_sources"],
+                "writer_entities": spec["writer_entities"],
+                "include_verifier": spec.get("include_verifier", True),
+                "has_tool_calls": len(spec.get("tool_calls", [])) > 0,
+                "skip_step": spec.get("skip_step"),
+                "frozen": True,  # never regenerate — used as fixed validation baseline
+            }
+        )
 
-        cat_emoji = {"pass": "✅", "reasoning_failure": "🟡", "execution_failure": "🔴", "verification_failure": "🔵", "workflow_failure": "🟠"}
-        print(f"  {cat_emoji.get(spec['category'], '⚪')} {run_id}  [{spec['category']}]  {spec['topic']}")
+        cat_emoji = {
+            "pass": "✅",
+            "reasoning_failure": "🟡",
+            "execution_failure": "🔴",
+            "verification_failure": "🔵",
+            "workflow_failure": "🟠",
+        }
+        print(
+            f"  {cat_emoji.get(spec['category'], '⚪')} {run_id}  [{spec['category']}]  {spec['topic']}"
+        )
         generated += 1
 
     # Save labels.json
@@ -589,8 +741,10 @@ def main():
             "pass": sum(1 for lbl in labels if lbl["category"] == "pass"),
             "reasoning_failure": sum(1 for lbl in labels if lbl["category"] == "reasoning_failure"),
             "execution_failure": sum(1 for lbl in labels if lbl["category"] == "execution_failure"),
-            "workflow_failure":  sum(1 for lbl in labels if lbl["category"] == "workflow_failure"),
-            "verification_failure": sum(1 for lbl in labels if lbl["category"] == "verification_failure"),
+            "workflow_failure": sum(1 for lbl in labels if lbl["category"] == "workflow_failure"),
+            "verification_failure": sum(
+                1 for lbl in labels if lbl["category"] == "verification_failure"
+            ),
         },
         "runs": labels,
     }
@@ -598,12 +752,12 @@ def main():
     with open(LABELS_PATH, "w", encoding="utf-8") as f:
         json.dump(labels_data, f, indent=2)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  Generated {generated}/20 labeled traces")
     print(f"  Trace files : {TRACES_DIR}/")
     print(f"  Labels file : {LABELS_PATH}")
     print(f"  DB updated  : {DB_PATH}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ from app.pipeline import PipelineState, build_pipeline
 
 # ── Pipeline structure tests (no API call needed) ─────────────────────────────
 
+
 def test_pipeline_builds_without_error():
     """The graph must compile successfully."""
     app = build_pipeline()
@@ -76,6 +77,7 @@ def test_pipeline_graph_edges_are_linear():
 
 
 # ── Integration test (requires GROQ_API_KEY) ──────────────────────────────────
+
 
 @pytest.mark.skipif(
     not os.getenv("GROQ_API_KEY") or os.getenv("GROQ_API_KEY") == "gsk_your_key_here",

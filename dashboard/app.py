@@ -46,6 +46,7 @@ from dashboard.theme import (
 # Shared layout helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def inject_css():
     ui.add_head_html(GLOBAL_CSS)
     ui.query("body").style(f"background:{BG};color:{TEXT};")
@@ -90,15 +91,19 @@ def header(pipeline_name: str = "research_report_pipeline"):
 def nav_bar(active: str, run_id: str = ""):
     """Top navigation tabs. active = one of: runs, metrics, diff, timeline, evidence, explain"""
     global_tabs = [
-        ("🔍", "Runs",    "runs",    "/"),
+        ("🔍", "Runs", "runs", "/"),
         ("📈", "Metrics", "metrics", "/metrics"),
-        ("⚖️",  "Diff",   "diff",    "/diff"),
+        ("⚖️", "Diff", "diff", "/diff"),
     ]
-    run_tabs = [
-        ("⏱",  "Timeline", "timeline", f"/run/{run_id}"),
-        ("🔬", "Evidence",  "evidence", f"/run/{run_id}/evidence"),
-        ("✦",  "Explain",  "explain",  f"/run/{run_id}/explain"),
-    ] if run_id else []
+    run_tabs = (
+        [
+            ("⏱", "Timeline", "timeline", f"/run/{run_id}"),
+            ("🔬", "Evidence", "evidence", f"/run/{run_id}/evidence"),
+            ("✦", "Explain", "explain", f"/run/{run_id}/explain"),
+        ]
+        if run_id
+        else []
+    )
 
     tabs_html = ""
     for icon, label, key, href in global_tabs:
@@ -119,6 +124,7 @@ def nav_bar(active: str, run_id: str = ""):
 # Page 1 — Run Explorer  /
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @ui.page("/")
 def runs_page():
     inject_css()
@@ -129,7 +135,9 @@ def runs_page():
         runs = state.list_runs(limit=50)
 
         # ── Filter bar ────────────────────────────────────────────────────────
-        with ui.element("div").style("display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;"):
+        with ui.element("div").style(
+            "display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;"
+        ):
             ui.html('<div class="al-section">Run Explorer</div>')
             # (filters are cosmetic for MVP; full filtering = Day 22)
             ui.html("""
@@ -140,19 +148,23 @@ def runs_page():
             """)
 
         # ── Stat cards ────────────────────────────────────────────────────────
-        analyzed     = [r for r in runs if state.get_cached(r.run_id)]
-        warnings     = sum(1 for r in runs if state.get_cached(r.run_id) and
-                           state.get_cached(r.run_id).loss_result and
-                           state.get_cached(r.run_id).loss_result.verdict != "PASS")
-        avg_lat      = (sum(r.latency_ms for r in runs) / len(runs)) if runs else 0
-        total_tok    = sum(r.tokens_total for r in runs)
+        analyzed = [r for r in runs if state.get_cached(r.run_id)]
+        warnings = sum(
+            1
+            for r in runs
+            if state.get_cached(r.run_id)
+            and state.get_cached(r.run_id).loss_result
+            and state.get_cached(r.run_id).loss_result.verdict != "PASS"
+        )
+        avg_lat = (sum(r.latency_ms for r in runs) / len(runs)) if runs else 0
+        total_tok = sum(r.tokens_total for r in runs)
 
         with ui.element("div").style("display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;"):
             for label, val, color, sub in [
-                ("Total Runs",    str(len(runs)),      PURPLE, f"{len(analyzed)} analyzed"),
-                ("Avg Latency",   fmt_ms(avg_lat),     CYAN,   "per pipeline run"),
-                ("Total Tokens",  f"{total_tok:,}",    AMBER,  f"~${total_tok*0.000005:.3f} est."),
-                ("Warnings",      str(warnings),       RED if warnings else GREEN, "from analyzed runs"),
+                ("Total Runs", str(len(runs)), PURPLE, f"{len(analyzed)} analyzed"),
+                ("Avg Latency", fmt_ms(avg_lat), CYAN, "per pipeline run"),
+                ("Total Tokens", f"{total_tok:,}", AMBER, f"~${total_tok * 0.000005:.3f} est."),
+                ("Warnings", str(warnings), RED if warnings else GREEN, "from analyzed runs"),
             ]:
                 ui.html(f"""
                 <div class="al-stat">
@@ -193,29 +205,37 @@ def runs_page():
 def _run_row(r: state.RunRow, cols: str):
     cached = state.get_cached(r.run_id)
     bundle = cached.bundle if cached else None
-    loss   = cached.loss_result if cached else None
+    loss = cached.loss_result if cached else None
 
     # Determine tint from verdict
-    verdict = (loss.verdict if loss else ("PASS" if bundle and bundle.priority_level.value == "P5" else "UNKNOWN"))
-    bg      = row_bg(verdict)
+    verdict = (
+        loss.verdict
+        if loss
+        else ("PASS" if bundle and bundle.priority_level.value == "P5" else "UNKNOWN")
+    )
+    bg = row_bg(verdict)
 
     # Primary cause display
     if bundle:
-        cause_str  = bundle.primary_cause.value
-        agent_str  = bundle.primary_agent or ""
-        cause_disp = f'{cause_str.capitalize()} {"in handoff" if "workflow" in cause_str else ""}' \
-                     f'<br><span style="font-size:11px;color:{TEXT_MUTED};font-family:monospace;">({agent_str})</span>'
+        cause_str = bundle.primary_cause.value
+        agent_str = bundle.primary_agent or ""
+        cause_disp = (
+            f"{cause_str.capitalize()} {'in handoff' if 'workflow' in cause_str else ''}"
+            f'<br><span style="font-size:11px;color:{TEXT_MUTED};font-family:monospace;">({agent_str})</span>'
+        )
     else:
         cause_disp = f'<span style="color:{TEXT_DIM};">—</span>'
 
-    verdict_disp = verdict_badge(verdict, bundle.grounded if bundle else False) if bundle else \
-                   f'<span style="color:{TEXT_DIM};font-size:12px;">Unanalyzed</span>'
+    verdict_disp = (
+        verdict_badge(verdict, bundle.grounded if bundle else False)
+        if bundle
+        else f'<span style="color:{TEXT_DIM};font-size:12px;">Unanalyzed</span>'
+    )
 
     # Row container
-    row_el = ui.element("div").style(
-        f"background:{bg};"
-        f"grid-template-columns:{cols};"
-    ).classes("al-trow")
+    row_el = (
+        ui.element("div").style(f"background:{bg};grid-template-columns:{cols};").classes("al-trow")
+    )
 
     with row_el:
         with ui.element("div").classes("al-tcell"):
@@ -250,15 +270,18 @@ def _run_row(r: state.RunRow, cols: str):
 def _toggle(el):
     """Toggle display:none on a NiceGUI element."""
     # Use client-side JS for instant response
-    ui.run_javascript(f"var el = document.getElementById('{el.id}'); el.style.display = el.style.display === 'none' ? 'block' : 'none';")
+    ui.run_javascript(
+        f"var el = document.getElementById('{el.id}'); el.style.display = el.style.display === 'none' ? 'block' : 'none';"
+    )
 
 
 def _inline_verdict_panel(bundle, loss, run_id: str):
-    conf        = f"{loss.confidence:.0%}" if loss else "—"
+    conf = f"{loss.confidence:.0%}" if loss else "—"
     verdict_str = loss.verdict if loss else "UNKNOWN"
 
     # Build markdown in Python so it can be passed safely via json.dumps
     import json as _j
+
     md = (
         f"## AgentLens Verdict\n"
         f"**Run:** `{run_id}`\n"
@@ -269,12 +292,10 @@ def _inline_verdict_panel(bundle, loss, run_id: str):
         f"**Grounded:** {'Yes' if bundle.grounded else 'No'}"
     )
 
-    with ui.element("div").style(
-        "display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;"
-    ):
+    with ui.element("div").style("display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;"):
         for label, html_val in [
-            ("Priority",   priority_badge(bundle.priority_level.value)),
-            ("Cause",      cause_badge(bundle.primary_cause.value)),
+            ("Priority", priority_badge(bundle.priority_level.value)),
+            ("Cause", cause_badge(bundle.primary_cause.value)),
         ]:
             with ui.element("div"):
                 ui.html(f'<div class="al-section" style="margin-bottom:6px;">{label}</div>')
@@ -282,11 +303,13 @@ def _inline_verdict_panel(bundle, loss, run_id: str):
 
         ag_color = STEP_COLOR.get(bundle.primary_agent or "", GRAY)
         grnd_color = "#22c55e" if bundle.grounded else TEXT_MUTED
-        grnd_txt   = "\u2713 Yes" if bundle.grounded else "\u2717 No (heuristic)"
+        grnd_txt = "\u2713 Yes" if bundle.grounded else "\u2717 No (heuristic)"
 
         with ui.element("div"):
             ui.html('<div class="al-section" style="margin-bottom:6px;">Agent</div>')
-            ui.html(f'<span style="font-size:13px;font-weight:500;color:{ag_color};">{bundle.primary_agent or "N/A"}</span>')
+            ui.html(
+                f'<span style="font-size:13px;font-weight:500;color:{ag_color};">{bundle.primary_agent or "N/A"}</span>'
+            )
 
         with ui.element("div"):
             ui.html('<div class="al-section" style="margin-bottom:6px;">Confidence</div>')
@@ -317,13 +340,17 @@ def _inline_verdict_panel(bundle, loss, run_id: str):
             )
 
 
-def _inline_analyze_panel(run_id: str, expansion, row_el, cols: str, cause_el=None, verdict_el=None):
+def _inline_analyze_panel(
+    run_id: str, expansion, row_el, cols: str, cause_el=None, verdict_el=None
+):
     content_area = ui.element("div")
 
     async def analyze():
         content_area.clear()
         with content_area:
-            with ui.element("div").style(f"display:flex;align-items:center;gap:10px;color:{TEXT_MUTED};"):
+            with ui.element("div").style(
+                f"display:flex;align-items:center;gap:10px;color:{TEXT_MUTED};"
+            ):
                 ui.spinner(size="xs").style(f"color:{PURPLE};")
                 ui.label("Analyzing… (LLM calls, ~8-10s)")
 
@@ -338,18 +365,24 @@ def _inline_analyze_panel(run_id: str, expansion, row_el, cols: str, cause_el=No
 
                 # ── Update the row cells so the table reflects the verdict ──
                 bundle = result.bundle
-                loss   = result.loss_result
-                verdict = loss.verdict if loss else ("PASS" if bundle.priority_level.value == "P5" else "UNKNOWN")
+                loss = result.loss_result
+                verdict = (
+                    loss.verdict
+                    if loss
+                    else ("PASS" if bundle.priority_level.value == "P5" else "UNKNOWN")
+                )
 
                 # Update cause cell
                 if cause_el is not None:
                     cause_str = bundle.primary_cause.value
                     agent_str = bundle.primary_agent or ""
                     new_cause = (
-                        f'{cause_str.capitalize()} {"in handoff" if "workflow" in cause_str else ""}'
+                        f"{cause_str.capitalize()} {'in handoff' if 'workflow' in cause_str else ''}"
                         f'<br><span style="font-size:11px;color:{TEXT_MUTED};font-family:monospace;">({agent_str})</span>'
                     )
-                    cause_el.set_content(f'<div style="font-size:13px;line-height:1.5;">{new_cause}</div>')
+                    cause_el.set_content(
+                        f'<div style="font-size:13px;line-height:1.5;">{new_cause}</div>'
+                    )
 
                 # Update verdict cell
                 if verdict_el is not None:
@@ -357,9 +390,7 @@ def _inline_analyze_panel(run_id: str, expansion, row_el, cols: str, cause_el=No
 
                 # Update row background tint
                 new_bg = row_bg(verdict)
-                row_el.style(
-                    f"background:{new_bg};grid-template-columns:{cols};"
-                )
+                row_el.style(f"background:{new_bg};grid-template-columns:{cols};")
 
     with content_area:
         ui.button("▶  Analyze this run", on_click=analyze).style(
@@ -371,6 +402,7 @@ def _inline_analyze_panel(run_id: str, expansion, row_el, cols: str, cause_el=No
 # ─────────────────────────────────────────────────────────────────────────────
 # Page 2 — Trace Timeline  /run/{run_id}
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @ui.page("/run/{run_id}")
 def trace_page(run_id: str):
@@ -389,7 +421,7 @@ def trace_page(run_id: str):
         </div>
         """)
 
-        steps_db    = state.get_steps(run_id)
+        steps_db = state.get_steps(run_id)
         steps_trace = state.get_trace_steps(run_id)
         trace_by_agent = {s.get("agent", ""): s for s in steps_trace}
 
@@ -400,17 +432,19 @@ def trace_page(run_id: str):
         max_lat = max((s.latency_ms for s in steps_db), default=1)
         _ = max((s.tokens_total for s in steps_db), default=1)  # reserved for token chart
 
-        ui.html('<div class="al-section" style="margin-bottom:16px;">Step-by-step pipeline execution</div>')
+        ui.html(
+            '<div class="al-section" style="margin-bottom:16px;">Step-by-step pipeline execution</div>'
+        )
 
         # ── Node flow ─────────────────────────────────────────────────────────
-        with ui.element("div").style("display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding-bottom:8px;"):
+        with ui.element("div").style(
+            "display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding-bottom:8px;"
+        ):
             for i, s in enumerate(steps_db):
                 color = STEP_COLOR.get(s.agent, GRAY)
                 t_data = trace_by_agent.get(s.agent, {})
 
-                node = ui.element("div").style(
-                    f"border-color:{color}44;"
-                ).classes("al-node")
+                node = ui.element("div").style(f"border-color:{color}44;").classes("al-node")
 
                 json_panel = ui.element("div").style("display:none;margin-top:12px;")
 
@@ -449,12 +483,14 @@ def trace_page(run_id: str):
                             except Exception:
                                 handoff = {}
 
-                        tabs_data["Input"]    = handoff.get("input_state", {})
+                        tabs_data["Input"] = handoff.get("input_state", {})
                         tabs_data["Filtered"] = handoff.get("filtered_state", {})
-                        tabs_data["Output"]   = handoff.get("output_state", {})
+                        tabs_data["Output"] = handoff.get("output_state", {})
 
                         for tab_name, tab_data in tabs_data.items():
-                            ui.html(f'<div style="font-size:10px;color:{TEXT_MUTED};margin:8px 0 4px;font-weight:600;">{tab_name}</div>')
+                            ui.html(
+                                f'<div style="font-size:10px;color:{TEXT_MUTED};margin:8px 0 4px;font-weight:600;">{tab_name}</div>'
+                            )
                             content = json.dumps(tab_data, indent=2, default=str)[:800]
                             ui.html(f'<div class="al-json">{content}</div>')
 
@@ -464,12 +500,15 @@ def trace_page(run_id: str):
                             f"var jp = document.getElementById('{jp.id}'); "
                             f"jp.style.display = jp.style.display === 'none' ? 'block' : 'none';"
                         )
+
                     n.on("click", toggle)
 
                 make_toggle()
 
                 if i < len(steps_db) - 1:
-                    ui.html(f'<div style="font-size:22px;color:{TEXT_DIM};padding:20px 8px;flex-shrink:0;">→</div>')
+                    ui.html(
+                        f'<div style="font-size:22px;color:{TEXT_DIM};padding:20px 8px;flex-shrink:0;">→</div>'
+                    )
 
         # ── Summary card ──────────────────────────────────────────────────────
         ui.html('<div class="al-section" style="margin:24px 0 12px;">Run Summary</div>')
@@ -481,9 +520,9 @@ def trace_page(run_id: str):
         ):
             for label, val, color in [
                 ("Total Latency", fmt_ms(total_lat), CYAN),
-                ("Total Tokens",  f"{total_tok:,}",  AMBER),
-                ("Step Count",    str(len(steps_db)), PURPLE),
-                ("Est. Cost",     f"${total_tok*0.000005:.4f}", GREEN),
+                ("Total Tokens", f"{total_tok:,}", AMBER),
+                ("Step Count", str(len(steps_db)), PURPLE),
+                ("Est. Cost", f"${total_tok * 0.000005:.4f}", GREEN),
             ]:
                 ui.html(f"""
                 <div>
@@ -496,6 +535,7 @@ def trace_page(run_id: str):
 # ─────────────────────────────────────────────────────────────────────────────
 # Page 3 — Evidence View  /run/{run_id}/evidence
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @ui.page("/run/{run_id}/evidence")
 def evidence_page(run_id: str):
@@ -519,7 +559,9 @@ def evidence_page(run_id: str):
 
         async def load():
             with spinner_area:
-                with ui.element("div").style(f"display:flex;align-items:center;gap:10px;color:{TEXT_MUTED};padding:16px 0;"):
+                with ui.element("div").style(
+                    f"display:flex;align-items:center;gap:10px;color:{TEXT_MUTED};padding:16px 0;"
+                ):
                     ui.spinner(size="sm").style(f"color:{PURPLE};")
                     ui.label("Loading evidence (Days 9–12 pipeline)…")
 
@@ -532,18 +574,22 @@ def evidence_page(run_id: str):
                     return
 
                 bundle = result.bundle
-                loss   = result.loss_result
+                loss = result.loss_result
 
                 # ── Section: Rule Matches ─────────────────────────────────────
-                ui.html(f'<div class="al-section" style="margin-bottom:12px;">Rule Matches ({len(bundle.rule_matches)})</div>')
+                ui.html(
+                    f'<div class="al-section" style="margin-bottom:12px;">Rule Matches ({len(bundle.rule_matches)})</div>'
+                )
                 if bundle.rule_matches:
                     with ui.element("div").style(
                         f"background:{CARD};border:1px solid {BORDER};border-radius:10px;overflow:hidden;margin-bottom:20px;"
                     ):
                         for rm in bundle.rule_matches:
-                            sev_col  = {"HIGH": RED, "MEDIUM": AMBER, "LOW": CYAN}.get(rm.severity.value.upper(), GRAY)
-                            p_badge  = priority_badge("P2")
-                            r_badge  = rule_badge(rm.rule_id)
+                            sev_col = {"HIGH": RED, "MEDIUM": AMBER, "LOW": CYAN}.get(
+                                rm.severity.value.upper(), GRAY
+                            )
+                            p_badge = priority_badge("P2")
+                            r_badge = rule_badge(rm.rule_id)
                             ag_color = STEP_COLOR.get(rm.agent or "", GRAY)
                             ui.html(f"""
                             <div style="padding:14px 20px;border-bottom:1px solid {BORDER};">
@@ -552,7 +598,7 @@ def evidence_page(run_id: str):
                                 {p_badge}
                                 {badge(rm.severity.value, sev_col)}
                                 <span style="font-size:12px;color:{ag_color};margin-left:4px;">
-                                  agent: {rm.agent or 'unknown'}
+                                  agent: {rm.agent or "unknown"}
                                 </span>
                                 <span style="margin-left:auto;font-size:11px;color:{TEXT_DIM};">
                                   {rm.category.value}
@@ -564,10 +610,14 @@ def evidence_page(run_id: str):
                             </div>
                             """)
                 else:
-                    ui.html(f'<div style="color:{TEXT_MUTED};padding:12px 0;">No rule matches.</div>')
+                    ui.html(
+                        f'<div style="color:{TEXT_MUTED};padding:12px 0;">No rule matches.</div>'
+                    )
 
                 # ── Section: Extracted Evidence ────────────────────────────────
-                ui.html(f'<div class="al-section" style="margin-bottom:12px;margin-top:4px;">Extracted Facts ({len(result.extracted)} agents)</div>')
+                ui.html(
+                    f'<div class="al-section" style="margin-bottom:12px;margin-top:4px;">Extracted Facts ({len(result.extracted)} agents)</div>'
+                )
                 with ui.element("div").style(
                     f"background:{CARD};border:1px solid {BORDER};border-radius:10px;overflow:hidden;margin-bottom:20px;"
                 ):
@@ -601,9 +651,12 @@ def evidence_page(run_id: str):
                                 async def _click():
                                     ag_col = STEP_COLOR.get(ag, GRAY)
                                     dlg = ui.dialog()
-                                    with dlg, ui.card().style(
-                                        f"background:{CARD};border:1px solid {BORDER};"
-                                        "min-width:520px;max-width:680px;padding:24px;"
+                                    with (
+                                        dlg,
+                                        ui.card().style(
+                                            f"background:{CARD};border:1px solid {BORDER};"
+                                            "min-width:520px;max-width:680px;padding:24px;"
+                                        ),
                                     ):
                                         ui.html(f"""
                                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
@@ -630,10 +683,16 @@ def evidence_page(run_id: str):
                                             f'<div style="color:{TEXT_MUTED};padding:8px 0;">'
                                             f'<span style="color:{PURPLE};">⟳</span>  Generating explanation…</div>'
                                         )
-                                        with ui.row().style("justify-content:flex-end;margin-top:12px;"):
-                                            ui.button("Close", on_click=dlg.close).props("flat").style(f"color:{TEXT_MUTED};")
+                                        with ui.row().style(
+                                            "justify-content:flex-end;margin-top:12px;"
+                                        ):
+                                            ui.button("Close", on_click=dlg.close).props(
+                                                "flat"
+                                            ).style(f"color:{TEXT_MUTED};")
                                     dlg.open()
-                                    text = await run.io_bound(state.explain_agent_evidence, ag, ev, bndl)
+                                    text = await run.io_bound(
+                                        state.explain_agent_evidence, ag, ev, bndl
+                                    )
                                     status_lbl.set_content(f"""
                                     <div style="background:{BG_SIDEBAR};border-left:3px solid {STEP_COLOR.get(ag, GRAY)};
                                                 border-radius:6px;padding:14px 16px;">
@@ -642,7 +701,9 @@ def evidence_page(run_id: str):
                                     </div>
                                     """)
 
-                                ui.button("Explain this →", on_click=_click).props("flat dense").style(
+                                ui.button("Explain this →", on_click=_click).props(
+                                    "flat dense"
+                                ).style(
                                     f"color:{TEXT_MUTED};font-size:11px;border:1px solid {BORDER};"
                                     "border-radius:6px;padding:4px 12px;white-space:nowrap;"
                                 )
@@ -650,7 +711,9 @@ def evidence_page(run_id: str):
                             _mk_btn()
                 # ── Section: Information Loss Detail ──────────────────────────
                 if loss:
-                    ui.html('<div class="al-section" style="margin-bottom:12px;">Information Loss Delta (Researcher → Writer)</div>')
+                    ui.html(
+                        '<div class="al-section" style="margin-bottom:12px;">Information Loss Delta (Researcher → Writer)</div>'
+                    )
                     v_col = VERDICT_COLOR.get(loss.verdict, GRAY)
                     with ui.element("div").style(
                         f"background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:16px 20px;margin-bottom:20px;"
@@ -665,8 +728,20 @@ def evidence_page(run_id: str):
                         </div>
                         """)
                         for diff in [loss.source_diff, loss.entity_diff]:
-                            arrow_col = RED if diff.signal == "DROPPED" else AMBER if diff.signal == "ADDED" else GREEN
-                            arrow     = "↓" if diff.signal == "DROPPED" else "↑" if diff.signal == "ADDED" else "→"
+                            arrow_col = (
+                                RED
+                                if diff.signal == "DROPPED"
+                                else AMBER
+                                if diff.signal == "ADDED"
+                                else GREEN
+                            )
+                            arrow = (
+                                "↓"
+                                if diff.signal == "DROPPED"
+                                else "↑"
+                                if diff.signal == "ADDED"
+                                else "→"
+                            )
                             ui.html(f"""
                             <div style="display:flex;justify-content:space-between;align-items:center;
                                         padding:10px 0;border-bottom:1px solid {BORDER};font-size:13px;">
@@ -689,6 +764,7 @@ def evidence_page(run_id: str):
 # Page 4 — Diff Viewer  /diff
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @ui.page("/diff")
 def diff_page():
     inject_css()
@@ -696,28 +772,34 @@ def diff_page():
     nav_bar("diff")
 
     with ui.element("div").classes("al-content"):
-        ui.html('<div class="al-section" style="margin-bottom:16px;">Diff Viewer — compare two runs</div>')
+        ui.html(
+            '<div class="al-section" style="margin-bottom:16px;">Diff Viewer — compare two runs</div>'
+        )
 
-        runs    = state.list_runs(limit=50)
+        runs = state.list_runs(limit=50)
         run_ids = [r.run_id for r in runs]
         if len(run_ids) < 2:
-            ui.html(f'<div style="color:{TEXT_MUTED};">Need at least 2 runs. Run the pipeline a few more times.</div>')
+            ui.html(
+                f'<div style="color:{TEXT_MUTED};">Need at least 2 runs. Run the pipeline a few more times.</div>'
+            )
             return
 
         sel_a = ui.select(run_ids, label="Run A", value=run_ids[0]).style(
             f"background:{CARD};color:{TEXT};min-width:240px;"
         )
         ui.html('<div style="height:12px;"></div>')
-        sel_b = ui.select(run_ids, label="Run B", value=run_ids[1] if len(run_ids) > 1 else run_ids[0]).style(
-            f"background:{CARD};color:{TEXT};min-width:240px;"
-        )
+        sel_b = ui.select(
+            run_ids, label="Run B", value=run_ids[1] if len(run_ids) > 1 else run_ids[0]
+        ).style(f"background:{CARD};color:{TEXT};min-width:240px;")
 
         result_area = ui.element("div").style("margin-top:20px;")
 
         async def compute():
             result_area.clear()
             with result_area:
-                with ui.element("div").style(f"display:flex;gap:10px;align-items:center;color:{TEXT_MUTED};"):
+                with ui.element("div").style(
+                    f"display:flex;gap:10px;align-items:center;color:{TEXT_MUTED};"
+                ):
                     ui.spinner(size="sm").style(f"color:{PURPLE};")
                     ui.label("Computing diff…")
 
@@ -758,11 +840,11 @@ def diff_page():
                     </div>
                     """)
                     for row in diff.steps:
-                        ag    = row["agent"]
-                        col   = STEP_COLOR.get(ag, GRAY)
-                        sc    = row["sim"] * 100
+                        ag = row["agent"]
+                        col = STEP_COLOR.get(ag, GRAY)
+                        sc = row["sim"] * 100
                         s_col = GREEN if sc > 80 else AMBER if sc > 50 else RED
-                        is_div = (ag == diff.first_divergence)
+                        is_div = ag == diff.first_divergence
                         div_bg = f"background:{RED}18;" if is_div else ""
                         ui.html(f"""
                         <div style="display:grid;grid-template-columns:{DCOLS};
@@ -771,10 +853,10 @@ def diff_page():
                             {ag}{" ← diverge" if is_div else ""}
                           </span>
                           <span style="font-size:12px;color:{TEXT_MUTED};">
-                            {fmt_ms(row['lat_a'])} / {row['tok_a']:,}
+                            {fmt_ms(row["lat_a"])} / {row["tok_a"]:,}
                           </span>
                           <span style="font-size:12px;color:{TEXT_MUTED};">
-                            {fmt_ms(row['lat_b'])} / {row['tok_b']:,}
+                            {fmt_ms(row["lat_b"])} / {row["tok_b"]:,}
                           </span>
                           <span style="font-size:13px;font-weight:600;color:{s_col};">
                             {sc:.0f}%
@@ -792,6 +874,7 @@ def diff_page():
 # Page 5 — Metrics  /metrics
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @ui.page("/metrics")
 def metrics_page():
     inject_css()
@@ -799,7 +882,9 @@ def metrics_page():
     nav_bar("metrics")
 
     with ui.element("div").classes("al-content"):
-        ui.html('<div class="al-section" style="margin-bottom:16px;">Aggregate Metrics — no LLM, pure DB reads</div>')
+        ui.html(
+            '<div class="al-section" style="margin-bottom:16px;">Aggregate Metrics — no LLM, pure DB reads</div>'
+        )
 
         data = state.get_metrics_data()
         if not data:
@@ -812,56 +897,119 @@ def metrics_page():
         # ── Stat cards ────────────────────────────────────────────────────────
         with ui.element("div").style("display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;"):
             for ag in agents:
-                d   = data[ag]
+                d = data[ag]
                 col = STEP_COLOR.get(ag, GRAY)
                 ui.html(f"""
                 <div class="al-stat">
                   <div class="al-stat-label" style="color:{col};">{ag}</div>
-                  <div class="al-stat-value" style="color:{col};">{fmt_ms(d['avg_latency_ms'])}</div>
-                  <div class="al-stat-sub">avg latency · {d['run_count']} runs</div>
+                  <div class="al-stat-value" style="color:{col};">{fmt_ms(d["avg_latency_ms"])}</div>
+                  <div class="al-stat-sub">avg latency · {d["run_count"]} runs</div>
                 </div>
                 """)
 
         # ── Latency bar chart ─────────────────────────────────────────────────
         ui.html('<div class="al-section" style="margin-bottom:12px;">Avg Latency per Agent</div>')
-        ui.echart({
-            "backgroundColor": "transparent",
-            "tooltip": {"trigger": "axis", "backgroundColor": CARD, "borderColor": BORDER, "textStyle": {"color": TEXT}},
-            "xAxis": {"type": "category", "data": agents, "axisLabel": {"color": TEXT_MUTED},
-                      "axisLine": {"lineStyle": {"color": BORDER}}},
-            "yAxis": {"type": "value", "name": "ms", "nameTextStyle": {"color": TEXT_MUTED},
-                      "axisLabel": {"color": TEXT_MUTED}, "splitLine": {"lineStyle": {"color": BORDER}}},
-            "series": [{
-                "type": "bar",
-                "data": [{"value": round(data[ag]["avg_latency_ms"]), "itemStyle": {"color": STEP_COLOR.get(ag, GRAY)}} for ag in agents],
-                "barMaxWidth": 60,
-                "label": {"show": True, "position": "top", "color": TEXT_MUTED, "fontSize": 11,
-                          "formatter": "{c}ms"},
-            }],
-        }).style(f"height:260px;background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:12px;margin-bottom:16px;")
+        ui.echart(
+            {
+                "backgroundColor": "transparent",
+                "tooltip": {
+                    "trigger": "axis",
+                    "backgroundColor": CARD,
+                    "borderColor": BORDER,
+                    "textStyle": {"color": TEXT},
+                },
+                "xAxis": {
+                    "type": "category",
+                    "data": agents,
+                    "axisLabel": {"color": TEXT_MUTED},
+                    "axisLine": {"lineStyle": {"color": BORDER}},
+                },
+                "yAxis": {
+                    "type": "value",
+                    "name": "ms",
+                    "nameTextStyle": {"color": TEXT_MUTED},
+                    "axisLabel": {"color": TEXT_MUTED},
+                    "splitLine": {"lineStyle": {"color": BORDER}},
+                },
+                "series": [
+                    {
+                        "type": "bar",
+                        "data": [
+                            {
+                                "value": round(data[ag]["avg_latency_ms"]),
+                                "itemStyle": {"color": STEP_COLOR.get(ag, GRAY)},
+                            }
+                            for ag in agents
+                        ],
+                        "barMaxWidth": 60,
+                        "label": {
+                            "show": True,
+                            "position": "top",
+                            "color": TEXT_MUTED,
+                            "fontSize": 11,
+                            "formatter": "{c}ms",
+                        },
+                    }
+                ],
+            }
+        ).style(
+            f"height:260px;background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:12px;margin-bottom:16px;"
+        )
 
         # ── Token usage chart ─────────────────────────────────────────────────
         ui.html('<div class="al-section" style="margin-bottom:12px;">Total Tokens per Agent</div>')
-        ui.echart({
-            "backgroundColor": "transparent",
-            "tooltip": {"trigger": "axis", "backgroundColor": CARD, "borderColor": BORDER, "textStyle": {"color": TEXT}},
-            "xAxis": {"type": "category", "data": agents, "axisLabel": {"color": TEXT_MUTED},
-                      "axisLine": {"lineStyle": {"color": BORDER}}},
-            "yAxis": {"type": "value", "name": "tokens", "nameTextStyle": {"color": TEXT_MUTED},
-                      "axisLabel": {"color": TEXT_MUTED}, "splitLine": {"lineStyle": {"color": BORDER}}},
-            "series": [{
-                "type": "bar",
-                "data": [{"value": data[ag]["total_tokens"], "itemStyle": {"color": PURPLE + "cc"}} for ag in agents],
-                "barMaxWidth": 60,
-                "label": {"show": True, "position": "top", "color": TEXT_MUTED, "fontSize": 11,
-                          "formatter": "{c}"},
-            }],
-        }).style(f"height:260px;background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:12px;")
+        ui.echart(
+            {
+                "backgroundColor": "transparent",
+                "tooltip": {
+                    "trigger": "axis",
+                    "backgroundColor": CARD,
+                    "borderColor": BORDER,
+                    "textStyle": {"color": TEXT},
+                },
+                "xAxis": {
+                    "type": "category",
+                    "data": agents,
+                    "axisLabel": {"color": TEXT_MUTED},
+                    "axisLine": {"lineStyle": {"color": BORDER}},
+                },
+                "yAxis": {
+                    "type": "value",
+                    "name": "tokens",
+                    "nameTextStyle": {"color": TEXT_MUTED},
+                    "axisLabel": {"color": TEXT_MUTED},
+                    "splitLine": {"lineStyle": {"color": BORDER}},
+                },
+                "series": [
+                    {
+                        "type": "bar",
+                        "data": [
+                            {
+                                "value": data[ag]["total_tokens"],
+                                "itemStyle": {"color": PURPLE + "cc"},
+                            }
+                            for ag in agents
+                        ],
+                        "barMaxWidth": 60,
+                        "label": {
+                            "show": True,
+                            "position": "top",
+                            "color": TEXT_MUTED,
+                            "fontSize": 11,
+                            "formatter": "{c}",
+                        },
+                    }
+                ],
+            }
+        ).style(
+            f"height:260px;background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:12px;"
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Page 6 — Explanation  /run/{run_id}/explain
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @ui.page("/run/{run_id}/explain")
 def explain_page(run_id: str):
@@ -882,12 +1030,14 @@ def explain_page(run_id: str):
 
         # Pipeline analysis flow banner — descriptive steps, no day labels
         steps = [
-            ("Evidence",   "Extract sources & entities from each agent's output",  CYAN),
-            ("Info Loss",  "Compare researcher → writer handoff for dropped facts", AMBER),
-            ("Arbiter",    "Score evidence, assign priority (P2/P5), root cause",   PURPLE),
-            ("Explain",    "LLM generates actionable root-cause explanation",        GREEN),
+            ("Evidence", "Extract sources & entities from each agent's output", CYAN),
+            ("Info Loss", "Compare researcher → writer handoff for dropped facts", AMBER),
+            ("Arbiter", "Score evidence, assign priority (P2/P5), root cause", PURPLE),
+            ("Explain", "LLM generates actionable root-cause explanation", GREEN),
         ]
-        with ui.element("div").style("display:flex;align-items:center;gap:0;margin-bottom:24px;flex-wrap:wrap;"):
+        with ui.element("div").style(
+            "display:flex;align-items:center;gap:0;margin-bottom:24px;flex-wrap:wrap;"
+        ):
             for i, (lbl, desc, col) in enumerate(steps):
                 ui.html(f"""
                 <div style="background:{col}18;border:1px solid {col}44;border-radius:8px;
@@ -898,7 +1048,9 @@ def explain_page(run_id: str):
                 </div>
                 """)
                 if i < len(steps) - 1:
-                    ui.html(f'<span style="color:{TEXT_DIM};font-size:16px;padding:0 6px;flex-shrink:0;">→</span>')
+                    ui.html(
+                        f'<span style="color:{TEXT_DIM};font-size:16px;padding:0 6px;flex-shrink:0;">→</span>'
+                    )
 
         content = ui.element("div")
         spinner = ui.element("div")
@@ -910,8 +1062,12 @@ def explain_page(run_id: str):
                     f"padding:48px;display:flex;flex-direction:column;align-items:center;gap:12px;"
                 ):
                     ui.spinner(size="lg").style(f"color:{PURPLE};")
-                    ui.html(f'<div style="color:{TEXT_MUTED};font-size:14px;">Running full analysis pipeline…</div>')
-                    ui.html(f'<div style="color:{TEXT_DIM};font-size:12px;">Days 9 → 12 (LLM evidence extraction)</div>')
+                    ui.html(
+                        f'<div style="color:{TEXT_MUTED};font-size:14px;">Running full analysis pipeline…</div>'
+                    )
+                    ui.html(
+                        f'<div style="color:{TEXT_DIM};font-size:12px;">Days 9 → 12 (LLM evidence extraction)</div>'
+                    )
 
             analysis = await run.io_bound(state.run_full_analysis, run_id)
             spinner.clear()
@@ -931,12 +1087,17 @@ def explain_page(run_id: str):
 
 def _render_explanation(bundle, analysis):
     # p_col / c_col reserved for future per-cause color coding
-    _ = (PRIORITY_COLOR.get(bundle.priority_level.value, GRAY), CAUSE_COLOR.get(bundle.primary_cause.value, GRAY))
-    verdict = (analysis.loss_result.verdict if analysis.loss_result else "UNKNOWN")
-    conf    = f"{analysis.loss_result.confidence:.0%}" if analysis.loss_result else "—"
+    _ = (
+        PRIORITY_COLOR.get(bundle.priority_level.value, GRAY),
+        CAUSE_COLOR.get(bundle.primary_cause.value, GRAY),
+    )
+    verdict = analysis.loss_result.verdict if analysis.loss_result else "UNKNOWN"
+    conf = f"{analysis.loss_result.confidence:.0%}" if analysis.loss_result else "—"
 
     is_grounded = bundle.grounded
-    hedge_note  = "heuristic — hedged language" if not is_grounded else "grounded — confident language"
+    hedge_note = (
+        "heuristic — hedged language" if not is_grounded else "grounded — confident language"
+    )
 
     # Copy verdict markdown
     # Build markdown string as a proper Python variable (not embedded in onclick HTML)
@@ -958,11 +1119,17 @@ def _render_explanation(bundle, analysis):
         f"padding:16px 20px;margin-bottom:16px;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;"
     ):
         for label, content_html in [
-            ("Priority",      priority_badge(bundle.priority_level.value)),
-            ("Cause",         cause_badge(bundle.primary_cause.value)),
-            ("Agent",         f'<span style="color:{STEP_COLOR.get(bundle.primary_agent or "", GRAY)};font-weight:600;">{bundle.primary_agent or "N/A"}</span>'),
-            ("Confidence",    f'<span style="font-size:15px;font-weight:700;">{conf}</span>'),
-            ("Grounded",      f'<span style="color:{"#22c55e" if is_grounded else TEXT_MUTED};">{"✓ Yes" if is_grounded else "✗ No"}</span>'),
+            ("Priority", priority_badge(bundle.priority_level.value)),
+            ("Cause", cause_badge(bundle.primary_cause.value)),
+            (
+                "Agent",
+                f'<span style="color:{STEP_COLOR.get(bundle.primary_agent or "", GRAY)};font-weight:600;">{bundle.primary_agent or "N/A"}</span>',
+            ),
+            ("Confidence", f'<span style="font-size:15px;font-weight:700;">{conf}</span>'),
+            (
+                "Grounded",
+                f'<span style="color:{"#22c55e" if is_grounded else TEXT_MUTED};">{"✓ Yes" if is_grounded else "✗ No"}</span>',
+            ),
         ]:
             with ui.element("div").style("flex:1;min-width:100px;"):
                 ui.html(f'<div class="al-section" style="margin-bottom:6px;">{label}</div>')
@@ -973,7 +1140,9 @@ def _render_explanation(bundle, analysis):
         f"background:linear-gradient(135deg,{PURPLE}18,{CYAN}0a);"
         f"border:1px solid {PURPLE}44;border-radius:10px;padding:20px 22px;margin-bottom:16px;"
     ):
-        with ui.element("div").style("display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;"):
+        with ui.element("div").style(
+            "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;"
+        ):
             ui.html(f"""
             <div style="display:flex;align-items:center;gap:8px;">
               <span style="font-size:14px;">✦</span>
@@ -983,12 +1152,12 @@ def _render_explanation(bundle, analysis):
               </span>
             </div>
             """)
+
             # Use NiceGUI button + async JS for clipboard — HTML onclick breaks with special chars
             async def copy_to_clipboard(md=md_verdict):
                 import json as _json
-                await ui.run_javascript(
-                    f"navigator.clipboard.writeText({_json.dumps(md)})"
-                )
+
+                await ui.run_javascript(f"navigator.clipboard.writeText({_json.dumps(md)})")
                 ui.notify("✓ Copied to clipboard", type="positive", position="top", timeout=2000)
 
             ui.button("📋 Copy verdict", on_click=copy_to_clipboard).props("flat dense").style(
@@ -1018,15 +1187,19 @@ def _render_explanation(bundle, analysis):
         with ui.element("div").style(
             f"background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:16px 20px;margin-bottom:16px;"
         ):
-            ui.html(f'<div class="al-section" style="margin-bottom:12px;">Fired Rules ({len(bundle.rule_matches)})</div>')
+            ui.html(
+                f'<div class="al-section" style="margin-bottom:12px;">Fired Rules ({len(bundle.rule_matches)})</div>'
+            )
             for rm in bundle.rule_matches:
-                sev_col = {"HIGH": RED, "MEDIUM": AMBER, "LOW": CYAN}.get(rm.severity.value.upper(), GRAY)
+                sev_col = {"HIGH": RED, "MEDIUM": AMBER, "LOW": CYAN}.get(
+                    rm.severity.value.upper(), GRAY
+                )
                 ui.html(f"""
                 <div style="padding:10px 0;border-bottom:1px solid {BORDER};">
                   <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
                     {rule_badge(rm.rule_id)}
                     {badge(rm.severity.value, sev_col)}
-                    <span style="font-size:11px;color:{TEXT_MUTED};margin-left:auto;">agent: {rm.agent or 'unknown'}</span>
+                    <span style="font-size:11px;color:{TEXT_MUTED};margin-left:auto;">agent: {rm.agent or "unknown"}</span>
                   </div>
                   <div style="font-size:12px;color:{TEXT_MUTED};">{rm.description[:200]}</div>
                 </div>
@@ -1039,6 +1212,7 @@ def _render_explanation(bundle, analysis):
 
 if __name__ in {"__main__", "__mp_main__"}:
     import os
+
     # Serve dashboard/assets/ at /assets so logo.png is reachable
     assets_dir = os.path.join(os.path.dirname(__file__), "assets")
     app.add_static_files("/assets", assets_dir)
@@ -1049,5 +1223,7 @@ if __name__ in {"__main__", "__mp_main__"}:
         port=8080,
         reload=False,
         dark=True,
-        favicon=os.path.join(assets_dir, "logo.png") if os.path.exists(os.path.join(assets_dir, "logo.png")) else "🔬",
+        favicon=os.path.join(assets_dir, "logo.png")
+        if os.path.exists(os.path.join(assets_dir, "logo.png"))
+        else "🔬",
     )

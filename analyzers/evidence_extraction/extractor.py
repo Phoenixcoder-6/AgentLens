@@ -41,6 +41,7 @@ log = get_logger("extractor")
 # ExtractedEvidence — the schema the LLM must return
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class ExtractedEvidence(BaseModel):
     """
     Structured evidence extracted from a single agent's output.
@@ -48,31 +49,29 @@ class ExtractedEvidence(BaseModel):
 
     schema_version is stamped so records are traceable across schema upgrades.
     """
+
     schema_version: str = Field(
-        default=SCHEMA_VERSION,
-        description="Schema version stamped on every record"
+        default=SCHEMA_VERSION, description="Schema version stamped on every record"
     )
     source_count: int = Field(
         default=0,
         ge=0,
-        description="Number of distinct sources or citations referenced in the output"
+        description="Number of distinct sources or citations referenced in the output",
     )
     entity_count: int = Field(
         default=0,
         ge=0,
-        description="Number of distinct named entities (people, orgs, places, concepts) mentioned"
+        description="Number of distinct named entities (people, orgs, places, concepts) mentioned",
     )
     tool_calls: list[str] = Field(
         default_factory=list,
-        description="Names of any tools explicitly invoked during this step. Empty list if none."
+        description="Names of any tools explicitly invoked during this step. Empty list if none.",
     )
     extraction_failed: bool = Field(
-        default=False,
-        description="True if extraction fell back to defaults due to LLM error"
+        default=False, description="True if extraction fell back to defaults due to LLM error"
     )
     error_message: str | None = Field(
-        default=None,
-        description="Error details if extraction_failed is True"
+        default=None, description="Error details if extraction_failed is True"
     )
 
 
@@ -116,6 +115,7 @@ class EvidenceExtractor:
     def _build_llm(self):
         """Build a schema-constrained LLM that returns ExtractedEvidence."""
         from dotenv import load_dotenv
+
         load_dotenv()
 
         model = get("llm", "model", "llama-3.3-70b-versatile")
@@ -140,8 +140,7 @@ class EvidenceExtractor:
         """
         if not raw_output or not raw_output.strip():
             return ExtractedEvidence(
-                extraction_failed=True,
-                error_message="Empty output — nothing to extract"
+                extraction_failed=True, error_message="Empty output — nothing to extract"
             )
 
         # Truncate very long outputs to stay within token limits
@@ -157,22 +156,29 @@ class EvidenceExtractor:
             result: ExtractedEvidence = self._llm.invoke(messages)
             latency_ms = (time.time() - start_t) * 1000
 
-            log.info("Extraction LLM call completed", extra={"extra_fields": {
-                "model": getattr(self._llm, "model_name", "unknown"),
-                "latency_ms": round(latency_ms, 2),
-                "agent": agent,
-                "cost_estimate": 0.0, # Groq token counting varies by model, stubbing for now
-            }})
+            log.info(
+                "Extraction LLM call completed",
+                extra={
+                    "extra_fields": {
+                        "model": getattr(self._llm, "model_name", "unknown"),
+                        "latency_ms": round(latency_ms, 2),
+                        "agent": agent,
+                        "cost_estimate": 0.0,  # Groq token counting varies by model, stubbing for now
+                    }
+                },
+            )
 
             # Stamp schema_version (Pydantic default does this, but enforce it)
             result.schema_version = SCHEMA_VERSION
             return result
 
         except Exception as exc:
-            log.warning("Extraction LLM call failed", extra={"extra_fields": {"error": str(exc), "agent": agent}})
+            log.warning(
+                "Extraction LLM call failed",
+                extra={"extra_fields": {"error": str(exc), "agent": agent}},
+            )
             return ExtractedEvidence(
-                extraction_failed=True,
-                error_message=f"{type(exc).__name__}: {exc}"
+                extraction_failed=True, error_message=f"{type(exc).__name__}: {exc}"
             )
 
     def extract_run(self, steps: list[dict]) -> dict[int, ExtractedEvidence]:

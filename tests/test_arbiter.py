@@ -132,6 +132,7 @@ def make_loss_result(
 # TestDeterminism — core Day 12 requirement
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestDeterminism:
     """
     CORE REQUIREMENT: same evidence in → same output out, every time.
@@ -142,10 +143,10 @@ class TestDeterminism:
         results = [determine_primary_cause(deepcopy(evidence), RUN_ID) for _ in range(runs)]
         first = results[0]
         for i, r in enumerate(results[1:], start=2):
-            assert r.primary_cause   == first.primary_cause,   f"Run {i}: primary_cause differs"
-            assert r.priority_level  == first.priority_level,  f"Run {i}: priority_level differs"
-            assert r.grounded        == first.grounded,         f"Run {i}: grounded differs"
-            assert r.primary_agent   == first.primary_agent,    f"Run {i}: primary_agent differs"
+            assert r.primary_cause == first.primary_cause, f"Run {i}: primary_cause differs"
+            assert r.priority_level == first.priority_level, f"Run {i}: priority_level differs"
+            assert r.grounded == first.grounded, f"Run {i}: grounded differs"
+            assert r.primary_agent == first.primary_agent, f"Run {i}: primary_agent differs"
 
     def test_deterministic_empty_evidence(self):
         self._assert_deterministic([])
@@ -154,23 +155,25 @@ class TestDeterminism:
         self._assert_deterministic([make_rule_evidence("information_loss_v1")])
 
     def test_deterministic_multiple_p2_rules(self):
-        self._assert_deterministic([
-            make_rule_evidence("rule_b"),
-            make_rule_evidence("rule_a"),
-            make_rule_evidence("rule_c"),
-        ])
+        self._assert_deterministic(
+            [
+                make_rule_evidence("rule_b"),
+                make_rule_evidence("rule_a"),
+                make_rule_evidence("rule_c"),
+            ]
+        )
 
     def test_deterministic_regardless_of_input_order(self):
         """Shuffling input must not change verdict."""
         ev_a = make_rule_evidence("rule_alpha", confidence=0.9)
-        ev_b = make_rule_evidence("rule_beta",  confidence=0.5)
+        ev_b = make_rule_evidence("rule_beta", confidence=0.5)
 
         result_ab = determine_primary_cause([ev_a, ev_b], RUN_ID)
         result_ba = determine_primary_cause([ev_b, ev_a], RUN_ID)
 
-        assert result_ab.primary_cause  == result_ba.primary_cause
+        assert result_ab.primary_cause == result_ba.primary_cause
         assert result_ab.priority_level == result_ba.priority_level
-        assert result_ab.primary_agent  == result_ba.primary_agent
+        assert result_ab.primary_agent == result_ba.primary_agent
 
     def test_arbiter_run_deterministic_with_shuffled_input(self):
         arbiter = Arbiter()
@@ -187,29 +190,31 @@ class TestDeterminism:
 
         first = results[0]
         for r in results[1:]:
-            assert r.primary_cause  == first.primary_cause
+            assert r.primary_cause == first.primary_cause
             assert r.priority_level == first.priority_level
-            assert r.primary_agent  == first.primary_agent
+            assert r.primary_agent == first.primary_agent
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TestP2RuleMatch
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestP2RuleMatch:
 
+class TestP2RuleMatch:
     def test_p2_priority_on_rule_engine_evidence(self):
         bundle = determine_primary_cause([make_rule_evidence()], RUN_ID)
         assert bundle.priority_level == PriorityLevel.P2
 
     def test_p2_reasoning_category(self):
         bundle = determine_primary_cause(
-            [make_rule_evidence(category=FailureCategory.REASONING)], RUN_ID)
+            [make_rule_evidence(category=FailureCategory.REASONING)], RUN_ID
+        )
         assert bundle.primary_cause == FailureCategory.REASONING
 
     def test_p2_workflow_category(self):
         bundle = determine_primary_cause(
-            [make_rule_evidence(category=FailureCategory.WORKFLOW)], RUN_ID)
+            [make_rule_evidence(category=FailureCategory.WORKFLOW)], RUN_ID
+        )
         assert bundle.primary_cause == FailureCategory.WORKFLOW
 
     def test_p2_not_grounded(self):
@@ -222,7 +227,8 @@ class TestP2RuleMatch:
 
     def test_p2_all_evidence_attached(self):
         bundle = determine_primary_cause(
-            [make_rule_evidence("r1"), make_rule_evidence("r2")], RUN_ID)
+            [make_rule_evidence("r1"), make_rule_evidence("r2")], RUN_ID
+        )
         assert len(bundle.evidence) == 2
 
     def test_p2_rule_matches_populated(self):
@@ -234,8 +240,7 @@ class TestP2RuleMatch:
         assert bundle.run_id == RUN_ID
 
     def test_p2_summary_contains_rule_id(self):
-        bundle = determine_primary_cause(
-            [make_rule_evidence("information_loss_v1")], RUN_ID)
+        bundle = determine_primary_cause([make_rule_evidence("information_loss_v1")], RUN_ID)
         assert "information_loss_v1" in bundle.summary
 
 
@@ -243,8 +248,8 @@ class TestP2RuleMatch:
 # TestP5Fallback
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestP5Fallback:
 
+class TestP5Fallback:
     def test_p5_on_empty_evidence(self):
         assert determine_primary_cause([], RUN_ID).priority_level == PriorityLevel.P5
 
@@ -276,12 +281,12 @@ class TestP5Fallback:
 # TestTieBreak
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestTieBreak:
 
+class TestTieBreak:
     def test_lowest_rule_id_wins(self):
         evidence = [
             make_rule_evidence("rule_c"),
-            make_rule_evidence("rule_a"),   # ← wins (alphabetically first)
+            make_rule_evidence("rule_a"),  # ← wins (alphabetically first)
             make_rule_evidence("rule_b"),
         ]
         bundle = determine_primary_cause(evidence, RUN_ID)
@@ -301,17 +306,17 @@ class TestTieBreak:
     def test_tiebreak_alphabetical_not_by_confidence(self):
         """Higher confidence must NOT override rule_id tie-break."""
         ev_high = make_rule_evidence("rule_z", confidence=0.99)
-        ev_low  = make_rule_evidence("rule_a", confidence=0.10)
+        ev_low = make_rule_evidence("rule_a", confidence=0.10)
         bundle = determine_primary_cause([ev_high, ev_low], RUN_ID)
-        assert "rule_a" in bundle.summary   # rule_a wins despite lower confidence
+        assert "rule_a" in bundle.summary  # rule_a wins despite lower confidence
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TestEvidenceConversion
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestEvidenceConversion:
 
+class TestEvidenceConversion:
     def test_warning_produces_evidence(self):
         ev = evidence_from_information_loss(make_loss_result("WARNING"))
         assert ev is not None and isinstance(ev, EvidenceRecord)
@@ -354,13 +359,13 @@ class TestEvidenceConversion:
         ev = evidence_from_information_loss(make_loss_result("WARNING"))
         bundle = Arbiter().run(RUN_ID, [ev])
         assert bundle.priority_level == PriorityLevel.P2
-        assert bundle.primary_cause  == FailureCategory.REASONING
+        assert bundle.primary_cause == FailureCategory.REASONING
 
     def test_end_to_end_fail_reaches_p2_workflow(self):
         ev = evidence_from_information_loss(make_loss_result("FAIL", src_writer=2))
         bundle = Arbiter().run(RUN_ID, [ev])
         assert bundle.priority_level == PriorityLevel.P2
-        assert bundle.primary_cause  == FailureCategory.WORKFLOW
+        assert bundle.primary_cause == FailureCategory.WORKFLOW
 
     def test_end_to_end_pass_reaches_p5(self):
         ev = evidence_from_information_loss(make_loss_result("PASS"))
@@ -372,8 +377,8 @@ class TestEvidenceConversion:
 # TestArbiterClass
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestArbiterClass:
 
+class TestArbiterClass:
     def test_run_returns_bundle(self):
         assert isinstance(Arbiter().run(RUN_ID, []), AnalysisBundle)
 
@@ -387,12 +392,14 @@ class TestArbiterClass:
         evidence = [make_rule_evidence("rule_c"), make_rule_evidence("rule_a")]
         b1 = Arbiter().run(RUN_ID, evidence)
         b2 = Arbiter().run(RUN_ID, list(reversed(evidence)))
-        assert b1.primary_cause  == b2.primary_cause
+        assert b1.primary_cause == b2.primary_cause
         assert b1.priority_level == b2.priority_level
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TestGrounded
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestGrounded:
     """Test compute_grounded function logic."""
@@ -401,7 +408,7 @@ class TestGrounded:
         """No P1 evidence -> always False."""
         evidence = [
             make_rule_evidence(),  # P2
-            make_rule_evidence("another_rule")  # P2
+            make_rule_evidence("another_rule"),  # P2
         ]
         assert compute_grounded(evidence) is False
         assert compute_grounded([]) is False
@@ -416,6 +423,6 @@ class TestGrounded:
         )
         evidence = [
             make_rule_evidence(),  # P2
-            p1_evidence            # P1
+            p1_evidence,  # P1
         ]
         assert compute_grounded(evidence) is True

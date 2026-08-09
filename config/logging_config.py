@@ -67,8 +67,10 @@ def setup_logging():
     logger.propagate = False
     return logger
 
+
 # Initialize logging when module is imported
 _root_logger = setup_logging()
+
 
 def get_logger(name: str) -> logging.Logger:
     """Get a child logger configured for JSON output."""

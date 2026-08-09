@@ -49,6 +49,7 @@ class AnalysisResult:
         skipped     : True if the analyzer could not run (e.g. extraction failed)
         skip_reason : why it was skipped, for dashboard display
     """
+
     evidence: list[EvidenceRecord] = field(default_factory=list)
     analyzer_id: str = ""
     skipped: bool = False
@@ -63,6 +64,7 @@ class TraceEvent:
     This is intentionally un-typed (raw dicts) because the Normalizer is
     responsible for converting it into a typed AgentStep.
     """
+
     agent: str
     raw_input: Any
     raw_output: Any
@@ -75,6 +77,7 @@ class TraceEvent:
 # ─────────────────────────────────────────────────────────────────────────────
 # Interface 1: Analyzer
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @runtime_checkable
 class Analyzer(Protocol):
@@ -123,6 +126,7 @@ class Analyzer(Protocol):
 # ─────────────────────────────────────────────────────────────────────────────
 # Interface 2: CaptureProvider
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @runtime_checkable
 class CaptureProvider(Protocol):
@@ -197,6 +201,7 @@ class CaptureProvider(Protocol):
 # ─────────────────────────────────────────────────────────────────────────────
 # Interface 3: StorageProvider
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @runtime_checkable
 class StorageProvider(Protocol):
@@ -290,6 +295,7 @@ class StorageProvider(Protocol):
 # Interface 4: LLMProvider
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @runtime_checkable
 class LLMProvider(Protocol):
     """
@@ -370,18 +376,22 @@ class LLMProvider(Protocol):
 # Custom Exceptions
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class LLMProviderError(Exception):
     """Raised when an LLMProvider call fails after all retry attempts."""
+
     pass
 
 
 class ExtractionError(Exception):
     """Raised when structured extraction output is malformed after retry."""
+
     pass
 
 
 class StorageError(Exception):
     """Raised when a StorageProvider operation fails."""
+
     pass
 
 
@@ -390,4 +400,5 @@ class CaptureError(Exception):
     Raised internally within the CaptureProvider — never propagated to the
     agent pipeline. Capture failures are logged and silently skipped.
     """
+
     pass

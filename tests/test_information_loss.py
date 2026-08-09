@@ -17,8 +17,10 @@ from schema.models import SCHEMA_VERSION
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def make_evidence(source_count=8, entity_count=16, tool_calls=None,
-                  extraction_failed=False, error_message=None) -> ExtractedEvidence:
+
+def make_evidence(
+    source_count=8, entity_count=16, tool_calls=None, extraction_failed=False, error_message=None
+) -> ExtractedEvidence:
     return ExtractedEvidence(
         source_count=source_count,
         entity_count=entity_count,
@@ -35,8 +37,8 @@ RUN_ID = "run_test_day10"
 # FieldDiff
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestFieldDiff:
 
+class TestFieldDiff:
     def test_dropped_signal_when_delta_negative(self):
         rule = InformationLossRule()
         diff = rule._compute_diff("source_count", researcher_val=8, writer_val=5)
@@ -80,38 +82,38 @@ class TestFieldDiff:
 # InformationLossRule — PASS cases
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestInformationLossPass:
 
+class TestInformationLossPass:
     def setup_method(self):
         self.rule = InformationLossRule()
 
     def test_exact_match_is_pass(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=8, entity_count=16)
+        writer = make_evidence(source_count=8, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "PASS"
 
     def test_schema_version_stamped(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=8, entity_count=16)
+        writer = make_evidence(source_count=8, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.schema_version == SCHEMA_VERSION
 
     def test_run_id_preserved(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=8, entity_count=16)
+        writer = make_evidence(source_count=8, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.run_id == RUN_ID
 
     def test_no_loss_flags_on_pass(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=8, entity_count=16)
+        writer = make_evidence(source_count=8, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.has_information_loss is False
 
     def test_confidence_is_1_on_clean_pass(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=8, entity_count=16)
+        writer = make_evidence(source_count=8, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.confidence == 1.0
 
@@ -120,35 +122,35 @@ class TestInformationLossPass:
 # InformationLossRule — WARNING cases
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestInformationLossWarning:
 
+class TestInformationLossWarning:
     def setup_method(self):
         self.rule = InformationLossRule()
 
     def test_small_source_drop_is_warning(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=7, entity_count=16)  # 1 source dropped
+        writer = make_evidence(source_count=7, entity_count=16)  # 1 source dropped
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "WARNING"
         assert result.has_information_loss is True
 
     def test_small_entity_drop_is_warning(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=8, entity_count=15)  # 1 entity dropped
+        writer = make_evidence(source_count=8, entity_count=15)  # 1 entity dropped
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "WARNING"
 
     def test_sources_added_is_warning(self):
         """Writer adds MORE sources than Researcher — hallucination risk."""
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=11, entity_count=16)  # 3 added
+        writer = make_evidence(source_count=11, entity_count=16)  # 3 added
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "WARNING"
         assert result.has_information_gain is True
 
     def test_entities_added_is_warning(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=8, entity_count=19)
+        writer = make_evidence(source_count=8, entity_count=19)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "WARNING"
         assert result.has_information_gain is True
@@ -160,8 +162,8 @@ class TestInformationLossWarning:
             Writer:     source_count=11, entity_count=17
         Both counts increased → WARNING (gain, not loss).
         """
-        researcher = make_evidence(source_count=8,  entity_count=16)
-        writer     = make_evidence(source_count=11, entity_count=17)
+        researcher = make_evidence(source_count=8, entity_count=16)
+        writer = make_evidence(source_count=11, entity_count=17)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "WARNING"
         assert result.has_information_gain is True
@@ -174,42 +176,42 @@ class TestInformationLossWarning:
 # InformationLossRule — FAIL cases
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestInformationLossFail:
 
+class TestInformationLossFail:
     def setup_method(self):
         self.rule = InformationLossRule()
 
     def test_large_source_drop_is_fail(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=4, entity_count=16)  # 4 dropped (HIGH)
+        writer = make_evidence(source_count=4, entity_count=16)  # 4 dropped (HIGH)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "FAIL"
         assert result.source_diff.severity == "HIGH"
 
     def test_large_entity_drop_is_fail(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=8, entity_count=10)  # 6 dropped (HIGH)
+        writer = make_evidence(source_count=8, entity_count=10)  # 6 dropped (HIGH)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "FAIL"
         assert result.entity_diff.severity == "HIGH"
 
     def test_both_fields_dropped_heavily_is_fail(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=2, entity_count=5)
+        writer = make_evidence(source_count=2, entity_count=5)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "FAIL"
         assert result.has_information_loss is True
 
     def test_confidence_high_on_fail(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=2, entity_count=5)
+        writer = make_evidence(source_count=2, entity_count=5)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         # Large drop → confidence should be well above 0.80
         assert result.confidence >= 0.80
 
     def test_writer_zero_sources_is_fail(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=0, entity_count=16)
+        writer = make_evidence(source_count=0, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "FAIL"
 
@@ -218,35 +220,35 @@ class TestInformationLossFail:
 # InformationLossRule — extraction failure handling
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestExtractionFailureHandling:
 
+class TestExtractionFailureHandling:
     def setup_method(self):
         self.rule = InformationLossRule()
 
     def test_researcher_extraction_failed_skips_rule(self):
         researcher = make_evidence(extraction_failed=True, error_message="timeout")
-        writer     = make_evidence(source_count=8, entity_count=16)
+        writer = make_evidence(source_count=8, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.rule_failed is True
-        assert result.verdict == "PASS"   # don't falsely flag when data is bad
+        assert result.verdict == "PASS"  # don't falsely flag when data is bad
         assert result.confidence == 0.0
 
     def test_writer_extraction_failed_skips_rule(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(extraction_failed=True, error_message="timeout")
+        writer = make_evidence(extraction_failed=True, error_message="timeout")
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.rule_failed is True
         assert result.confidence == 0.0
 
     def test_both_failed_skips_rule(self):
         researcher = make_evidence(extraction_failed=True)
-        writer     = make_evidence(extraction_failed=True)
+        writer = make_evidence(extraction_failed=True)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.rule_failed is True
 
     def test_confidence_zero_on_skip(self):
         researcher = make_evidence(extraction_failed=True, error_message="API timeout")
-        writer     = make_evidence(source_count=8, entity_count=16)
+        writer = make_evidence(source_count=8, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.confidence == 0.0
 
@@ -254,6 +256,7 @@ class TestExtractionFailureHandling:
 # ─────────────────────────────────────────────────────────────────────────────
 # Scalable confidence — verifies confidence scales with delta magnitude
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestScalableConfidence:
     """
@@ -271,20 +274,20 @@ class TestScalableConfidence:
 
     def test_pass_confidence_is_always_1(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=8, entity_count=16)
+        writer = make_evidence(source_count=8, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.confidence == 1.0
 
     def test_fail_confidence_in_range(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=4, entity_count=16)  # HIGH drop
+        writer = make_evidence(source_count=4, entity_count=16)  # HIGH drop
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "FAIL"
         assert 0.80 <= result.confidence <= 0.99
 
     def test_warning_confidence_in_range(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=7, entity_count=16)  # small drop
+        writer = make_evidence(source_count=7, entity_count=16)  # small drop
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "WARNING"
         assert 0.60 <= result.confidence <= 0.84
@@ -312,7 +315,7 @@ class TestScalableConfidence:
         small_gain = self.rule.evaluate(
             RUN_ID,
             researcher,
-            make_evidence(source_count=9,  entity_count=16),  # gain 1
+            make_evidence(source_count=9, entity_count=16),  # gain 1
         )
         large_gain = self.rule.evaluate(
             RUN_ID,
@@ -324,7 +327,7 @@ class TestScalableConfidence:
     def test_total_drop_gives_near_max_confidence(self):
         """If writer has 0 sources, confidence should be near 0.99."""
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=0, entity_count=0)
+        writer = make_evidence(source_count=0, entity_count=0)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict == "FAIL"
         assert result.confidence >= 0.95
@@ -335,12 +338,14 @@ class TestScalableConfidence:
 
         # WARNING: small drop
         warning_result = self.rule.evaluate(
-            RUN_ID, researcher,
+            RUN_ID,
+            researcher,
             make_evidence(source_count=7, entity_count=16),
         )
         # FAIL: large drop
         fail_result = self.rule.evaluate(
-            RUN_ID, researcher,
+            RUN_ID,
+            researcher,
             make_evidence(source_count=4, entity_count=16),
         )
         assert fail_result.confidence > warning_result.confidence
@@ -350,39 +355,39 @@ class TestScalableConfidence:
 # Summary and result fields
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestResultFields:
 
+class TestResultFields:
     def setup_method(self):
         self.rule = InformationLossRule()
 
     def test_summary_is_string(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=5, entity_count=16)
+        writer = make_evidence(source_count=5, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert isinstance(result.summary, str)
         assert len(result.summary) > 0
 
     def test_summary_contains_verdict(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=5, entity_count=16)
+        writer = make_evidence(source_count=5, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.verdict in result.summary
 
     def test_rule_id_is_set(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=8, entity_count=16)
+        writer = make_evidence(source_count=8, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.rule_id == "information_loss_v1"
 
     def test_rule_category_is_workflow(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=8, entity_count=16)
+        writer = make_evidence(source_count=8, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.rule_category == "workflow"
 
     def test_timestamp_is_set(self):
         researcher = make_evidence(source_count=8, entity_count=16)
-        writer     = make_evidence(source_count=8, entity_count=16)
+        writer = make_evidence(source_count=8, entity_count=16)
         result = self.rule.evaluate(RUN_ID, researcher, writer)
         assert result.timestamp is not None
         assert "2026" in result.timestamp or "2025" in result.timestamp

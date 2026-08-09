@@ -29,31 +29,53 @@ def tmp_db(tmp_path) -> DatabaseManager:
     return db
 
 
-def _seed_run(db: DatabaseManager, run_id: str, latencies: list[float],
-              tokens: list[int] = None) -> None:
+def _seed_run(
+    db: DatabaseManager, run_id: str, latencies: list[float], tokens: list[int] = None
+) -> None:
     """Seed one run with N steps into the DB."""
     agents = ["researcher", "writer", "verifier"]
     total_latency = sum(latencies)
-    db.insert_run(run_id, "test_pipeline", TS, "SUCCESS",
-                  total_latency, sum(tokens or [0]*len(latencies)), SCHEMA_VERSION)
+    db.insert_run(
+        run_id,
+        "test_pipeline",
+        TS,
+        "SUCCESS",
+        total_latency,
+        sum(tokens or [0] * len(latencies)),
+        SCHEMA_VERSION,
+    )
 
     for i, latency in enumerate(latencies):
         agent = agents[i % len(agents)]
         tok = tokens[i] if tokens else 0
-        db.insert_step(run_id, i + 1, agent, "SUCCESS", latency,
-                       tok // 3, tok - tok // 3 * 2, tok,
-                       f"added=['key_{i}']", TS, SCHEMA_VERSION)
+        db.insert_step(
+            run_id,
+            i + 1,
+            agent,
+            "SUCCESS",
+            latency,
+            tok // 3,
+            tok - tok // 3 * 2,
+            tok,
+            f"added=['key_{i}']",
+            TS,
+            SCHEMA_VERSION,
+        )
         db.insert_metric(run_id, i + 1, agent, "latency_ms", latency, "ms", TS, SCHEMA_VERSION)
-        db.insert_metric(run_id, i + 1, agent, "execution_time_ms", latency, "ms", TS, SCHEMA_VERSION)
-        db.insert_metric(run_id, i + 1, agent, "tokens_total", float(tok), "tokens", TS, SCHEMA_VERSION)
+        db.insert_metric(
+            run_id, i + 1, agent, "execution_time_ms", latency, "ms", TS, SCHEMA_VERSION
+        )
+        db.insert_metric(
+            run_id, i + 1, agent, "tokens_total", float(tok), "tokens", TS, SCHEMA_VERSION
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stats helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestStatsHelpers:
 
+class TestStatsHelpers:
     def test_mean_basic(self):
         assert _mean([1.0, 2.0, 3.0]) == 2.0
 
@@ -83,24 +105,40 @@ class TestStatsHelpers:
 # StepMetrics
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestStepMetrics:
 
+class TestStepMetrics:
     def test_schema_version_stamped(self):
         sm = StepMetrics(
-            schema_version=SCHEMA_VERSION, run_id="r", step=1, agent="researcher",
-            latency_ms=1000.0, latency_flag=False, latency_threshold_ms=5000.0,
-            tokens_prompt=0, tokens_completion=0, tokens_total=0,
-            execution_time_ms=1000.0, is_anomalous=False
+            schema_version=SCHEMA_VERSION,
+            run_id="r",
+            step=1,
+            agent="researcher",
+            latency_ms=1000.0,
+            latency_flag=False,
+            latency_threshold_ms=5000.0,
+            tokens_prompt=0,
+            tokens_completion=0,
+            tokens_total=0,
+            execution_time_ms=1000.0,
+            is_anomalous=False,
         )
         assert sm.schema_version == SCHEMA_VERSION
 
     def test_latency_flag_set_when_above_threshold(self):
         sm = StepMetrics(
-            schema_version=SCHEMA_VERSION, run_id="r", step=1, agent="researcher",
-            latency_ms=6000.0, latency_flag=True, latency_threshold_ms=5000.0,
-            tokens_prompt=0, tokens_completion=0, tokens_total=0,
-            execution_time_ms=6000.0, is_anomalous=True,
-            anomaly_reasons=["latency exceeded"]
+            schema_version=SCHEMA_VERSION,
+            run_id="r",
+            step=1,
+            agent="researcher",
+            latency_ms=6000.0,
+            latency_flag=True,
+            latency_threshold_ms=5000.0,
+            tokens_prompt=0,
+            tokens_completion=0,
+            tokens_total=0,
+            execution_time_ms=6000.0,
+            is_anomalous=True,
+            anomaly_reasons=["latency exceeded"],
         )
         assert sm.latency_flag is True
         assert sm.is_anomalous is True
@@ -110,8 +148,8 @@ class TestStepMetrics:
 # MetricsAnalyzer — basic analysis
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestMetricsAnalyzerBasic:
 
+class TestMetricsAnalyzerBasic:
     def test_analyze_run_returns_run_metrics(self, tmp_db):
         _seed_run(tmp_db, "run_a", [2000.0, 3000.0, 1000.0])
         analyzer = MetricsAnalyzer(tmp_db)
@@ -174,7 +212,7 @@ class TestMetricsAnalyzerBasic:
         _seed_run(tmp_db, "run_a", [2000.0, 5000.0, 1000.0])
         analyzer = MetricsAnalyzer(tmp_db)
         result = analyzer.analyze_run("run_a")
-        assert result.slowest_step == "writer"   # 5000ms
+        assert result.slowest_step == "writer"  # 5000ms
 
     def test_fastest_step_identified(self, tmp_db):
         _seed_run(tmp_db, "run_a", [2000.0, 5000.0, 1000.0])
@@ -199,8 +237,8 @@ class TestMetricsAnalyzerBasic:
 # MetricsAnalyzer — latency threshold anomaly
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestLatencyAnomaly:
 
+class TestLatencyAnomaly:
     def test_no_anomaly_when_below_threshold(self, tmp_db):
         _seed_run(tmp_db, "run_a", [2000.0, 3000.0, 1000.0])
         analyzer = MetricsAnalyzer(tmp_db)
@@ -229,7 +267,10 @@ class TestLatencyAnomaly:
         result = analyzer.analyze_run("run_a")
         writer_step = next(s for s in result.steps if s.agent == "writer")
         assert len(writer_step.anomaly_reasons) > 0
-        assert "7000" in writer_step.anomaly_reasons[0] or "threshold" in writer_step.anomaly_reasons[0]
+        assert (
+            "7000" in writer_step.anomaly_reasons[0]
+            or "threshold" in writer_step.anomaly_reasons[0]
+        )
 
     def test_anomalous_steps_list_correct(self, tmp_db):
         _seed_run(tmp_db, "run_a", [6000.0, 7000.0, 1000.0])  # researcher + writer both slow
@@ -244,8 +285,8 @@ class TestLatencyAnomaly:
 # MetricsAnalyzer — statistical baseline (requires min_runs_for_baseline runs)
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestStatisticalBaseline:
 
+class TestStatisticalBaseline:
     def test_no_statistical_anomaly_below_min_runs(self, tmp_db):
         """Statistical detection inactive with fewer than min_runs_for_baseline runs."""
         # Seed only 2 runs (< min_runs_for_baseline = 5)

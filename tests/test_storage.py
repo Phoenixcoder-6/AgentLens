@@ -23,6 +23,7 @@ from storage.writer import StorageWriter
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def tmp_db(tmp_path) -> DatabaseManager:
     """Fresh in-memory-equivalent DB using a temp file for each test."""
@@ -35,6 +36,7 @@ def tmp_db(tmp_path) -> DatabaseManager:
 @pytest.fixture
 def sample_run() -> RunTrace:
     """A minimal 3-step RunTrace for testing."""
+
     def make_step(n, agent):
         return AgentStep(
             run_id="run_test999",
@@ -74,8 +76,8 @@ def normalized_run(sample_run) -> NormalizedRun:
 # DatabaseManager — initialization
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestDatabaseManagerInit:
 
+class TestDatabaseManagerInit:
     def test_initialize_creates_all_tables(self, tmp_db):
         counts = tmp_db.table_counts()
         assert set(counts.keys()) == {"runs", "steps", "analysis", "metrics"}
@@ -95,8 +97,8 @@ class TestDatabaseManagerInit:
 # DatabaseManager — runs table
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestRunsTable:
 
+class TestRunsTable:
     def test_insert_and_get_run(self, tmp_db):
         tmp_db.insert_run(
             run_id="run_abc",
@@ -120,10 +122,12 @@ class TestRunsTable:
 
     def test_insert_run_is_upsert(self, tmp_db):
         """Inserting with same run_id replaces the row."""
-        tmp_db.insert_run("run_x", "wf", "2026-07-17T12:00:00+00:00", "SUCCESS",
-                           100.0, 0, SCHEMA_VERSION)
-        tmp_db.insert_run("run_x", "wf", "2026-07-17T12:00:00+00:00", "ERROR",
-                           100.0, 0, SCHEMA_VERSION)
+        tmp_db.insert_run(
+            "run_x", "wf", "2026-07-17T12:00:00+00:00", "SUCCESS", 100.0, 0, SCHEMA_VERSION
+        )
+        tmp_db.insert_run(
+            "run_x", "wf", "2026-07-17T12:00:00+00:00", "ERROR", 100.0, 0, SCHEMA_VERSION
+        )
         row = tmp_db.get_run("run_x")
         assert row["status"] == "ERROR"
 
@@ -132,16 +136,19 @@ class TestRunsTable:
 
     def test_list_runs_returns_all(self, tmp_db):
         for i in range(3):
-            tmp_db.insert_run(f"run_{i}", "wf", "2026-07-17T12:00:00+00:00",
-                              "SUCCESS", 100.0, 0, SCHEMA_VERSION)
+            tmp_db.insert_run(
+                f"run_{i}", "wf", "2026-07-17T12:00:00+00:00", "SUCCESS", 100.0, 0, SCHEMA_VERSION
+            )
         rows = tmp_db.list_runs()
         assert len(rows) == 3
 
     def test_list_runs_status_filter(self, tmp_db):
-        tmp_db.insert_run("run_ok", "wf", "2026-07-17T12:00:00+00:00",
-                          "SUCCESS", 100.0, 0, SCHEMA_VERSION)
-        tmp_db.insert_run("run_bad", "wf", "2026-07-17T12:00:00+00:00",
-                          "ERROR", 100.0, 0, SCHEMA_VERSION)
+        tmp_db.insert_run(
+            "run_ok", "wf", "2026-07-17T12:00:00+00:00", "SUCCESS", 100.0, 0, SCHEMA_VERSION
+        )
+        tmp_db.insert_run(
+            "run_bad", "wf", "2026-07-17T12:00:00+00:00", "ERROR", 100.0, 0, SCHEMA_VERSION
+        )
         rows = tmp_db.list_runs(status_filter="SUCCESS")
         assert len(rows) == 1
         assert rows[0]["run_id"] == "run_ok"
@@ -151,16 +158,28 @@ class TestRunsTable:
 # DatabaseManager — steps table
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestStepsTable:
 
+class TestStepsTable:
     def _insert_run(self, db):
-        db.insert_run("run_s", "wf", "2026-07-17T12:00:00+00:00",
-                      "SUCCESS", 300.0, 0, SCHEMA_VERSION)
+        db.insert_run(
+            "run_s", "wf", "2026-07-17T12:00:00+00:00", "SUCCESS", 300.0, 0, SCHEMA_VERSION
+        )
 
     def test_insert_and_get_steps(self, tmp_db):
         self._insert_run(tmp_db)
-        tmp_db.insert_step("run_s", 1, "researcher", "SUCCESS", 100.0,
-                           0, 0, 0, "added=['key']", "2026-07-17T12:00:00+00:00", SCHEMA_VERSION)
+        tmp_db.insert_step(
+            "run_s",
+            1,
+            "researcher",
+            "SUCCESS",
+            100.0,
+            0,
+            0,
+            0,
+            "added=['key']",
+            "2026-07-17T12:00:00+00:00",
+            SCHEMA_VERSION,
+        )
         rows = tmp_db.get_steps_for_run("run_s")
         assert len(rows) == 1
         assert rows[0]["agent"] == "researcher"
@@ -169,8 +188,19 @@ class TestStepsTable:
     def test_steps_ordered_by_step_number(self, tmp_db):
         self._insert_run(tmp_db)
         for n, agent in [(3, "verifier"), (1, "researcher"), (2, "writer")]:
-            tmp_db.insert_step("run_s", n, agent, "SUCCESS", float(n * 100),
-                               0, 0, 0, "", "2026-07-17T12:00:00+00:00", SCHEMA_VERSION)
+            tmp_db.insert_step(
+                "run_s",
+                n,
+                agent,
+                "SUCCESS",
+                float(n * 100),
+                0,
+                0,
+                0,
+                "",
+                "2026-07-17T12:00:00+00:00",
+                SCHEMA_VERSION,
+            )
         rows = tmp_db.get_steps_for_run("run_s")
         assert [r["agent"] for r in rows] == ["researcher", "writer", "verifier"]
 
@@ -182,17 +212,25 @@ class TestStepsTable:
 # DatabaseManager — metrics table
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestMetricsTable:
 
+class TestMetricsTable:
     def _insert_run(self, db):
-        db.insert_run("run_m", "wf", "2026-07-17T12:00:00+00:00",
-                      "SUCCESS", 300.0, 0, SCHEMA_VERSION)
+        db.insert_run(
+            "run_m", "wf", "2026-07-17T12:00:00+00:00", "SUCCESS", 300.0, 0, SCHEMA_VERSION
+        )
 
     def test_insert_and_get_metrics(self, tmp_db):
         self._insert_run(tmp_db)
-        tmp_db.insert_metric("run_m", "latency_ms", 234.5,
-                             "2026-07-17T12:00:00+00:00", SCHEMA_VERSION,
-                             step=1, agent="researcher", metric_unit="ms")
+        tmp_db.insert_metric(
+            "run_m",
+            "latency_ms",
+            234.5,
+            "2026-07-17T12:00:00+00:00",
+            SCHEMA_VERSION,
+            step=1,
+            agent="researcher",
+            metric_unit="ms",
+        )
         rows = tmp_db.get_metrics_for_run("run_m")
         assert len(rows) == 1
         assert rows[0]["metric_name"] == "latency_ms"
@@ -204,8 +242,8 @@ class TestMetricsTable:
 # StorageWriter
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestStorageWriter:
 
+class TestStorageWriter:
     def test_write_run_inserts_run_row(self, tmp_db, normalized_run):
         writer = StorageWriter(tmp_db)
         writer.write_run(normalized_run)
@@ -251,6 +289,7 @@ class TestStorageWriter:
 # ─────────────────────────────────────────────────────────────────────────────
 # Checkpoint — full end-to-end: capture → normalize → store → query
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestCheckpoint:
     """

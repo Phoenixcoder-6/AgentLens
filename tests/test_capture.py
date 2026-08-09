@@ -1,4 +1,3 @@
-
 import pytest
 
 from capture.session import CaptureSession
@@ -17,6 +16,7 @@ def test_capture_session_starts_and_ends():
     assert completed is not None
     assert completed.status == StepStatus.SUCCESS
     assert CaptureSession.get_current_trace() is None
+
 
 def test_trace_step_decorator():
     CaptureSession.start_trace(workflow="test_decorator")
@@ -38,6 +38,7 @@ def test_trace_step_decorator():
     assert step.latency_ms > 0
     assert "input_key" in step.input
     assert "output_key" in step.output
+
 
 def test_trace_step_captures_errors():
     CaptureSession.start_trace(workflow="test_error")

@@ -31,6 +31,7 @@ from typing import Any
 # Value helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _is_empty(value: Any) -> bool:
     """
     True when a state value is considered 'absent':
@@ -54,6 +55,7 @@ def _values_equal(a: Any, b: Any) -> bool:
 # HandoffDiff — the structured diff result
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class HandoffDiff:
     """
@@ -70,6 +72,7 @@ class HandoffDiff:
     dropped_keys   : Keys that had content in input but are empty in output.
                      These are *information loss* — the critical failure signal.
     """
+
     added_keys: list[str] = field(default_factory=list)
     modified_keys: list[str] = field(default_factory=list)
     unchanged_keys: list[str] = field(default_factory=list)
@@ -107,6 +110,7 @@ class HandoffDiff:
 # ─────────────────────────────────────────────────────────────────────────────
 # HandoffCapture — the main class
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class HandoffCapture:
     """
@@ -148,9 +152,9 @@ class HandoffCapture:
         diff = self._compute_diff(self._input_state, output_state)
 
         return (
-            self._input_state,      # what agent received
-            self._agent_return,     # what agent chose to return (filtered view)
-            output_state,           # full merged state going to next agent
+            self._input_state,  # what agent received
+            self._agent_return,  # what agent chose to return (filtered view)
+            output_state,  # full merged state going to next agent
             diff,
         )
 
@@ -173,10 +177,10 @@ class HandoffCapture:
 
         for key in sorted(all_keys):
             before_val = before.get(key)
-            after_val  = after.get(key)
+            after_val = after.get(key)
 
             before_empty = _is_empty(before_val)
-            after_empty  = _is_empty(after_val)
+            after_empty = _is_empty(after_val)
 
             if before_empty and not after_empty:
                 # Key went from absent to populated → agent added it

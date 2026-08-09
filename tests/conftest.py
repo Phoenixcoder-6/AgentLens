@@ -3,6 +3,7 @@
 Shared pytest fixtures for the AgentLens test suite.
 All tests import fixtures from here via pytest's automatic discovery.
 """
+
 import os
 import sys
 
@@ -15,6 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 @pytest.fixture
 def sample_handoff_state():
     from schema import HandoffState
+
     return HandoffState(
         input_state={"sources": 10, "topic": "AI"},
         filtered_state={"sources": 3},
@@ -25,6 +27,7 @@ def sample_handoff_state():
 @pytest.fixture
 def sample_agent_step(sample_handoff_state):
     from schema import AgentStep, NodeType, StepStatus, TokenUsage
+
     return AgentStep(
         run_id="run_test01",
         step=1,
@@ -42,6 +45,7 @@ def sample_agent_step(sample_handoff_state):
 @pytest.fixture
 def sample_run_trace(sample_agent_step):
     from schema import RunTrace
+
     return RunTrace(
         workflow="research_report_pipeline",
         steps=[sample_agent_step],
@@ -51,6 +55,7 @@ def sample_run_trace(sample_agent_step):
 @pytest.fixture
 def sample_rule_match():
     from schema import FailureCategory, RuleMatch, RuleSeverity
+
     return RuleMatch(
         rule_id="R-WF-001",
         category=FailureCategory.WORKFLOW,
@@ -65,6 +70,7 @@ def sample_rule_match():
 @pytest.fixture
 def sample_evidence_record(sample_rule_match):
     from schema import EvidenceRecord, EvidenceSource
+
     return EvidenceRecord(
         source=EvidenceSource.RULE_ENGINE,
         description="Information loss in writer handoff",

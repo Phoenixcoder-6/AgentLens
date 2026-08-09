@@ -7,7 +7,6 @@ Integration test: real LLM call against a known sample output.
 Unit tests run without any API key. Integration test requires GROQ_API_KEY.
 """
 
-
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -22,8 +21,8 @@ from schema.models import SCHEMA_VERSION
 # ExtractedEvidence model
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestExtractedEvidence:
 
+class TestExtractedEvidence:
     def test_schema_version_stamped_by_default(self):
         ev = ExtractedEvidence()
         assert ev.schema_version == SCHEMA_VERSION
@@ -58,6 +57,7 @@ class TestExtractedEvidence:
 # ─────────────────────────────────────────────────────────────────────────────
 # EvidenceExtractor — unit tests (mocked LLM)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestEvidenceExtractorUnit:
     """Tests that mock the LLM — no API key needed."""
@@ -108,9 +108,7 @@ class TestEvidenceExtractorUnit:
 
     def test_extract_with_tool_calls(self):
         mock_ev = ExtractedEvidence(
-            source_count=2,
-            entity_count=4,
-            tool_calls=["web_search", "calculator"]
+            source_count=2, entity_count=4, tool_calls=["web_search", "calculator"]
         )
         extractor = self._make_extractor_with_mock(mock_ev)
         result = extractor.extract("used web_search and calculator")
@@ -122,8 +120,8 @@ class TestEvidenceExtractorUnit:
 
         steps = [
             {"step": 1, "agent": "researcher", "raw_output": "SOURCES:\n- Book A"},
-            {"step": 2, "agent": "writer",     "raw_output": "Report text..."},
-            {"step": 3, "agent": "verifier",   "raw_output": "APPROVED"},
+            {"step": 2, "agent": "writer", "raw_output": "Report text..."},
+            {"step": 3, "agent": "verifier", "raw_output": "APPROVED"},
         ]
 
         results = extractor.extract_run(steps)
@@ -150,6 +148,7 @@ class TestEvidenceExtractorUnit:
 # ─────────────────────────────────────────────────────────────────────────────
 # Integration test — real LLM (requires GROQ_API_KEY)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.integration
 class TestEvidenceExtractorIntegration:

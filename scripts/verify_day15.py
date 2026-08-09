@@ -19,9 +19,7 @@ def main() -> None:
 
     db = DatabaseManager("data/agentlens.db")
     with db.connection() as conn:
-        rows = conn.execute(
-            "SELECT COUNT(*) FROM runs WHERE run_id LIKE 'run_lbl_%'"
-        ).fetchone()
+        rows = conn.execute("SELECT COUNT(*) FROM runs WHERE run_id LIKE 'run_lbl_%'").fetchone()
         print(f"DB rows     : {rows[0]} labeled runs in DB")
 
     print("\nDay 15 COMPLETE ✓")

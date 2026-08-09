@@ -27,8 +27,8 @@ from schema.models import SCHEMA_VERSION, AgentStep, HandoffState, RunTrace, Ste
 # Serializer — to_serializable
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestToSerializable:
 
+class TestToSerializable:
     def test_none_passthrough(self):
         assert to_serializable(None) is None
 
@@ -70,11 +70,13 @@ class TestToSerializable:
         class Color(Enum):
             RED = "red"
             BLUE = "blue"
+
         assert to_serializable(Color.RED) == "red"
 
     def test_bytes_to_base64(self):
         result = to_serializable(b"hello")
         import base64
+
         assert result == base64.b64encode(b"hello").decode()
 
     def test_dict_recursive(self):
@@ -112,6 +114,7 @@ class TestToSerializable:
         class WeirdObj:
             def __str__(self):
                 return "weird"
+
         result = to_serializable(WeirdObj())
         assert result == "weird"
 
@@ -138,6 +141,7 @@ class TestToSerializableNumpy:
     def skip_if_no_numpy(self):
         try:
             import numpy as np
+
             self.np = np
         except ImportError:
             pytest.skip("numpy not installed")
@@ -174,6 +178,7 @@ class TestToSerializablePandas:
     def skip_if_no_pandas(self):
         try:
             import pandas as pd
+
             self.pd = pd
         except ImportError:
             pytest.skip("pandas not installed")
@@ -200,8 +205,8 @@ class TestToSerializablePandas:
 # Serializer — safe_loads
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestSafeLoads:
 
+class TestSafeLoads:
     def test_dict_passthrough(self):
         d = {"key": "value"}
         assert safe_loads(d) == d
@@ -215,7 +220,7 @@ class TestSafeLoads:
         assert result == {"key": "value", "count": 5}
 
     def test_valid_json_array_string(self):
-        result = safe_loads('[1, 2, 3]')
+        result = safe_loads("[1, 2, 3]")
         assert result == [1, 2, 3]
 
     def test_plain_string_returned_as_is(self):
@@ -243,6 +248,7 @@ class TestSafeLoads:
 # Normalizer — normalize_step
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _make_agent_step(**overrides) -> AgentStep:
     """Helper: create a minimal AgentStep with sensible defaults."""
     defaults = dict(
@@ -258,7 +264,11 @@ def _make_agent_step(**overrides) -> AgentStep:
         handoff=HandoffState(
             input_state={"topic": "AI", "research_findings": "", "source_count": 0},
             filtered_state={"research_findings": "SOURCES:\\n- Book A", "source_count": 1},
-            output_state={"topic": "AI", "research_findings": "SOURCES:\\n- Book A", "source_count": 1},
+            output_state={
+                "topic": "AI",
+                "research_findings": "SOURCES:\\n- Book A",
+                "source_count": 1,
+            },
         ),
     )
     defaults.update(overrides)
@@ -266,7 +276,6 @@ def _make_agent_step(**overrides) -> AgentStep:
 
 
 class TestNormalizerStep:
-
     def setup_method(self):
         self.normalizer = Normalizer()
 
@@ -331,10 +340,7 @@ class TestNormalizerStep:
         assert result.diff_summary == "added=['source_count']"
 
     def test_error_preserved(self):
-        step = _make_agent_step(
-            status=StepStatus.ERROR,
-            error="ValueError: Something broke"
-        )
+        step = _make_agent_step(status=StepStatus.ERROR, error="ValueError: Something broke")
         result = self.normalizer.normalize_step(step)
         assert result.error == "ValueError: Something broke"
 
@@ -349,8 +355,8 @@ class TestNormalizerStep:
 # Normalizer — normalize_run
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestNormalizerRun:
 
+class TestNormalizerRun:
     def setup_method(self):
         self.normalizer = Normalizer()
 

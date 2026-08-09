@@ -4,30 +4,30 @@ Matches the Run Explorer screenshot: near-black bg, dark-tinted rows, badge syst
 """
 
 # ── Base palette ──────────────────────────────────────────────────────────────
-BG          = "#0c0c12"
-BG_SIDEBAR  = "#09090f"
-CARD        = "#111118"
-CARD_HOVER  = "#16161f"
-BORDER      = "#1e1e2e"
+BG = "#0c0c12"
+BG_SIDEBAR = "#09090f"
+CARD = "#111118"
+CARD_HOVER = "#16161f"
+BORDER = "#1e1e2e"
 BORDER_SOFT = "#161622"
-TEXT        = "#e2e2f0"
-TEXT_MUTED  = "#6e6e88"
-TEXT_DIM    = "#3e3e55"
+TEXT = "#e2e2f0"
+TEXT_MUTED = "#6e6e88"
+TEXT_DIM = "#3e3e55"
 
 # Accents
-PURPLE      = "#8b5cf6"
-CYAN        = "#06b6d4"
-GREEN       = "#22c55e"
-AMBER       = "#f59e0b"
-RED         = "#ef4444"
-GRAY        = "#6b7280"
+PURPLE = "#8b5cf6"
+CYAN = "#06b6d4"
+GREEN = "#22c55e"
+AMBER = "#f59e0b"
+RED = "#ef4444"
+GRAY = "#6b7280"
 
 # ── Row tints (status-coded, matches screenshot) ──────────────────────────────
 ROW_TINT = {
-    "FAIL":    "rgba(180, 20,  20,  0.18)",   # deep crimson
-    "WARNING": "rgba(160, 80,  0,   0.15)",   # dark amber
-    "PASS":    "rgba(20,  120, 40,  0.06)",   # very subtle green
-    "P5":      "transparent",
+    "FAIL": "rgba(180, 20,  20,  0.18)",  # deep crimson
+    "WARNING": "rgba(160, 80,  0,   0.15)",  # dark amber
+    "PASS": "rgba(20,  120, 40,  0.06)",  # very subtle green
+    "P5": "transparent",
     "UNKNOWN": "transparent",
 }
 
@@ -35,16 +35,16 @@ ROW_TINT = {
 VERDICT_COLOR = {"PASS": GREEN, "WARNING": AMBER, "FAIL": RED, "UNKNOWN": GRAY}
 PRIORITY_COLOR = {"P1": RED, "P2": AMBER, "P3": CYAN, "P4": PURPLE, "P5": GRAY}
 CAUSE_COLOR = {
-    "reasoning":    AMBER,
-    "workflow":     RED,
-    "execution":    CYAN,
+    "reasoning": AMBER,
+    "workflow": RED,
+    "execution": CYAN,
     "verification": PURPLE,
-    "unknown":      GRAY,
+    "unknown": GRAY,
 }
 STEP_COLOR = {
     "researcher": "#3b82f6",
-    "writer":     PURPLE,
-    "verifier":   CYAN,
+    "writer": PURPLE,
+    "verifier": CYAN,
 }
 
 # ── Global CSS ────────────────────────────────────────────────────────────────
@@ -296,6 +296,7 @@ body, .q-page, .nicegui-content {{
 
 # ── HTML helpers ─────────────────────────────────────────────────────────────
 
+
 def badge(label: str, color: str, icon: str = "■") -> str:
     return (
         f'<span class="al-badge" style="background:{color}1a;color:{color};border:1px solid {color}44;">'
@@ -330,7 +331,7 @@ def row_bg(verdict: str) -> str:
 
 
 def fmt_ms(ms: float) -> str:
-    return f"{ms/1000:.1f}s" if ms >= 1000 else f"{int(ms)}ms"
+    return f"{ms / 1000:.1f}s" if ms >= 1000 else f"{int(ms)}ms"
 
 
 def bar_html(value: float, max_val: float, color: str, h: int = 5) -> str:
@@ -338,5 +339,5 @@ def bar_html(value: float, max_val: float, color: str, h: int = 5) -> str:
     return (
         f'<div class="al-bar-bg" style="height:{h}px;">'
         f'<div class="al-bar-fill" style="width:{pct:.1f}%;background:{color};height:{h}px;"></div>'
-        f'</div>'
+        f"</div>"
     )

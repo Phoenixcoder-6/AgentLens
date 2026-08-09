@@ -3,7 +3,7 @@ import os
 import sqlite3
 import sys
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from analyzers.arbiter import Arbiter
 from storage.db import DEFAULT_DB_PATH
@@ -62,6 +62,7 @@ def verify_day16():
                     print("  [FAIL] Log entries are NOT valid JSON.")
             else:
                 print("  [FAIL] Log file is empty.")
+
 
 if __name__ == "__main__":
     verify_day16()

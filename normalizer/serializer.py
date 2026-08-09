@@ -36,18 +36,21 @@ from typing import Any
 
 try:
     import numpy as np
+
     _NUMPY_AVAILABLE = True
 except ImportError:
     _NUMPY_AVAILABLE = False
 
 try:
     import pandas as pd
+
     _PANDAS_AVAILABLE = True
 except ImportError:
     _PANDAS_AVAILABLE = False
 
 try:
     from pydantic import BaseModel as PydanticBaseModel
+
     _PYDANTIC_AVAILABLE = True
 except ImportError:
     _PYDANTIC_AVAILABLE = False
@@ -56,6 +59,7 @@ except ImportError:
 # ─────────────────────────────────────────────────────────────────────────────
 # Direction 1: to_serializable — convert any value to JSON-safe native
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def to_serializable(value: Any) -> Any:
     """
@@ -140,6 +144,7 @@ def to_serializable(value: Any) -> Any:
 # Direction 2: safe_loads — parse a raw JSON string safely
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def safe_loads(text: Any) -> Any:
     """
     Safely parse a value that might be a JSON string, a plain string, or
@@ -169,6 +174,7 @@ def safe_loads(text: Any) -> Any:
 # ─────────────────────────────────────────────────────────────────────────────
 # Convenience: safe_dumps — serialize any value to a JSON string
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def safe_dumps(value: Any, indent: int | None = None) -> str:
     """

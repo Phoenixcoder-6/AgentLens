@@ -10,6 +10,7 @@ class CaptureSession:
     Manages the active RunTrace for the current pipeline run.
     Acts as a singleton to collect AgentSteps during execution.
     """
+
     _current_trace: RunTrace | None = None
     _pending_tokens: tuple | None = None  # (prompt, completion) set by node, read by tracer
 
@@ -48,7 +49,7 @@ class CaptureSession:
             run_id=run_id or f"run_{uuid.uuid4().hex[:8]}",
             workflow=workflow,
             timestamp=datetime.now(UTC),
-            status=StepStatus.SUCCESS
+            status=StepStatus.SUCCESS,
         )
         return cls._current_trace
 
@@ -61,10 +62,10 @@ class CaptureSession:
         if cls._current_trace:
             cls._current_trace.steps.append(step)
 
-
-
     @classmethod
-    def end_trace(cls, status: StepStatus = StepStatus.SUCCESS, error: str | None = None) -> RunTrace | None:
+    def end_trace(
+        cls, status: StepStatus = StepStatus.SUCCESS, error: str | None = None
+    ) -> RunTrace | None:
         if not cls._current_trace:
             return None
 
@@ -133,4 +134,3 @@ class CaptureSession:
         except Exception as exc:
             # Storage failure must never crash the pipeline
             print(f"[CaptureSession] Warning: storage write failed: {exc}")
-

@@ -61,8 +61,10 @@ load_dotenv()
 # Structured output schema for the LLM
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class ExplanationOutput(BaseModel):
     """Schema for the LLM's structured explanation output."""
+
     summary: str = Field(
         description=(
             "A detailed root cause analysis in 4-6 sentences covering: "
@@ -85,6 +87,7 @@ class ExplanationOutput(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 # LLMExplainer
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class LLMExplainer:
     """
@@ -132,9 +135,7 @@ class LLMExplainer:
     def _build_llm(self) -> ChatGroq:
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
-            raise OSError(
-                "GROQ_API_KEY not found. Copy .env.example to .env and set your key."
-            )
+            raise OSError("GROQ_API_KEY not found. Copy .env.example to .env and set your key.")
         return ChatGroq(
             model=get("llm", "model"),
             temperature=0.0,
@@ -159,28 +160,38 @@ class LLMExplainer:
             structured_llm = self._llm.with_structured_output(ExplanationOutput)
 
             start_t = time.time()
-            result = cast(ExplanationOutput, structured_llm.invoke([
-                SystemMessage(content=self.SYSTEM_PROMPT),
-                HumanMessage(content=prompt),
-            ]))
+            result = cast(
+                ExplanationOutput,
+                structured_llm.invoke(
+                    [
+                        SystemMessage(content=self.SYSTEM_PROMPT),
+                        HumanMessage(content=prompt),
+                    ]
+                ),
+            )
             latency_ms = (time.time() - start_t) * 1000
 
-            log.info("Explanation LLM call completed", extra={"extra_fields": {
-                "model": getattr(self._llm, "model_name", "unknown"),
-                "latency_ms": round(latency_ms, 2),
-                "run_id": bundle.run_id,
-                "cost_estimate": 0.0,
-            }})
+            log.info(
+                "Explanation LLM call completed",
+                extra={
+                    "extra_fields": {
+                        "model": getattr(self._llm, "model_name", "unknown"),
+                        "latency_ms": round(latency_ms, 2),
+                        "run_id": bundle.run_id,
+                        "cost_estimate": 0.0,
+                    }
+                },
+            )
 
-            bundle.summary       = result.summary
+            bundle.summary = result.summary
             bundle.suggested_fix = result.suggested_fix
         except Exception as exc:
-            log.warning("Explanation LLM call failed, falling back to rule-based", extra={"extra_fields": {
-                "error": str(exc),
-                "run_id": bundle.run_id
-            }})
+            log.warning(
+                "Explanation LLM call failed, falling back to rule-based",
+                extra={"extra_fields": {"error": str(exc), "run_id": bundle.run_id}},
+            )
             # Never crash the pipeline — fall back to rule-based explanation
-            bundle.summary       = self._fallback_summary(bundle)
+            bundle.summary = self._fallback_summary(bundle)
             bundle.suggested_fix = self._fallback_fix(bundle)
 
         return bundle
@@ -215,7 +226,7 @@ class LLMExplainer:
             )
 
         evidence_block = "\n".join(evidence_lines) or "  (none)"
-        rule_block     = "\n".join(rule_lines)     or "  (none)"
+        rule_block = "\n".join(rule_lines) or "  (none)"
 
         return textwrap.dedent(f"""\
             ANALYSIS VERDICT
@@ -223,7 +234,7 @@ class LLMExplainer:
             run_id         : {bundle.run_id}
             primary_cause  : {bundle.primary_cause.value}
             priority_level : {bundle.priority_level.value}
-            primary_agent  : {bundle.primary_agent or 'unknown'}
+            primary_agent  : {bundle.primary_agent or "unknown"}
             grounded       : {bundle.grounded}
             evidence_count : {len(bundle.evidence)}
 
@@ -244,14 +255,11 @@ class LLMExplainer:
 
     def _fallback_summary(self, bundle: AnalysisBundle) -> str:
         """Rule-based summary when LLM is unavailable."""
-        agent    = bundle.primary_agent or "an agent"
-        cause    = bundle.primary_cause.value
+        agent = bundle.primary_agent or "an agent"
+        cause = bundle.primary_cause.value
         priority = bundle.priority_level.value
-        hedge    = "may indicate" if not bundle.grounded else "indicates"
-        rule_id  = (
-            bundle.rule_matches[0].rule_id
-            if bundle.rule_matches else "unknown rule"
-        )
+        hedge = "may indicate" if not bundle.grounded else "indicates"
+        rule_id = bundle.rule_matches[0].rule_id if bundle.rule_matches else "unknown rule"
         return (
             f"[Fallback — LLM unavailable] "
             f"The {priority} analysis {hedge} a {cause} issue attributed to {agent}. "
@@ -263,10 +271,10 @@ class LLMExplainer:
         cause = bundle.primary_cause.value
         agent = bundle.primary_agent or "the agent"
         fixes = {
-            "reasoning":     f"Review {agent}'s output for hallucinated facts not present in the research.",
-            "workflow":      f"Check the handoff from the previous agent to {agent} for dropped context.",
-            "execution":     f"Investigate {agent} for tool errors, timeouts, or missing outputs.",
-            "verification":  "Review the verifier's approval criteria — it may have passed a flawed output.",
-            "unknown":       "Inspect the pipeline trace manually — no specific rule matched.",
+            "reasoning": f"Review {agent}'s output for hallucinated facts not present in the research.",
+            "workflow": f"Check the handoff from the previous agent to {agent} for dropped context.",
+            "execution": f"Investigate {agent} for tool errors, timeouts, or missing outputs.",
+            "verification": "Review the verifier's approval criteria — it may have passed a flawed output.",
+            "unknown": "Inspect the pipeline trace manually — no specific rule matched.",
         }
         return fixes.get(cause, "Inspect the pipeline trace for anomalies.")

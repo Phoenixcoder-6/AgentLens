@@ -37,8 +37,10 @@ SCHEMA_VERSION = "1.0"
 # Enums
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class StepStatus(StrEnum):
     """Execution outcome of a single agent step or overall run."""
+
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
     ERROR = "ERROR"
@@ -47,6 +49,7 @@ class StepStatus(StrEnum):
 
 class NodeType(StrEnum):
     """The type of node in the LangGraph pipeline."""
+
     LLM = "llm"
     TOOL = "tool"
     ROUTER = "router"
@@ -64,6 +67,7 @@ class FailureCategory(StrEnum):
     - VERIFICATION: verifier approved a bad answer
     - UNKNOWN:      no evidence matched (P5 — Arbiter fallback)
     """
+
     EXECUTION = "execution"
     REASONING = "reasoning"
     WORKFLOW = "workflow"
@@ -82,6 +86,7 @@ class PriorityLevel(StrEnum):
     P4: statistical_anomaly    — metrics analyzer detected outlier
     P5: unknown                — no evidence matched
     """
+
     P1 = "P1"
     P2 = "P2"
     P3 = "P3"
@@ -91,6 +96,7 @@ class PriorityLevel(StrEnum):
 
 class EvidenceSource(StrEnum):
     """Which analyzer produced an EvidenceRecord."""
+
     RULE_ENGINE = "rule_engine"
     WORKFLOW_VALIDATOR = "workflow_validator"
     CONSISTENCY_VALIDATOR = "consistency_validator"
@@ -102,6 +108,7 @@ class EvidenceSource(StrEnum):
 
 class RuleSeverity(StrEnum):
     """How serious a rule match is — used for dashboard display priority."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -112,8 +119,10 @@ class RuleSeverity(StrEnum):
 # Sub-models (building blocks used inside the main models)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TokenUsage(BaseModel):
     """Token counts for a single agent step."""
+
     prompt: int = 0
     completion: int = 0
     total: int = 0
@@ -126,6 +135,7 @@ class TokenUsage(BaseModel):
 
 class GenerationParams(BaseModel):
     """LLM generation parameters captured per step."""
+
     temperature: float = 0.0
     top_p: float = 1.0
     max_tokens: int = 2048
@@ -135,6 +145,7 @@ class GenerationParams(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 # Model 1: HandoffState
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class HandoffState(BaseModel):
     """
@@ -148,23 +159,23 @@ class HandoffState(BaseModel):
     Comparing input_state vs output_state reveals dropped keys, mutated values,
     and silent context loss — failure modes invisible in plain input/output logs.
     """
+
     input_state: dict[str, Any] = Field(
-        default_factory=dict,
-        description="State received from the previous agent or pipeline entry"
+        default_factory=dict, description="State received from the previous agent or pipeline entry"
     )
     filtered_state: dict[str, Any] = Field(
         default_factory=dict,
-        description="Intermediate state after agent's internal filtering/processing"
+        description="Intermediate state after agent's internal filtering/processing",
     )
     output_state: dict[str, Any] = Field(
-        default_factory=dict,
-        description="State passed forward to the next agent"
+        default_factory=dict, description="State passed forward to the next agent"
     )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Model 2: WorkflowState
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class WorkflowState(BaseModel):
     """
@@ -174,15 +185,15 @@ class WorkflowState(BaseModel):
     Used by the Workflow Validator to detect graph-level anomalies:
     skipped nodes, unexpected transitions, missing required keys.
     """
+
     schema_version: str = Field(
-        default=SCHEMA_VERSION,
-        description="Schema version — stamped on every record"
+        default=SCHEMA_VERSION, description="Schema version — stamped on every record"
     )
     run_id: str = Field(description="Shared run identifier across all steps")
     step_index: int = Field(description="Position of this state snapshot in the workflow")
     state_data: dict[str, Any] = Field(
         default_factory=dict,
-        description="The full LangGraph state dict at this point in the pipeline"
+        description="The full LangGraph state dict at this point in the pipeline",
     )
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -190,6 +201,7 @@ class WorkflowState(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 # Model 3: AgentStep
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class AgentStep(BaseModel):
     """
@@ -201,6 +213,7 @@ class AgentStep(BaseModel):
     The handoff field is the key differentiator from plain input/output logging:
     it records the full state transformation, enabling information-loss detection.
     """
+
     schema_version: str = Field(default=SCHEMA_VERSION)
     run_id: str = Field(description="Links this step to its parent RunTrace")
     step: int = Field(description="Sequential step number within the run (1-indexed)")
@@ -212,7 +225,7 @@ class AgentStep(BaseModel):
     output: str = Field(default="", description="Raw output produced by this agent")
     expected_output: str | None = Field(
         default=None,
-        description="Ground-truth expected output, if available (enables P1 grounded evaluation)"
+        description="Ground-truth expected output, if available (enables P1 grounded evaluation)",
     )
 
     # Prompt details
@@ -227,8 +240,7 @@ class AgentStep(BaseModel):
 
     # Tool usage
     tool_calls: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="List of tool invocations made during this step"
+        default_factory=list, description="List of tool invocations made during this step"
     )
 
     # Handoff — captures state transformation (not just input/output)
@@ -236,23 +248,20 @@ class AgentStep(BaseModel):
 
     # Graph relationships
     parent_step: str | None = Field(
-        default=None,
-        description="Step ID of the agent that produced input to this step"
+        default=None, description="Step ID of the agent that produced input to this step"
     )
     child_step: str | None = Field(
-        default=None,
-        description="Step ID of the agent that will receive this step's output"
+        default=None, description="Step ID of the agent that will receive this step's output"
     )
 
     # Status
     status: StepStatus = Field(default=StepStatus.SUCCESS)
     error: str | None = Field(
-        default=None,
-        description="Error message if status is FAILURE or ERROR"
+        default=None, description="Error message if status is FAILURE or ERROR"
     )
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-    @field_serializer('timestamp')
+    @field_serializer("timestamp")
     def serialize_timestamp(self, v: datetime) -> str:
         return v.isoformat()
 
@@ -262,6 +271,7 @@ class AgentStep(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 # Model 4: RunTrace
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class RunTrace(BaseModel):
     """
@@ -273,15 +283,15 @@ class RunTrace(BaseModel):
     The trace_path field links the SQLite record to its full JSON payload,
     keeping traces portable and human-readable while SQLite handles queries.
     """
+
     schema_version: str = Field(default=SCHEMA_VERSION)
     run_id: str = Field(
         default_factory=lambda: f"run_{uuid.uuid4().hex[:8]}",
-        description="Unique run identifier, e.g. 'run_8f21ac'"
+        description="Unique run identifier, e.g. 'run_8f21ac'",
     )
     workflow: str = Field(description="Workflow name, e.g. 'research_report_pipeline'")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
-        description="When this run started"
+        default_factory=lambda: datetime.now(UTC), description="When this run started"
     )
 
     # All steps in this run, in order
@@ -291,23 +301,20 @@ class RunTrace(BaseModel):
     total_latency_ms: float = Field(default=0.0)
     total_tokens: int = Field(default=0)
     status: StepStatus = Field(
-        default=StepStatus.SUCCESS,
-        description="Overall run status — FAILURE if any step failed"
+        default=StepStatus.SUCCESS, description="Overall run status — FAILURE if any step failed"
     )
 
     # Ground truth (optional — enables P1 grounded evaluation in Arbiter)
     expected_output: str | None = Field(
-        default=None,
-        description="Expected final output for this run, if labeled"
+        default=None, description="Expected final output for this run, if labeled"
     )
 
     # Storage reference
     trace_path: str | None = Field(
-        default=None,
-        description="Relative path to the full JSON trace blob in data/traces/"
+        default=None, description="Relative path to the full JSON trace blob in data/traces/"
     )
 
-    @field_serializer('timestamp')
+    @field_serializer("timestamp")
     def serialize_timestamp(self, v: datetime) -> str:
         return v.isoformat()
 
@@ -317,6 +324,7 @@ class RunTrace(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 # Model 5: RuleMatch
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class RuleMatch(BaseModel):
     """
@@ -329,27 +337,25 @@ class RuleMatch(BaseModel):
 
     Consumed by the Arbiter as P2 or P3 evidence.
     """
+
     rule_id: str = Field(description="Unique rule identifier, e.g. 'R-WF-001'")
     category: FailureCategory = Field(description="Which failure category this rule belongs to")
     description: str = Field(description="Human-readable description of what was detected")
     severity: RuleSeverity = Field(default=RuleSeverity.MEDIUM)
     agent: str | None = Field(
-        default=None,
-        description="Which agent triggered this rule (if attributable)"
+        default=None, description="Which agent triggered this rule (if attributable)"
     )
-    step: int | None = Field(
-        default=None,
-        description="Which step index triggered this rule"
-    )
+    step: int | None = Field(default=None, description="Which step index triggered this rule")
     evidence_detail: str | None = Field(
         default=None,
-        description="Specific detail about what was found, e.g. 'sources dropped: 10 → 3'"
+        description="Specific detail about what was found, e.g. 'sources dropped: 10 → 3'",
     )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Model 6: EvidenceRecord
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class EvidenceRecord(BaseModel):
     """
@@ -361,35 +367,31 @@ class EvidenceRecord(BaseModel):
     Standardizing all evidence into this shape means the Arbiter compares
     apples to apples — it doesn't need to know which analyzer produced what.
     """
+
     source: EvidenceSource = Field(description="Which analyzer produced this evidence")
     description: str = Field(description="What was found")
     value: Any = Field(
-        default=None,
-        description="Numeric value, boolean, or string — the raw finding"
+        default=None, description="Numeric value, boolean, or string — the raw finding"
     )
     rule_match: RuleMatch | None = Field(
-        default=None,
-        description="Populated when source is rule_engine or a validator"
+        default=None, description="Populated when source is rule_engine or a validator"
     )
     agent: str | None = Field(
-        default=None,
-        description="Which agent this evidence is attributed to"
+        default=None, description="Which agent this evidence is attributed to"
     )
-    step: int | None = Field(
-        default=None,
-        description="Which step this evidence came from"
-    )
+    step: int | None = Field(default=None, description="Which step this evidence came from")
     confidence: float = Field(
         default=1.0,
         ge=0.0,
         le=1.0,
-        description="Confidence 0.0–1.0; deterministic rules = 1.0, statistical = variable"
+        description="Confidence 0.0–1.0; deterministic rules = 1.0, statistical = variable",
     )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Model 7: AnalysisBundle
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class AnalysisBundle(BaseModel):
     """
@@ -404,49 +406,41 @@ class AnalysisBundle(BaseModel):
         True  → verdict backed by expected_output comparison (P1 evidence)
         False → verdict is heuristic only (P2–P5), hedging language should be used
     """
+
     schema_version: str = Field(default=SCHEMA_VERSION)
     run_id: str = Field(description="Links this bundle to its RunTrace")
 
     # Arbiter verdict
-    primary_cause: FailureCategory = Field(
-        description="The single most likely failure category"
-    )
+    primary_cause: FailureCategory = Field(description="The single most likely failure category")
     priority_level: PriorityLevel = Field(
         description="Which priority tier produced the primary cause"
     )
-    grounded: bool = Field(
-        description="True if expected_output was available for comparison"
-    )
+    grounded: bool = Field(description="True if expected_output was available for comparison")
 
     # Evidence used to reach the verdict
     evidence: list[EvidenceRecord] = Field(
-        default_factory=list,
-        description="All evidence records considered by the Arbiter"
+        default_factory=list, description="All evidence records considered by the Arbiter"
     )
     rule_matches: list[RuleMatch] = Field(
-        default_factory=list,
-        description="All rules that fired during analysis"
+        default_factory=list, description="All rules that fired during analysis"
     )
 
     # Attribution
     primary_agent: str | None = Field(
-        default=None,
-        description="Which agent is most responsible for the primary cause"
+        default=None, description="Which agent is most responsible for the primary cause"
     )
 
     # LLM Explainer output (populated after explanation step)
     summary: str | None = Field(
-        default=None,
-        description="LLM-generated root cause summary (filled by explanation layer)"
+        default=None, description="LLM-generated root cause summary (filled by explanation layer)"
     )
     suggested_fix: str | None = Field(
-        default=None,
-        description="LLM-generated suggested fix (filled by explanation layer)"
+        default=None, description="LLM-generated suggested fix (filled by explanation layer)"
     )
 
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-    @field_serializer('timestamp')
+    @field_serializer("timestamp")
     def serialize_timestamp(self, v: datetime) -> str:
         return v.isoformat()
 

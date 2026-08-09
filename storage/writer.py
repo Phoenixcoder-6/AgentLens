@@ -54,16 +54,16 @@ class StorageWriter:
 
         # 1. Insert the run row
         self.db.insert_run(
-            run_id           = run.run_id,
-            workflow         = run.workflow,
-            timestamp        = ts,
-            status           = status_str,
-            total_latency_ms = run.total_latency_ms,
-            total_tokens     = run.total_tokens,
-            schema_version   = SCHEMA_VERSION,
-            trace_path       = trace_path,
-            trace_json       = trace_json,
-            expected_output  = run.expected_output,
+            run_id=run.run_id,
+            workflow=run.workflow,
+            timestamp=ts,
+            status=status_str,
+            total_latency_ms=run.total_latency_ms,
+            total_tokens=run.total_tokens,
+            schema_version=SCHEMA_VERSION,
+            trace_path=trace_path,
+            trace_json=trace_json,
+            expected_output=run.expected_output,
         )
 
         # 2. Insert each step + its metrics
@@ -76,60 +76,60 @@ class StorageWriter:
         status_str = step.status.value if hasattr(step.status, "value") else str(step.status)
 
         self.db.insert_step(
-            run_id            = run_id,
-            step              = step.step,
-            agent             = step.agent,
-            status            = status_str,
-            latency_ms        = step.latency_ms,
-            tokens_prompt     = step.tokens.prompt,
-            tokens_completion = step.tokens.completion,
-            tokens_total      = step.tokens.total,
-            diff_summary      = step.diff_summary or "",
-            error             = step.error,
-            timestamp         = ts,
-            schema_version    = SCHEMA_VERSION,
+            run_id=run_id,
+            step=step.step,
+            agent=step.agent,
+            status=status_str,
+            latency_ms=step.latency_ms,
+            tokens_prompt=step.tokens.prompt,
+            tokens_completion=step.tokens.completion,
+            tokens_total=step.tokens.total,
+            diff_summary=step.diff_summary or "",
+            error=step.error,
+            timestamp=ts,
+            schema_version=SCHEMA_VERSION,
         )
 
         # Write latency metric
         self.db.insert_metric(
-            run_id         = run_id,
-            step           = step.step,
-            agent          = step.agent,
-            metric_name    = "latency_ms",
-            metric_value   = step.latency_ms,
-            metric_unit    = "ms",
-            timestamp      = ts,
-            schema_version = SCHEMA_VERSION,
+            run_id=run_id,
+            step=step.step,
+            agent=step.agent,
+            metric_name="latency_ms",
+            metric_value=step.latency_ms,
+            metric_unit="ms",
+            timestamp=ts,
+            schema_version=SCHEMA_VERSION,
         )
 
         # Write execution_time_ms (wall-clock = latency for current pipeline)
         self.db.insert_metric(
-            run_id         = run_id,
-            step           = step.step,
-            agent          = step.agent,
-            metric_name    = "execution_time_ms",
-            metric_value   = step.latency_ms,
-            metric_unit    = "ms",
-            timestamp      = ts,
-            schema_version = SCHEMA_VERSION,
+            run_id=run_id,
+            step=step.step,
+            agent=step.agent,
+            metric_name="execution_time_ms",
+            metric_value=step.latency_ms,
+            metric_unit="ms",
+            timestamp=ts,
+            schema_version=SCHEMA_VERSION,
         )
 
         # Write token metrics — always write rows so MetricsAnalyzer can read them
         # Value is 0 when the LLM provider doesn't return token counts (e.g. Groq)
         for name, value in [
-            ("tokens_prompt",     step.tokens.prompt),
+            ("tokens_prompt", step.tokens.prompt),
             ("tokens_completion", step.tokens.completion),
-            ("tokens_total",      step.tokens.total),
+            ("tokens_total", step.tokens.total),
         ]:
             self.db.insert_metric(
-                run_id         = run_id,
-                step           = step.step,
-                agent          = step.agent,
-                metric_name    = name,
-                metric_value   = float(value),
-                metric_unit    = "tokens",
-                timestamp      = ts,
-                schema_version = SCHEMA_VERSION,
+                run_id=run_id,
+                step=step.step,
+                agent=step.agent,
+                metric_name=name,
+                metric_value=float(value),
+                metric_unit="tokens",
+                timestamp=ts,
+                schema_version=SCHEMA_VERSION,
             )
 
 

@@ -31,15 +31,17 @@ from schema.models import SCHEMA_VERSION
 # Result model
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class FieldDiff:
     """Diff result for a single numeric field."""
+
     field_name: str
     researcher_value: int
     writer_value: int
-    delta: int                    # writer - researcher (negative = dropped, positive = added)
-    signal: str                   # "DROPPED" | "ADDED" | "PRESERVED"
-    severity: str                 # "HIGH" | "MEDIUM" | "LOW" | "NONE"
+    delta: int  # writer - researcher (negative = dropped, positive = added)
+    signal: str  # "DROPPED" | "ADDED" | "PRESERVED"
+    severity: str  # "HIGH" | "MEDIUM" | "LOW" | "NONE"
 
 
 @dataclass
@@ -49,6 +51,7 @@ class InformationLossResult:
 
     schema_version is stamped so records are traceable.
     """
+
     schema_version: str
     run_id: str
     rule_id: str = "information_loss_v1"
@@ -59,8 +62,8 @@ class InformationLossResult:
     entity_diff: FieldDiff | None = None
 
     # Overall verdict
-    verdict: str = "PASS"          # "PASS" | "WARNING" | "FAIL"
-    confidence: float = 1.0        # 0.0–1.0
+    verdict: str = "PASS"  # "PASS" | "WARNING" | "FAIL"
+    confidence: float = 1.0  # 0.0–1.0
     summary: str = ""
 
     # Flags
@@ -69,14 +72,13 @@ class InformationLossResult:
     rule_failed: bool = False
     error_message: str | None = None
 
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # InformationLossRule
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class InformationLossRule:
     """
@@ -95,8 +97,8 @@ class InformationLossRule:
     """
 
     # How much delta triggers each severity level
-    _SEVERE_THRESHOLD = 3      # |delta| >= 3 → HIGH severity
-    _MODERATE_THRESHOLD = 1    # |delta| >= 1 → MEDIUM severity
+    _SEVERE_THRESHOLD = 3  # |delta| >= 3 → HIGH severity
+    _MODERATE_THRESHOLD = 1  # |delta| >= 1 → MEDIUM severity
 
     def evaluate(
         self,
@@ -148,12 +150,8 @@ class InformationLossRule:
         result.entity_diff = entity_diff
 
         # ── Determine overall verdict ─────────────────────────────────────
-        dropped_fields = [
-            d for d in [source_diff, entity_diff] if d.signal == "DROPPED"
-        ]
-        added_fields = [
-            d for d in [source_diff, entity_diff] if d.signal == "ADDED"
-        ]
+        dropped_fields = [d for d in [source_diff, entity_diff] if d.signal == "DROPPED"]
+        added_fields = [d for d in [source_diff, entity_diff] if d.signal == "ADDED"]
 
         result.has_information_loss = len(dropped_fields) > 0
         result.has_information_gain = len(added_fields) > 0
@@ -181,9 +179,7 @@ class InformationLossRule:
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    def _compute_diff(
-        self, field_name: str, researcher_val: int, writer_val: int
-    ) -> FieldDiff:
+    def _compute_diff(self, field_name: str, researcher_val: int, writer_val: int) -> FieldDiff:
         """Compute diff between researcher and writer for one numeric field."""
         delta = writer_val - researcher_val
 

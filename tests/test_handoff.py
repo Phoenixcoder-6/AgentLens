@@ -13,6 +13,7 @@ from capture.handoff import HandoffCapture, _is_empty
 # _is_empty helper
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestIsEmpty:
     def test_none_is_empty(self):
         assert _is_empty(None) is True
@@ -50,8 +51,8 @@ class TestIsEmpty:
 # HandoffCapture — three-state snapshot
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestHandoffCapture:
 
+class TestHandoffCapture:
     def test_input_state_is_full_state_before(self):
         """input_state must be the exact full state dict passed in."""
         before = {"topic": "AI", "research_findings": "", "source_count": 0}
@@ -102,14 +103,14 @@ class TestHandoffCapture:
 # HandoffDiff — four categories
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestHandoffDiff:
 
+class TestHandoffDiff:
     # ── added_keys ──────────────────────────────────────────────────────────
 
     def test_added_key_when_empty_becomes_populated(self):
         """Researcher fills research_findings → added."""
         before = {"topic": "AI", "research_findings": "", "source_count": 0}
-        after  = {"topic": "AI", "research_findings": "SOURCES:\n- Book A", "source_count": 3}
+        after = {"topic": "AI", "research_findings": "SOURCES:\n- Book A", "source_count": 3}
         capture = HandoffCapture(input_state=before)
         capture.record_agent_return({"research_findings": "SOURCES:\n- Book A", "source_count": 3})
         _, _, _, diff = capture.finalize()
@@ -155,12 +156,14 @@ class TestHandoffDiff:
 
     def test_no_dropped_keys_on_clean_run(self):
         """Normal researcher run should have zero dropped keys."""
-        before  = {"topic": "AI", "research_findings": "", "source_count": 0}
+        before = {"topic": "AI", "research_findings": "", "source_count": 0}
         capture = HandoffCapture(input_state=before)
-        capture.record_agent_return({
-            "research_findings": "SOURCES:\n- Book A\nENTITIES:\n- Author",
-            "source_count": 1,
-        })
+        capture.record_agent_return(
+            {
+                "research_findings": "SOURCES:\n- Book A\nENTITIES:\n- Author",
+                "source_count": 1,
+            }
+        )
         _, _, _, diff = capture.finalize()
 
         assert diff.dropped_keys == []
@@ -177,15 +180,17 @@ class TestHandoffDiff:
 
     def test_total_changes_counts_correctly(self):
         before = {
-            "topic": "AI",          # will be unchanged
-            "research_findings": "", # will be added
-            "source_count": 5,       # will be modified
+            "topic": "AI",  # will be unchanged
+            "research_findings": "",  # will be added
+            "source_count": 5,  # will be modified
         }
         capture = HandoffCapture(input_state=before)
-        capture.record_agent_return({
-            "research_findings": "SOURCES:\n- Book A",
-            "source_count": 8,
-        })
+        capture.record_agent_return(
+            {
+                "research_findings": "SOURCES:\n- Book A",
+                "source_count": 8,
+            }
+        )
         _, _, _, diff = capture.finalize()
         # added=1 (research_findings), modified=1 (source_count), dropped=0
         assert diff.total_changes == 2
@@ -210,8 +215,8 @@ class TestHandoffDiff:
 # Integration: full pipeline-like state flow
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestHandoffCaptureIntegration:
 
+class TestHandoffCaptureIntegration:
     def test_researcher_handoff_adds_findings_and_counts(self):
         """Simulates the state transition for the Researcher node."""
         pipeline_initial_state = {
@@ -265,9 +270,7 @@ class TestHandoffCaptureIntegration:
             "revision_notes": "",
         }
 
-        writer_return = {
-            "written_report": "# Introduction\nAI is rising in India."
-        }
+        writer_return = {"written_report": "# Introduction\nAI is rising in India."}
 
         capture = HandoffCapture(input_state=state_after_researcher)
         capture.record_agent_return(writer_return)

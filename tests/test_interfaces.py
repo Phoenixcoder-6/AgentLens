@@ -28,6 +28,7 @@ from app.interfaces import (
 
 # ── Import completeness ───────────────────────────────────────────────────────
 
+
 def test_all_interfaces_importable():
     assert Analyzer is not None
     assert CaptureProvider is not None
@@ -48,6 +49,7 @@ def test_all_exceptions_importable():
 
 
 # ── Exception hierarchy ───────────────────────────────────────────────────────
+
 
 def test_llm_provider_error_is_exception():
     assert issubclass(LLMProviderError, Exception)
@@ -75,6 +77,7 @@ def test_exceptions_can_be_raised_and_caught():
 
 # ── AnalysisResult defaults ───────────────────────────────────────────────────
 
+
 def test_analysis_result_default_instantiation():
     result = AnalysisResult()
     assert result.evidence == []
@@ -100,8 +103,10 @@ def test_analysis_result_with_evidence(sample_evidence_record):
 
 # ── TraceEvent defaults ───────────────────────────────────────────────────────
 
+
 def test_trace_event_instantiation():
     from datetime import datetime
+
     event = TraceEvent(
         agent="researcher",
         raw_input="Summarize 10 sources",
@@ -115,6 +120,7 @@ def test_trace_event_instantiation():
 
 
 # ── Protocol runtime checkability ─────────────────────────────────────────────
+
 
 def test_analyzer_is_runtime_checkable():
     """Analyzer is a runtime_checkable Protocol — isinstance() works on it."""

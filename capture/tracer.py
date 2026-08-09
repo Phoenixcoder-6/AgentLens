@@ -35,6 +35,7 @@ def trace_step(func: Callable) -> Callable:
     No-op when there is no active CaptureSession (e.g. during unit tests
     that don't start a trace). The wrapped function always returns normally.
     """
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         # ── No active session → run the function unchanged ─────────────────
@@ -44,11 +45,11 @@ def trace_step(func: Callable) -> Callable:
 
         # ── Metadata ────────────────────────────────────────────────────────
         agent_name = func.__name__.replace("_node", "")
-        step_idx   = len(trace.steps) + 1
+        step_idx = len(trace.steps) + 1
 
         # ── Snapshot full state BEFORE agent runs ────────────────────────
         state_in = args[0] if args else kwargs.get("state", {})
-        capture  = HandoffCapture(input_state=state_in if isinstance(state_in, dict) else {})
+        capture = HandoffCapture(input_state=state_in if isinstance(state_in, dict) else {})
 
         # ── Build the AgentStep (filled in below) ────────────────────────
         step = AgentStep(
@@ -75,18 +76,19 @@ def trace_step(func: Callable) -> Callable:
             input_s, filtered_s, output_s, diff = capture.finalize()
 
             # ── Populate the step ────────────────────────────────────────
-            step.output              = json.dumps(result, default=str)
-            step.latency_ms          = latency
-            step.status              = StepStatus.SUCCESS
-            step.handoff.input_state    = input_s
-            step.handoff.filtered_state = filtered_s   # agent's own return dict
-            step.handoff.output_state   = output_s     # full merged state
+            step.output = json.dumps(result, default=str)
+            step.latency_ms = latency
+            step.status = StepStatus.SUCCESS
+            step.handoff.input_state = input_s
+            step.handoff.filtered_state = filtered_s  # agent's own return dict
+            step.handoff.output_state = output_s  # full merged state
 
             # Apply token counts staged by the node via set_step_tokens()
             # Consumed here (after node returns) so the correct step gets them
             pending = CaptureSession.consume_pending_tokens()
             if pending:
                 from schema.models import TokenUsage
+
                 step.tokens = TokenUsage(
                     prompt=pending[0],
                     completion=pending[1],
@@ -95,11 +97,10 @@ def trace_step(func: Callable) -> Callable:
 
             # Store the diff summary in metadata for quick querying
             # (full diff object is recoverable by re-running the diff engine)
-            step.prompt = diff.summary()   # re-using prompt field for diff log
+            step.prompt = diff.summary()  # re-using prompt field for diff log
 
             CaptureSession.add_step(step)
             return result
-
 
         except Exception as exc:
             latency = (time.perf_counter() - start_time) * 1000.0
@@ -108,13 +109,13 @@ def trace_step(func: Callable) -> Callable:
             capture.record_agent_return({})
             input_s, filtered_s, output_s, diff = capture.finalize()
 
-            step.latency_ms             = latency
-            step.status                 = StepStatus.ERROR
-            step.error                  = f"{type(exc).__name__}: {exc}"
-            step.handoff.input_state    = input_s
+            step.latency_ms = latency
+            step.status = StepStatus.ERROR
+            step.error = f"{type(exc).__name__}: {exc}"
+            step.handoff.input_state = input_s
             step.handoff.filtered_state = filtered_s
-            step.handoff.output_state   = output_s
-            step.prompt                 = diff.summary()
+            step.handoff.output_state = output_s
+            step.prompt = diff.summary()
 
             CaptureSession.add_step(step)
             raise

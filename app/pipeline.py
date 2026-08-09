@@ -42,6 +42,7 @@ load_dotenv()
 # Pipeline State
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class PipelineState(TypedDict):
     """
     Shared state that flows between all agents in the pipeline.
@@ -50,28 +51,27 @@ class PipelineState(TypedDict):
     The HandoffState capture (Day 6) will snapshot this dict before and
     after each agent call to detect information loss.
     """
-    topic: str                    # The research topic / input question
-    research_findings: str        # Researcher output — key facts and sources
-    source_count: int             # Number of sources the researcher cited
-    entity_count: int             # Number of entities the researcher identified
-    written_report: str           # Writer output — structured report
-    verification_result: str      # Verifier output — APPROVED / NEEDS_REVISION
-    verified: bool                # True if verifier approved the report
-    revision_notes: str           # Verifier's notes if report needs revision
+
+    topic: str  # The research topic / input question
+    research_findings: str  # Researcher output — key facts and sources
+    source_count: int  # Number of sources the researcher cited
+    entity_count: int  # Number of entities the researcher identified
+    written_report: str  # Writer output — structured report
+    verification_result: str  # Verifier output — APPROVED / NEEDS_REVISION
+    verified: bool  # True if verifier approved the report
+    revision_notes: str  # Verifier's notes if report needs revision
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LLM Client (loaded from config.yaml — nothing hardcoded)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _build_llm() -> ChatGroq:
     """Build the LLM client from config.yaml settings."""
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise OSError(
-            "GROQ_API_KEY not found. "
-            "Copy .env.example to .env and set your key."
-        )
+        raise OSError("GROQ_API_KEY not found. Copy .env.example to .env and set your key.")
     return ChatGroq(
         model=get("llm", "model"),
         temperature=get("llm", "temperature"),
@@ -83,6 +83,7 @@ def _build_llm() -> ChatGroq:
 # ─────────────────────────────────────────────────────────────────────────────
 # Agent Nodes
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @trace_step
 def researcher_node(state: PipelineState) -> dict:
@@ -101,10 +102,10 @@ def researcher_node(state: PipelineState) -> dict:
     """
     llm = _build_llm()
 
-    min_sources  = get("pipeline", "researcher", "min_sources")
-    max_sources  = get("pipeline", "researcher", "max_sources")
+    min_sources = get("pipeline", "researcher", "min_sources")
+    max_sources = get("pipeline", "researcher", "max_sources")
     min_entities = get("pipeline", "researcher", "min_entities")
-    depth        = get("pipeline", "researcher", "depth")
+    depth = get("pipeline", "researcher", "depth")
 
     system_prompt = (
         f"You are a meticulous research agent. Given a topic, you produce "
@@ -120,10 +121,12 @@ def researcher_node(state: PipelineState) -> dict:
         f"KEY FINDINGS (detailed prose):"
     )
 
-    response = llm.invoke([
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=f"Research this topic thoroughly: {state['topic']}"),
-    ])
+    response = llm.invoke(
+        [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=f"Research this topic thoroughly: {state['topic']}"),
+        ]
+    )
 
     findings = response.content
 
@@ -135,8 +138,16 @@ def researcher_node(state: PipelineState) -> dict:
         )
 
     # Count sources and entities from the structured response
-    source_count = findings.count("\n- ", 0, findings.find("ENTITIES")) if "ENTITIES" in findings else findings.count("\n- ")
-    entity_lines = findings[findings.find("ENTITIES"):findings.find("KEY FINDINGS")] if "ENTITIES" in findings and "KEY FINDINGS" in findings else ""
+    source_count = (
+        findings.count("\n- ", 0, findings.find("ENTITIES"))
+        if "ENTITIES" in findings
+        else findings.count("\n- ")
+    )
+    entity_lines = (
+        findings[findings.find("ENTITIES") : findings.find("KEY FINDINGS")]
+        if "ENTITIES" in findings and "KEY FINDINGS" in findings
+        else ""
+    )
     entity_count = entity_lines.count("\n- ")
 
     return {
@@ -161,10 +172,10 @@ def writer_node(state: PipelineState) -> dict:
     """
     llm = _build_llm()
 
-    sections       = get("pipeline", "writer", "report_sections")
+    sections = get("pipeline", "writer", "report_sections")
     citation_style = get("pipeline", "writer", "citation_style")
-    word_count     = get("pipeline", "writer", "word_count_target")
-    sections_str   = ", ".join(sections)
+    word_count = get("pipeline", "writer", "word_count_target")
+    sections_str = ", ".join(sections)
 
     system_prompt = (
         f"You are a professional report writer. Given research findings, "
@@ -178,15 +189,17 @@ def writer_node(state: PipelineState) -> dict:
         f"- Every factual claim must have a citation"
     )
 
-    response = llm.invoke([
-        SystemMessage(content=system_prompt),
-        HumanMessage(
-            content=(
-                f"Write a report on: {state['topic']}\n\n"
-                f"Using these research findings:\n{state['research_findings']}"
-            )
-        ),
-    ])
+    response = llm.invoke(
+        [
+            SystemMessage(content=system_prompt),
+            HumanMessage(
+                content=(
+                    f"Write a report on: {state['topic']}\n\n"
+                    f"Using these research findings:\n{state['research_findings']}"
+                )
+            ),
+        ]
+    )
 
     # Capture real token counts from Groq's usage metadata
     if hasattr(response, "usage_metadata") and response.usage_metadata:
@@ -217,13 +230,15 @@ def verifier_node(state: PipelineState) -> dict:
     """
     llm = _build_llm()
 
-    strictness           = get("pipeline", "verifier", "strictness")
-    check_sources        = get("pipeline", "verifier", "check_source_coverage")
-    check_entities       = get("pipeline", "verifier", "check_entity_coverage")
-    check_no_new_facts   = get("pipeline", "verifier", "check_no_new_facts")
+    strictness = get("pipeline", "verifier", "strictness")
+    check_sources = get("pipeline", "verifier", "check_source_coverage")
+    check_entities = get("pipeline", "verifier", "check_entity_coverage")
+    check_no_new_facts = get("pipeline", "verifier", "check_no_new_facts")
 
     checks = []
-    checks.append(f"1. Accuracy — does the report contain any facts NOT in the research? (check_no_new_facts={check_no_new_facts})")
+    checks.append(
+        f"1. Accuracy — does the report contain any facts NOT in the research? (check_no_new_facts={check_no_new_facts})"
+    )
     if check_sources:
         checks.append("2. Source coverage — are ALL cited sources from the research mentioned?")
     if check_entities:
@@ -244,16 +259,18 @@ def verifier_node(state: PipelineState) -> dict:
         f"NEEDS_REVISION: [specific bullet list of every issue found]"
     )
 
-    response = llm.invoke([
-        SystemMessage(content=system_prompt),
-        HumanMessage(
-            content=(
-                f"Topic: {state['topic']}\n\n"
-                f"Original Research Findings:\n{state['research_findings']}\n\n"
-                f"Written Report to Verify:\n{state['written_report']}"
-            )
-        ),
-    ])
+    response = llm.invoke(
+        [
+            SystemMessage(content=system_prompt),
+            HumanMessage(
+                content=(
+                    f"Topic: {state['topic']}\n\n"
+                    f"Original Research Findings:\n{state['research_findings']}\n\n"
+                    f"Written Report to Verify:\n{state['written_report']}"
+                )
+            ),
+        ]
+    )
 
     result = response.content.strip()
     approved = result.upper().startswith("APPROVED")
@@ -275,6 +292,7 @@ def verifier_node(state: PipelineState) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 # Graph Construction
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def build_pipeline() -> StateGraph:
     """
@@ -302,6 +320,7 @@ def build_pipeline() -> StateGraph:
 # ─────────────────────────────────────────────────────────────────────────────
 # Public run function
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def run_pipeline(topic: str) -> PipelineState:
     """

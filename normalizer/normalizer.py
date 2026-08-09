@@ -40,6 +40,7 @@ from schema.models import (
 # NormalizedStep — the canonical output of the Normalizer
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class NormalizedStep:
     """
@@ -51,6 +52,7 @@ class NormalizedStep:
     schema_version is stamped on every record so schema migrations
     are fully traceable across stored records.
     """
+
     # Identity
     schema_version: str
     run_id: str
@@ -89,6 +91,7 @@ class NormalizedRun:
     Produced by Normalizer.normalize_run(). Contains all NormalizedSteps
     in execution order.
     """
+
     schema_version: str
     run_id: str
     workflow: str
@@ -103,6 +106,7 @@ class NormalizedRun:
 # ─────────────────────────────────────────────────────────────────────────────
 # Normalizer
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class Normalizer:
     """
@@ -131,9 +135,9 @@ class Normalizer:
             schema_version          → stamped as SCHEMA_VERSION
         """
         # ── Parse state dicts from raw JSON strings ───────────────────────
-        input_state    = self._parse_state(step.handoff.input_state or step.input)
+        input_state = self._parse_state(step.handoff.input_state or step.input)
         filtered_state = self._parse_state(step.handoff.filtered_state)
-        output_state   = self._parse_state(step.handoff.output_state or step.output)
+        output_state = self._parse_state(step.handoff.output_state or step.output)
 
         # ── Normalize timestamp → UTC-aware datetime ──────────────────────
         timestamp = self._normalize_timestamp(step.timestamp)
@@ -142,26 +146,26 @@ class Normalizer:
         status = self._normalize_status(step.status)
 
         # ── Ensure all state values are JSON-safe ─────────────────────────
-        input_state    = to_serializable(input_state)
+        input_state = to_serializable(input_state)
         filtered_state = to_serializable(filtered_state)
-        output_state   = to_serializable(output_state)
+        output_state = to_serializable(output_state)
 
         return NormalizedStep(
-            schema_version = SCHEMA_VERSION,          # ← stamped here
-            run_id         = step.run_id,
-            step           = step.step,
-            agent          = step.agent,
-            input_state    = input_state    if isinstance(input_state, dict)    else {},
-            filtered_state = filtered_state if isinstance(filtered_state, dict) else {},
-            output_state   = output_state   if isinstance(output_state, dict)   else {},
-            latency_ms     = float(step.latency_ms),
-            tokens         = step.tokens,
-            status         = status,
-            error          = step.error,
-            timestamp      = timestamp,
-            diff_summary   = step.prompt or "",       # diff stored in prompt field
-            raw_input      = step.input  or "",
-            raw_output     = step.output or "",
+            schema_version=SCHEMA_VERSION,  # ← stamped here
+            run_id=step.run_id,
+            step=step.step,
+            agent=step.agent,
+            input_state=input_state if isinstance(input_state, dict) else {},
+            filtered_state=filtered_state if isinstance(filtered_state, dict) else {},
+            output_state=output_state if isinstance(output_state, dict) else {},
+            latency_ms=float(step.latency_ms),
+            tokens=step.tokens,
+            status=status,
+            error=step.error,
+            timestamp=timestamp,
+            diff_summary=step.prompt or "",  # diff stored in prompt field
+            raw_input=step.input or "",
+            raw_output=step.output or "",
         )
 
     def normalize_run(self, run: RunTrace) -> NormalizedRun:
@@ -170,20 +174,20 @@ class Normalizer:
         All steps are normalized in order.
         """
         timestamp = self._normalize_timestamp(run.timestamp)
-        status    = self._normalize_status(run.status)
+        status = self._normalize_status(run.status)
 
         normalized_steps = [self.normalize_step(s) for s in run.steps]
 
         return NormalizedRun(
-            schema_version   = SCHEMA_VERSION,        # ← stamped here
-            run_id           = run.run_id,
-            workflow         = run.workflow,
-            timestamp        = timestamp,
-            status           = status,
-            total_latency_ms = float(run.total_latency_ms),
-            total_tokens     = int(run.total_tokens),
-            expected_output  = run.expected_output,
-            steps            = normalized_steps,
+            schema_version=SCHEMA_VERSION,  # ← stamped here
+            run_id=run.run_id,
+            workflow=run.workflow,
+            timestamp=timestamp,
+            status=status,
+            total_latency_ms=float(run.total_latency_ms),
+            total_tokens=int(run.total_tokens),
+            expected_output=run.expected_output,
+            steps=normalized_steps,
         )
 
     # ── Internal helpers ──────────────────────────────────────────────────────

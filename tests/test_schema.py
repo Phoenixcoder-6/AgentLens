@@ -30,11 +30,13 @@ from schema import (
 
 # ── SCHEMA_VERSION ────────────────────────────────────────────────────────────
 
+
 def test_schema_version_is_1_0():
     assert SCHEMA_VERSION == "1.0"
 
 
 # ── TokenUsage ────────────────────────────────────────────────────────────────
+
 
 def test_token_usage_auto_total():
     t = TokenUsage(prompt=512, completion=180)
@@ -53,6 +55,7 @@ def test_token_usage_zeros():
 
 # ── HandoffState ──────────────────────────────────────────────────────────────
 
+
 def test_handoff_state_instantiates(sample_handoff_state):
     assert sample_handoff_state is not None
 
@@ -65,11 +68,14 @@ def test_handoff_state_input_fields(sample_handoff_state):
 
 def test_handoff_state_detects_loss(sample_handoff_state):
     """Core capability: input_state vs output_state reveals dropped keys."""
-    dropped = set(sample_handoff_state.input_state.keys()) - set(sample_handoff_state.output_state.keys())
+    dropped = set(sample_handoff_state.input_state.keys()) - set(
+        sample_handoff_state.output_state.keys()
+    )
     assert "topic" in dropped  # topic was in input, gone in output
 
 
 # ── WorkflowState ─────────────────────────────────────────────────────────────
+
 
 def test_workflow_state_instantiates():
     ws = WorkflowState(run_id="run_test01", step_index=1, state_data={"topic": "AI"})
@@ -82,6 +88,7 @@ def test_workflow_state_schema_version():
 
 
 # ── AgentStep ─────────────────────────────────────────────────────────────────
+
 
 def test_agent_step_instantiates(sample_agent_step):
     assert sample_agent_step is not None
@@ -105,6 +112,7 @@ def test_agent_step_status_default(sample_agent_step):
 
 # ── RunTrace ──────────────────────────────────────────────────────────────────
 
+
 def test_run_trace_instantiates(sample_run_trace):
     assert sample_run_trace is not None
 
@@ -125,6 +133,7 @@ def test_run_trace_contains_steps(sample_run_trace):
 
 # ── RuleMatch ─────────────────────────────────────────────────────────────────
 
+
 def test_rule_match_instantiates(sample_rule_match):
     assert sample_rule_match is not None
 
@@ -142,6 +151,7 @@ def test_rule_match_rule_id_format(sample_rule_match):
 
 
 # ── EvidenceRecord ────────────────────────────────────────────────────────────
+
 
 def test_evidence_record_instantiates(sample_evidence_record):
     assert sample_evidence_record is not None
@@ -167,6 +177,7 @@ def test_evidence_record_confidence_bounds():
 
 # ── AnalysisBundle ────────────────────────────────────────────────────────────
 
+
 def test_analysis_bundle_instantiates(sample_run_trace, sample_evidence_record, sample_rule_match):
     bundle = AnalysisBundle(
         run_id=sample_run_trace.run_id,
@@ -180,7 +191,9 @@ def test_analysis_bundle_instantiates(sample_run_trace, sample_evidence_record, 
     assert bundle is not None
 
 
-def test_analysis_bundle_schema_version(sample_run_trace, sample_evidence_record, sample_rule_match):
+def test_analysis_bundle_schema_version(
+    sample_run_trace, sample_evidence_record, sample_rule_match
+):
     bundle = AnalysisBundle(
         run_id=sample_run_trace.run_id,
         primary_cause=FailureCategory.WORKFLOW,
@@ -208,6 +221,7 @@ def test_analysis_bundle_grounded_flag(sample_run_trace):
 
 
 # ── JSON Round-trip ───────────────────────────────────────────────────────────
+
 
 def test_run_trace_json_round_trip(sample_run_trace):
     json_str = sample_run_trace.model_dump_json()

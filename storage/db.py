@@ -109,6 +109,7 @@ _ALL_DDL = [_CREATE_RUNS, _CREATE_STEPS, _CREATE_ANALYSIS, _CREATE_METRICS]
 # DatabaseManager
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class DatabaseManager:
     """
     Manages the SQLite connection and all CRUD operations.
@@ -179,17 +180,24 @@ class DatabaseManager:
                      trace_path, trace_json, expected_output)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (run_id, workflow, timestamp, status,
-                 total_latency_ms, total_tokens, schema_version,
-                 trace_path, trace_json, expected_output),
+                (
+                    run_id,
+                    workflow,
+                    timestamp,
+                    status,
+                    total_latency_ms,
+                    total_tokens,
+                    schema_version,
+                    trace_path,
+                    trace_json,
+                    expected_output,
+                ),
             )
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         """Fetch a run row by run_id. Returns None if not found."""
         with self.connection() as conn:
-            row = conn.execute(
-                "SELECT * FROM runs WHERE run_id = ?", (run_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
         return dict(row) if row else None
 
     def list_runs(
@@ -199,7 +207,9 @@ class DatabaseManager:
         workflow_filter: str | None = None,
     ) -> list[dict[str, Any]]:
         """List run summaries, newest first."""
-        query = "SELECT run_id, workflow, timestamp, status, total_latency_ms, total_tokens FROM runs"
+        query = (
+            "SELECT run_id, workflow, timestamp, status, total_latency_ms, total_tokens FROM runs"
+        )
         params: list[Any] = []
         filters = []
         if status_filter:
@@ -244,9 +254,20 @@ class DatabaseManager:
                      diff_summary, error, timestamp, schema_version)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (run_id, step, agent, status, latency_ms,
-                 tokens_prompt, tokens_completion, tokens_total,
-                 diff_summary, error, timestamp, schema_version),
+                (
+                    run_id,
+                    step,
+                    agent,
+                    status,
+                    latency_ms,
+                    tokens_prompt,
+                    tokens_completion,
+                    tokens_total,
+                    diff_summary,
+                    error,
+                    timestamp,
+                    schema_version,
+                ),
             )
 
     def get_steps_for_run(self, run_id: str) -> list[dict[str, Any]]:
@@ -281,8 +302,17 @@ class DatabaseManager:
                      confidence, details_json, timestamp, schema_version)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (run_id, step, analyzer, category, verdict,
-                 confidence, json.dumps(details or {}), timestamp, schema_version),
+                (
+                    run_id,
+                    step,
+                    analyzer,
+                    category,
+                    verdict,
+                    confidence,
+                    json.dumps(details or {}),
+                    timestamp,
+                    schema_version,
+                ),
             )
 
     # ── Metrics ───────────────────────────────────────────────────────────────
@@ -307,8 +337,16 @@ class DatabaseManager:
                      metric_unit, timestamp, schema_version)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (run_id, step, agent, metric_name, metric_value,
-                 metric_unit, timestamp, schema_version),
+                (
+                    run_id,
+                    step,
+                    agent,
+                    metric_name,
+                    metric_value,
+                    metric_unit,
+                    timestamp,
+                    schema_version,
+                ),
             )
 
     def get_metrics_for_run(self, run_id: str) -> list[dict[str, Any]]:

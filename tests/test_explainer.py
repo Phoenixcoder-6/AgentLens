@@ -87,6 +87,7 @@ def make_explainer_with_mock() -> tuple[LLMExplainer, MagicMock]:
 # CORE REQUIREMENT: LLM never sees raw trace data
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestRawTraceNeverInPrompt:
     """
     The architectural guarantee of Day 13:
@@ -113,10 +114,10 @@ class TestRawTraceNeverInPrompt:
         explainer, _ = make_explainer_with_mock()
         prompt = explainer._build_prompt(bundle)
 
-        assert bundle.run_id          in prompt
-        assert "reasoning"            in prompt   # primary_cause.value
-        assert "P2"                   in prompt   # priority_level.value
-        assert "writer"               in prompt   # primary_agent
+        assert bundle.run_id in prompt
+        assert "reasoning" in prompt  # primary_cause.value
+        assert "P2" in prompt  # priority_level.value
+        assert "writer" in prompt  # primary_agent
 
     def test_prompt_contains_rule_id(self):
         bundle = make_bundle(rule_id="information_loss_v1")
@@ -147,7 +148,7 @@ class TestRawTraceNeverInPrompt:
         explainer, _ = make_explainer_with_mock()
         prompt = explainer._build_prompt(bundle)
         assert "evidence_count" in prompt
-        assert "1" in prompt   # one evidence record
+        assert "1" in prompt  # one evidence record
 
     def test_prompt_does_not_contain_research_findings_literal(self):
         """The literal string 'research_findings' must never appear as data in prompt."""
@@ -163,18 +164,19 @@ class TestRawTraceNeverInPrompt:
     def test_build_prompt_takes_only_bundle_not_trace(self):
         """_build_prompt signature must accept only AnalysisBundle."""
         import inspect
+
         explainer, _ = make_explainer_with_mock()
         sig = inspect.signature(explainer._build_prompt)
         params = list(sig.parameters.keys())
-        assert params == ["bundle"]   # bound method: self excluded, exactly one arg
+        assert params == ["bundle"]  # bound method: self excluded, exactly one arg
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fallback behaviour (no LLM call)
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestFallback:
 
+class TestFallback:
     def test_fallback_summary_contains_priority(self):
         bundle = make_bundle(priority=PriorityLevel.P2)
         explainer, _ = make_explainer_with_mock()
@@ -236,7 +238,7 @@ class TestFallback:
         mock_llm.with_structured_output.return_value.invoke.side_effect = Exception("network error")
 
         bundle = make_bundle()
-        result = explainer.explain(bundle)   # must not raise
+        result = explainer.explain(bundle)  # must not raise
         assert isinstance(result, AnalysisBundle)
 
 
@@ -244,8 +246,8 @@ class TestFallback:
 # Bundle mutation
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestBundleMutation:
 
+class TestBundleMutation:
     def test_explain_populates_summary(self):
         explainer, mock_llm = make_explainer_with_mock()
         mock_llm.with_structured_output.return_value.invoke.return_value = ExplanationOutput(
@@ -299,14 +301,16 @@ class TestBundleMutation:
 # System prompt verification
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestSystemPrompt:
 
+class TestSystemPrompt:
     def test_system_prompt_instructs_hedging(self):
         assert "hedged" in LLMExplainer.SYSTEM_PROMPT.lower()
 
     def test_system_prompt_forbids_re_analysis(self):
-        assert "do not re-analyze" in LLMExplainer.SYSTEM_PROMPT.lower() or \
-               "only explain" in LLMExplainer.SYSTEM_PROMPT.lower()
+        assert (
+            "do not re-analyze" in LLMExplainer.SYSTEM_PROMPT.lower()
+            or "only explain" in LLMExplainer.SYSTEM_PROMPT.lower()
+        )
 
     def test_system_prompt_mentions_grounded(self):
         assert "grounded" in LLMExplainer.SYSTEM_PROMPT.lower()
@@ -316,9 +320,9 @@ class TestSystemPrompt:
 # Integration test (requires GROQ_API_KEY — skipped by default)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.integration
 class TestExplainerIntegration:
-
     def test_real_llm_call_populates_bundle(self):
         """Live Groq call — only runs with -m integration flag."""
         bundle = make_bundle(

@@ -32,9 +32,11 @@ from storage.db import DatabaseManager
 # Data models
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class StepMetrics:
     """Metrics for a single agent step."""
+
     schema_version: str
     run_id: str
     step: int
@@ -42,7 +44,7 @@ class StepMetrics:
 
     # Latency
     latency_ms: float
-    latency_flag: bool          # True if latency exceeds threshold
+    latency_flag: bool  # True if latency exceeds threshold
     latency_threshold_ms: float
 
     # Tokens
@@ -61,6 +63,7 @@ class StepMetrics:
 @dataclass
 class RunMetrics:
     """Aggregated metrics for a complete pipeline run."""
+
     schema_version: str
     run_id: str
     workflow: str
@@ -78,21 +81,20 @@ class RunMetrics:
     agent_latency: dict[str, float] = field(default_factory=dict)
 
     # Slowest and fastest steps
-    slowest_step: str | None = None   # agent name
-    fastest_step: str | None = None   # agent name
+    slowest_step: str | None = None  # agent name
+    fastest_step: str | None = None  # agent name
 
     # Anomaly summary
     anomalous_steps: list[str] = field(default_factory=list)
     has_anomalies: bool = False
 
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MetricsAnalyzer
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class MetricsAnalyzer:
     """
@@ -152,12 +154,12 @@ class MetricsAnalyzer:
 
     def _analyze_step(self, row: dict, baseline: dict) -> StepMetrics:
         """Compute StepMetrics for one step row from the DB."""
-        latency    = float(row.get("latency_ms", 0.0))
-        tokens_p   = int(row.get("tokens_prompt", 0))
-        tokens_c   = int(row.get("tokens_completion", 0))
-        tokens_t   = int(row.get("tokens_total", 0))
-        agent      = row.get("agent", "")
-        step_num   = int(row.get("step", 0))
+        latency = float(row.get("latency_ms", 0.0))
+        tokens_p = int(row.get("tokens_prompt", 0))
+        tokens_c = int(row.get("tokens_completion", 0))
+        tokens_t = int(row.get("tokens_total", 0))
+        agent = row.get("agent", "")
+        step_num = int(row.get("step", 0))
 
         anomaly_reasons = []
 
@@ -172,7 +174,7 @@ class MetricsAnalyzer:
         if baseline.get("active"):
             # Latency stddev check
             lat_mean = baseline.get("latency_mean", 0.0)
-            lat_std  = baseline.get("latency_std", 0.0)
+            lat_std = baseline.get("latency_std", 0.0)
             if lat_std > 0 and latency > lat_mean + self._latency_stddev_mult * lat_std:
                 anomaly_reasons.append(
                     f"latency {latency:.0f}ms > statistical threshold "
@@ -181,7 +183,7 @@ class MetricsAnalyzer:
 
             # Token stddev check
             tok_mean = baseline.get("token_mean", 0.0)
-            tok_std  = baseline.get("token_std", 0.0)
+            tok_std = baseline.get("token_std", 0.0)
             if tok_std > 0 and tokens_t > tok_mean + self._token_stddev_mult * tok_std:
                 anomaly_reasons.append(
                     f"tokens {tokens_t} > statistical threshold "
@@ -189,27 +191,27 @@ class MetricsAnalyzer:
                 )
 
         return StepMetrics(
-            schema_version       = SCHEMA_VERSION,
-            run_id               = row.get("run_id", ""),
-            step                 = step_num,
-            agent                = agent,
-            latency_ms           = latency,
-            latency_flag         = latency_flag,
-            latency_threshold_ms = self._latency_threshold,
-            tokens_prompt        = tokens_p,
-            tokens_completion    = tokens_c,
-            tokens_total         = tokens_t,
-            execution_time_ms    = latency,   # wall-clock = latency for current pipeline
-            is_anomalous         = len(anomaly_reasons) > 0,
-            anomaly_reasons      = anomaly_reasons,
+            schema_version=SCHEMA_VERSION,
+            run_id=row.get("run_id", ""),
+            step=step_num,
+            agent=agent,
+            latency_ms=latency,
+            latency_flag=latency_flag,
+            latency_threshold_ms=self._latency_threshold,
+            tokens_prompt=tokens_p,
+            tokens_completion=tokens_c,
+            tokens_total=tokens_t,
+            execution_time_ms=latency,  # wall-clock = latency for current pipeline
+            is_anomalous=len(anomaly_reasons) > 0,
+            anomaly_reasons=anomaly_reasons,
         )
 
     def _build_run_metrics(self, run_row: dict, steps: list[StepMetrics]) -> RunMetrics:
         """Aggregate step metrics into a RunMetrics object."""
-        total_latency  = sum(s.latency_ms for s in steps)
-        total_tokens   = sum(s.tokens_total for s in steps)
-        total_exec     = sum(s.execution_time_ms for s in steps)
-        agent_latency  = {s.agent: s.latency_ms for s in steps}
+        total_latency = sum(s.latency_ms for s in steps)
+        total_tokens = sum(s.tokens_total for s in steps)
+        total_exec = sum(s.execution_time_ms for s in steps)
+        agent_latency = {s.agent: s.latency_ms for s in steps}
 
         slowest = max(steps, key=lambda s: s.latency_ms).agent if steps else None
         fastest = min(steps, key=lambda s: s.latency_ms).agent if steps else None
@@ -217,19 +219,19 @@ class MetricsAnalyzer:
         anomalous = [s.agent for s in steps if s.is_anomalous]
 
         return RunMetrics(
-            schema_version         = SCHEMA_VERSION,
-            run_id                 = run_row.get("run_id", ""),
-            workflow               = run_row.get("workflow", ""),
-            steps                  = steps,
-            total_latency_ms       = total_latency,
-            total_tokens           = total_tokens,
-            total_execution_time_ms= total_exec,
-            step_count             = len(steps),
-            agent_latency          = agent_latency,
-            slowest_step           = slowest,
-            fastest_step           = fastest,
-            anomalous_steps        = anomalous,
-            has_anomalies          = len(anomalous) > 0,
+            schema_version=SCHEMA_VERSION,
+            run_id=run_row.get("run_id", ""),
+            workflow=run_row.get("workflow", ""),
+            steps=steps,
+            total_latency_ms=total_latency,
+            total_tokens=total_tokens,
+            total_execution_time_ms=total_exec,
+            step_count=len(steps),
+            agent_latency=agent_latency,
+            slowest_step=slowest,
+            fastest_step=fastest,
+            anomalous_steps=anomalous,
+            has_anomalies=len(anomalous) > 0,
         )
 
     def _get_baseline(self) -> dict:
@@ -242,7 +244,7 @@ class MetricsAnalyzer:
             return {"active": False}
 
         latencies = []
-        tokens    = []
+        tokens = []
         for run in runs:
             steps = self.db.get_steps_for_run(run["run_id"])
             for s in steps:
@@ -253,11 +255,11 @@ class MetricsAnalyzer:
             return {"active": False}
 
         return {
-            "active":       True,
+            "active": True,
             "latency_mean": _mean(latencies),
-            "latency_std":  _stddev(latencies),
-            "token_mean":   _mean(tokens),
-            "token_std":    _stddev(tokens),
+            "latency_std": _stddev(latencies),
+            "token_mean": _mean(tokens),
+            "token_std": _stddev(tokens),
         }
 
 
