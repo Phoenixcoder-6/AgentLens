@@ -102,7 +102,7 @@ def main() -> None:
         CaptureSession.start_trace(workflow="research_report_pipeline")
         state = run_pipeline(topic=args.topic)
         CaptureSession.end_trace()
-        print_results(state, args.topic)
+        print_results(state, args.topic)  # type: ignore[arg-type]
     except OSError as e:
         CaptureSession.end_trace(status=StepStatus.ERROR, error=str(e))
         print(f"[ERROR] {e}")

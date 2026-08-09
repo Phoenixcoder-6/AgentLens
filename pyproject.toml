@@ -70,6 +70,7 @@ ignore = [
 python_version = "3.12"  # numpy stubs use `type` keyword (PEP 695, requires 3.12)
 strict = false
 ignore_missing_imports = true
+explicit_package_bases = true
 exclude = [
     "\\.venv",
     "_patch_.*\\.py",

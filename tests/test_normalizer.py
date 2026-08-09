@@ -272,7 +272,7 @@ def _make_agent_step(**overrides) -> AgentStep:
         ),
     )
     defaults.update(overrides)
-    return AgentStep(**defaults)
+    return AgentStep(**defaults)  # type: ignore[arg-type]
 
 
 class TestNormalizerStep:

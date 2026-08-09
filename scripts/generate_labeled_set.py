@@ -56,7 +56,7 @@ def _make_step(
     written_report: str = "",
     verification_result: str = "",
     verified: bool = False,
-    tool_calls: list[dict] = None,
+    tool_calls: list[dict] | None = None,
     status: str = "SUCCESS",
     error: str | None = None,
     latency_ms: float = 1200.0,

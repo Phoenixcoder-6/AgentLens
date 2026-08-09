@@ -29,6 +29,8 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
+from pydantic import SecretStr
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from capture.session import CaptureSession
@@ -76,7 +78,7 @@ def _build_llm() -> ChatGroq:
         model=get("llm", "model"),
         temperature=get("llm", "temperature"),
         max_tokens=get("llm", "max_tokens"),
-        api_key=api_key,
+        api_key=SecretStr(api_key),
     )
 
 
@@ -128,7 +130,7 @@ def researcher_node(state: PipelineState) -> dict:
         ]
     )
 
-    findings = response.content
+    findings = str(response.content)
 
     # Capture real token counts from Groq's usage metadata
     if hasattr(response, "usage_metadata") and response.usage_metadata:
@@ -209,7 +211,7 @@ def writer_node(state: PipelineState) -> dict:
         )
 
     return {
-        "written_report": response.content,
+        "written_report": str(response.content),
     }
 
 
@@ -272,7 +274,7 @@ def verifier_node(state: PipelineState) -> dict:
         ]
     )
 
-    result = response.content.strip()
+    result = str(response.content).strip()
     approved = result.upper().startswith("APPROVED")
 
     # Capture real token counts from Groq's usage metadata
@@ -294,7 +296,7 @@ def verifier_node(state: PipelineState) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def build_pipeline() -> StateGraph:
+def build_pipeline() -> CompiledStateGraph:
     """
     Build and compile the Researcher → Writer → Verifier pipeline.
 
@@ -346,4 +348,5 @@ def run_pipeline(topic: str) -> PipelineState:
     }
 
     final_state = app.invoke(initial_state)
-    return final_state
+    from typing import cast
+    return cast(PipelineState, final_state)

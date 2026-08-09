@@ -30,7 +30,7 @@ def tmp_db(tmp_path) -> DatabaseManager:
 
 
 def _seed_run(
-    db: DatabaseManager, run_id: str, latencies: list[float], tokens: list[int] = None
+    db: DatabaseManager, run_id: str, latencies: list[float], tokens: list[int] | None = None
 ) -> None:
     """Seed one run with N steps into the DB."""
     agents = ["researcher", "writer", "verifier"]
@@ -61,12 +61,14 @@ def _seed_run(
             TS,
             SCHEMA_VERSION,
         )
-        db.insert_metric(run_id, i + 1, agent, "latency_ms", latency, "ms", TS, SCHEMA_VERSION)
         db.insert_metric(
-            run_id, i + 1, agent, "execution_time_ms", latency, "ms", TS, SCHEMA_VERSION
+            run_id, "latency_ms", latency, TS, SCHEMA_VERSION, step=i + 1, agent=agent, metric_unit="ms"
         )
         db.insert_metric(
-            run_id, i + 1, agent, "tokens_total", float(tok), "tokens", TS, SCHEMA_VERSION
+            run_id, "execution_time_ms", latency, TS, SCHEMA_VERSION, step=i + 1, agent=agent, metric_unit="ms"
+        )
+        db.insert_metric(
+            run_id, "tokens_total", float(tok), TS, SCHEMA_VERSION, step=i + 1, agent=agent, metric_unit="tokens"
         )
 
 
