@@ -14,6 +14,7 @@ All prompt-inspection and fallback tests run without any LLM calls.
 
 from __future__ import annotations
 
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -320,8 +321,6 @@ class TestSystemPrompt:
 # Integration test (requires GROQ_API_KEY — skipped by default)
 # ─────────────────────────────────────────────────────────────────────────────
 
-
-import os
 
 @pytest.mark.integration
 @pytest.mark.skipif(not os.getenv("GROQ_API_KEY"), reason="Requires GROQ_API_KEY")

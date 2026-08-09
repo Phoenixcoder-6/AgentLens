@@ -9,6 +9,7 @@ Unit tests run without any API key. Integration test requires GROQ_API_KEY.
 
 from __future__ import annotations
 
+import os
 from unittest.mock import MagicMock
 
 import pytest
@@ -150,7 +151,6 @@ class TestEvidenceExtractorUnit:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-import os
 
 @pytest.mark.integration
 @pytest.mark.skipif(not os.getenv("GROQ_API_KEY"), reason="Requires GROQ_API_KEY")
