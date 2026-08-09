@@ -150,7 +150,10 @@ class TestEvidenceExtractorUnit:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+import os
+
 @pytest.mark.integration
+@pytest.mark.skipif(not os.getenv("GROQ_API_KEY"), reason="Requires GROQ_API_KEY")
 class TestEvidenceExtractorIntegration:
     """
     Real LLM call. Requires GROQ_API_KEY in .env

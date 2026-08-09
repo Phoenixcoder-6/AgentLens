@@ -321,7 +321,10 @@ class TestSystemPrompt:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+import os
+
 @pytest.mark.integration
+@pytest.mark.skipif(not os.getenv("GROQ_API_KEY"), reason="Requires GROQ_API_KEY")
 class TestExplainerIntegration:
     def test_real_llm_call_populates_bundle(self):
         """Live Groq call — only runs with -m integration flag."""
