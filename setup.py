@@ -10,7 +10,7 @@ setup(
     version="1.0.0",
     description="Multi-Agent Failure Attribution, Trace Diffing & Explainability Platform",
     author="Anks",
-    python_requires=">=3.12",
+    python_requires=">=3.11",
     packages=find_packages(exclude=["tests*", "sample_data*", "docs*"]),
     install_requires=[
         "langgraph>=0.2.0",
