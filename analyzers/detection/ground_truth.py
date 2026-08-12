@@ -28,6 +28,10 @@ class GroundTruthValidator(Analyzer):
     the configured threshold, it returns a P1 evidence record.
     """
 
+    @property
+    def analyzer_id(self) -> str:
+        return "ground_truth_validator"
+
     def analyze(self, trace: RunTrace) -> AnalysisResult:
         if not trace.expected_output:
             return AnalysisResult(
