@@ -214,9 +214,23 @@ def determine_primary_cause(
 
     is_grounded = compute_grounded(evidence)
 
-    # ── P1: ground truth mismatch (reserved — Day 17) ────────────────────────
-    # p1_evidence = [e for e in evidence if e.source == EvidenceSource.GROUND_TRUTH]
-    # → Day 17
+    # ── P1: ground truth mismatch (Day 17) ────────────────────────────────────
+    p1_evidence = [e for e in evidence if e.source == EvidenceSource.GROUND_TRUTH]
+    if p1_evidence:
+        best = sorted(p1_evidence, key=_tiebreak_key)[0]
+        category = best.rule_match.category if best.rule_match else FailureCategory.UNKNOWN
+        return _make_bundle(
+            run_id=run_id,
+            primary_cause=category,
+            priority=PriorityLevel.P1,
+            grounded=True,
+            evidence=evidence,
+            primary_agent=best.agent,
+            verdict_reason=(
+                f"P1 ground truth mismatch: {best.rule_match.rule_id if best.rule_match else 'unknown'} "
+                f"(confidence={best.confidence:.0%})"
+            ),
+        )
 
     # ── P2: rule match (deterministic rules fired) ────────────────────────────
     p2_evidence = [e for e in evidence if e.source == EvidenceSource.RULE_ENGINE]

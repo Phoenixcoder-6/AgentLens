@@ -56,6 +56,8 @@ metrics:
 # Arbiter Priority Levels
 # ─────────────────────────────────────────────
 arbiter:
+  ground_truth:
+    p1_similarity_threshold: 0.85          # String similarity threshold (difflib MVP) below which P1 fires
   priorities:
     P1: "ground_truth_mismatch"            # expected_output present and output differs
     P2: "rule_match"                       # Deterministic rule fired

@@ -196,6 +196,36 @@ class TestDeterminism:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# TestP1GroundTruth
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestP1GroundTruth:
+    def test_p1_outranks_p2(self):
+        p1_ev = EvidenceRecord(
+            source=EvidenceSource.GROUND_TRUTH,
+            description="Mismatch",
+            value="FAIL",
+            rule_match=RuleMatch(
+                rule_id="gt_mismatch_v1",
+                category=FailureCategory.REASONING,
+                description="Mismatch",
+                severity=RuleSeverity.CRITICAL,
+                agent="writer",
+            ),
+            agent="writer",
+            confidence=0.9,
+        )
+        p2_ev = make_rule_evidence("rule_v1")
+
+        bundle = determine_primary_cause([p1_ev, p2_ev], RUN_ID)
+        assert bundle.priority_level == PriorityLevel.P1
+        assert bundle.grounded is True
+        assert bundle.primary_cause == FailureCategory.REASONING
+        assert bundle.primary_agent == "writer"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # TestP2RuleMatch
 # ─────────────────────────────────────────────────────────────────────────────
 
