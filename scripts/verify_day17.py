@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from analyzers.arbiter import Arbiter
 from analyzers.detection.ground_truth import GroundTruthValidator
-from schema.models import AgentStep, FailureCategory, PriorityLevel, RunTrace
+from schema.models import AgentStep, PriorityLevel, RunTrace
 
 
 def main() -> None:
@@ -28,7 +28,7 @@ def main() -> None:
     )
 
     result_pass = validator.analyze(trace_pass)
-    
+
     if not result_pass.skipped and len(result_pass.evidence) == 0:
         print("  [PASS] Validator correctly returned no evidence for a match.\n")
     else:
@@ -46,10 +46,10 @@ def main() -> None:
     )
 
     result_fail = validator.analyze(trace_fail)
-    
+
     if not result_fail.skipped and len(result_fail.evidence) == 1:
         ev = result_fail.evidence[0]
-        print(f"  [PASS] Validator correctly detected mismatch.")
+        print("  [PASS] Validator correctly detected mismatch.")
         print(f"         Rule Fired: {ev.rule_match.rule_id if ev.rule_match else 'None'}")
         print(f"         Confidence: {ev.confidence:.0%}\n")
     else:
@@ -64,7 +64,7 @@ def main() -> None:
 
     if bundle.priority_level == PriorityLevel.P1 and bundle.grounded is True:
         print("  [PASS] Arbiter successfully prioritized the evidence as P1.")
-        print(f"  [PASS] Arbiter marked the bundle as grounded=True.")
+        print("  [PASS] Arbiter marked the bundle as grounded=True.")
         print(f"  [PASS] Primary Cause: {bundle.primary_cause.value}")
     else:
         print("  [FAIL] Arbiter did not prioritize correctly.")
