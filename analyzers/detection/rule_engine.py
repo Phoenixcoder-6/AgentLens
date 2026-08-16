@@ -106,7 +106,14 @@ class RuleEngine(Analyzer):
                     )
 
             # Reasoning: hallucination_v1
-            if res_step and wr_step and res_ev and wr_ev and not res_ev.extraction_failed and not wr_ev.extraction_failed:
+            if (
+                res_step
+                and wr_step
+                and res_ev
+                and wr_ev
+                and not res_ev.extraction_failed
+                and not wr_ev.extraction_failed
+            ):
                 entity_gain = wr_ev.entity_count - res_ev.entity_count
                 if entity_gain > entity_gain_threshold:
                     evidence.append(
@@ -123,7 +130,13 @@ class RuleEngine(Analyzer):
                     pass
 
             # Verification: verifier_passthrough_v1
-            if ver_step and wr_ev and ver_ev and not wr_ev.extraction_failed and not ver_ev.extraction_failed:
+            if (
+                ver_step
+                and wr_ev
+                and ver_ev
+                and not wr_ev.extraction_failed
+                and not ver_ev.extraction_failed
+            ):
                 entity_gain = 0
                 if res_ev and not res_ev.extraction_failed:
                     entity_gain = wr_ev.entity_count - res_ev.entity_count

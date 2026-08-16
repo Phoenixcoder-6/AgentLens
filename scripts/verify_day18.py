@@ -26,7 +26,9 @@ def main() -> None:
                 run_id="run1",
                 step=1,
                 agent="researcher",
-                tool_calls=[{"name": "search", "args": {}, "output": "Error: API Timeout", "error": ""}]
+                tool_calls=[
+                    {"name": "search", "args": {}, "output": "Error: API Timeout", "error": ""}
+                ],
             )
         ],
     )
@@ -68,7 +70,9 @@ def main() -> None:
     if not result_workflow.skipped and len(result_workflow.evidence) > 0:
         ev = result_workflow.evidence[0]
         print("  [PASS] WorkflowValidator correctly detected skipped step.")
-        print(f"         Rule Fired: {ev.rule_match.rule_id if ev.rule_match else 'None'} for agent '{ev.agent}'")
+        print(
+            f"         Rule Fired: {ev.rule_match.rule_id if ev.rule_match else 'None'} for agent '{ev.agent}'"
+        )
 
         # Test Arbiter Routing
         bundle = determine_primary_cause(result_workflow.evidence, "run2")
@@ -76,7 +80,9 @@ def main() -> None:
             print("  [PASS] Arbiter successfully prioritized the workflow violation as P3.")
             print(f"         Primary Cause: {bundle.primary_cause.value}")
         else:
-            print(f"  [FAIL] Arbiter failed to assign P3 to workflow violation. Got: {bundle.priority_level if bundle else 'None'}")
+            print(
+                f"  [FAIL] Arbiter failed to assign P3 to workflow violation. Got: {bundle.priority_level if bundle else 'None'}"
+            )
     else:
         print("  [FAIL] WorkflowValidator failed to detect skipped step.\n")
         sys.exit(1)
