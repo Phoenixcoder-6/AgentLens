@@ -339,6 +339,7 @@ class RuleMatch(BaseModel):
     """
 
     rule_id: str = Field(description="Unique rule identifier, e.g. 'R-WF-001'")
+    rule_version: str = Field(default="1.0.0", description="Version of the rule that fired")
     category: FailureCategory = Field(description="Which failure category this rule belongs to")
     description: str = Field(description="Human-readable description of what was detected")
     severity: RuleSeverity = Field(default=RuleSeverity.MEDIUM)

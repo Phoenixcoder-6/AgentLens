@@ -58,6 +58,11 @@ metrics:
 arbiter:
   ground_truth:
     p1_similarity_threshold: 0.85          # String similarity threshold (difflib MVP) below which P1 fires
+  reasoning:
+    researcher_min_sources: 1              # Minimum required sources for researcher_quality_v1
+    hallucination_entity_gain_threshold: 0 # Allowed entity count increase from researcher to writer
+  workflow:
+    required_agents: ["researcher", "writer", "verifier"]
   priorities:
     P1: "ground_truth_mismatch"            # expected_output present and output differs
     P2: "rule_match"                       # Deterministic rule fired

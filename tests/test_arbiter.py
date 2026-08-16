@@ -275,6 +275,51 @@ class TestP2RuleMatch:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# TestP3Workflow
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestP3Workflow:
+    def test_p3_outranks_p4_p5(self):
+        p3_ev = EvidenceRecord(
+            source=EvidenceSource.WORKFLOW_VALIDATOR,
+            description="Workflow violation",
+            value="FAIL",
+            rule_match=RuleMatch(
+                rule_id="skipped_step_v1",
+                category=FailureCategory.WORKFLOW,
+                description="Missing agent",
+            ),
+            agent="verifier",
+            confidence=1.0,
+        )
+
+        bundle = determine_primary_cause([p3_ev], RUN_ID)
+        assert bundle.priority_level == PriorityLevel.P3
+        assert bundle.primary_cause == FailureCategory.WORKFLOW
+        assert bundle.primary_agent == "verifier"
+
+    def test_p2_outranks_p3(self):
+        p3_ev = EvidenceRecord(
+            source=EvidenceSource.WORKFLOW_VALIDATOR,
+            description="Workflow violation",
+            value="FAIL",
+            rule_match=RuleMatch(
+                rule_id="skipped_step_v1",
+                category=FailureCategory.WORKFLOW,
+                description="Missing agent",
+            ),
+            agent="verifier",
+            confidence=1.0,
+        )
+        p2_ev = make_rule_evidence("rule_v1", category=FailureCategory.REASONING)
+
+        bundle = determine_primary_cause([p3_ev, p2_ev], RUN_ID)
+        assert bundle.priority_level == PriorityLevel.P2
+        assert bundle.primary_cause == FailureCategory.REASONING
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # TestP5Fallback
 # ─────────────────────────────────────────────────────────────────────────────
 

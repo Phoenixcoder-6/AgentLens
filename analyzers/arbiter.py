@@ -251,11 +251,19 @@ def determine_primary_cause(
             ),
         )
 
-    # ── P3: workflow violation (reserved — Day 18a) ───────────────────────────
-    # Kept as explicit separate block per architecture note in module docstring.
-    # p3_evidence = [e for e in evidence if e.source in (
-    #     EvidenceSource.WORKFLOW_VALIDATOR, EvidenceSource.CONSISTENCY_VALIDATOR)]
-    # → Day 18a
+    # ── P3: workflow violation ────────────────────────────────────────────────
+    p3_evidence = [e for e in evidence if e.source == EvidenceSource.WORKFLOW_VALIDATOR]
+    if p3_evidence:
+        best = sorted(p3_evidence, key=_tiebreak_key)[0]
+        return _make_bundle(
+            run_id=run_id,
+            primary_cause=FailureCategory.WORKFLOW,
+            priority=PriorityLevel.P3,
+            grounded=is_grounded,
+            evidence=evidence,
+            primary_agent=best.agent,
+            verdict_reason=f"P3 Workflow violation: {best.rule_match.rule_id if best.rule_match else 'unknown'} (confidence={best.confidence:.0%})",
+        )
 
     # ── P4: statistical anomaly (reserved — Day 27) ───────────────────────────
     # p4_evidence = [e for e in evidence if e.source == EvidenceSource.METRICS_ANALYZER]
