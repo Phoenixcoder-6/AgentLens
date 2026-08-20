@@ -7,7 +7,7 @@
 # ─────────────────────────────────────────────
 llm:
   provider: "groq"                          # groq | openai | local
-  model: "llama-3.3-70b-versatile"          # Groq model ID
+  model: "openai/gpt-oss-120b"              # Groq model ID
   temperature: 0.0                          # Deterministic output for extraction
   max_tokens: 2048
   timeout_seconds: 30

@@ -302,7 +302,7 @@ class LLMProvider(Protocol):
     The interface for LLM calls — used by Evidence Extraction and LLM Explainer.
 
     Implemented by:
-        app/groq_provider.py   → Groq API (llama-3.3-70b-versatile)
+        app/groq_provider.py   → Groq API (openai/gpt-oss-120b)
         app/local_provider.py  → local model adapter (future)
 
     Contract:

@@ -64,10 +64,23 @@ class TestEvidenceExtractorUnit:
     """Tests that mock the LLM — no API key needed."""
 
     def _make_extractor_with_mock(self, mock_response: ExtractedEvidence) -> EvidenceExtractor:
-        """Create extractor with mocked LLM returning mock_response."""
+        """Create extractor with mocked LLM returning mock_response as JSON content.
+
+        The extractor now uses JSON mode: the LLM returns a message object whose
+        .content is a JSON string. We simulate that here.
+        """
+        import json
+
         extractor = EvidenceExtractor.__new__(EvidenceExtractor)
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = mock_response
+        # Build a mock message with .content = JSON string (matching real JSON mode response)
+        mock_message = MagicMock()
+        mock_message.content = json.dumps({
+            "source_count": mock_response.source_count,
+            "entity_count": mock_response.entity_count,
+            "tool_calls": mock_response.tool_calls,
+        })
+        mock_llm.invoke.return_value = mock_message
         extractor._llm = mock_llm
         return extractor
 

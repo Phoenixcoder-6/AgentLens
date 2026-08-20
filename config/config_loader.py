@@ -29,7 +29,7 @@ def get(section: str, key: str | None = None, default: Any = None) -> Any:
     Fetch a value from config.yaml.
 
     Usage:
-        get("llm", "model")          → "llama-3.3-70b-versatile"
+        get("llm", "model")          → "openai/gpt-oss-120b"
         get("storage")               → full storage section dict
         get("metrics", "latency_threshold_ms")  → 5000
     """

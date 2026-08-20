@@ -2,26 +2,22 @@
 analyzers/evidence_extraction/extractor.py — Tiny Evidence Extractor
 ======================================================================
 Day 9: Extract exactly three fields from a raw agent output string
-via a schema-constrained LLM call.
+via a JSON-mode LLM call.
 
 Fields extracted:
     source_count  — number of sources referenced in the output
     entity_count  — number of named entities mentioned
     tool_calls    — list of any tool names invoked (empty list if none)
 
-"Schema-constrained" means the LLM is forced to return a Pydantic model
-via with_structured_output() — not free text. If extraction fails, a safe
-fallback ExtractedEvidence(0, 0, []) is returned and the error is logged.
-
-Why only these three fields?
-    - source_count and entity_count come directly from the pipeline state,
-      making them ground-truth verifiable.
-    - tool_calls are needed to detect silent tool failures later.
-    - Nothing broader yet — Day 9 is intentionally tiny and reliable.
+Uses JSON mode (response_format: json_object) instead of function calling
+for broad model compatibility across all Groq-hosted models.
+If extraction fails, a safe fallback ExtractedEvidence(0, 0, []) is returned
+and the error is logged.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import time
@@ -45,7 +41,7 @@ log = get_logger("extractor")
 class ExtractedEvidence(BaseModel):
     """
     Structured evidence extracted from a single agent's output.
-    Produced by a schema-constrained LLM call — not text parsing.
+    Produced by a JSON-mode LLM call — not text parsing.
 
     schema_version is stamped so records are traceable across schema upgrades.
     """
@@ -76,13 +72,13 @@ class ExtractedEvidence(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# EvidenceExtractor
+# Prompts
 # ─────────────────────────────────────────────────────────────────────────────
 
 _SYSTEM_PROMPT = """You are a precise evidence extractor for an AI observability system.
 
 Your job: read the agent output below and extract exactly three facts.
-Return ONLY the structured fields — no explanation, no extra text.
+Return ONLY a valid JSON object with these keys — no explanation, no extra text.
 
 Rules:
 - source_count: count distinct sources, citations, books, reports, or URLs explicitly listed
@@ -90,18 +86,34 @@ Rules:
 - tool_calls: list the name of any tool explicitly called (e.g. "web_search", "calculator").
   If no tools were called, return an empty list [].
 
+Return format (JSON only):
+{
+  "source_count": <integer>,
+  "entity_count": <integer>,
+  "tool_calls": [<string>, ...]
+}
+
 Be precise. Count carefully. When in doubt, undercount rather than overcount."""
 
 _USER_PROMPT = """Agent output to analyze:
 
 {output}
 
-Extract source_count, entity_count, and tool_calls from the above."""
+Extract source_count, entity_count, and tool_calls from the above. Return valid JSON only."""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EvidenceExtractor
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 class EvidenceExtractor:
     """
     Extracts structured evidence from a raw agent output string.
+
+    Uses JSON mode (response_format: json_object) for broad model compatibility.
+    This avoids the 400 "tool not in request" errors from with_structured_output()
+    on models that don't support function calling.
 
     Usage:
         extractor = EvidenceExtractor()
@@ -113,22 +125,25 @@ class EvidenceExtractor:
         self._llm = self._build_llm()
 
     def _build_llm(self):
-        """Build a schema-constrained LLM that returns ExtractedEvidence."""
+        """Build an LLM in JSON mode for structured extraction."""
         from dotenv import load_dotenv
 
         load_dotenv()
 
-        model = get("llm", "model", "llama-3.3-70b-versatile")
+        model = get("llm", "model", "openai/gpt-oss-120b")
         temperature = float(get("llm", "temperature", 0.0))
 
-        # with_structured_output forces the LLM to return a valid ExtractedEvidence
-        # Pydantic model — no free-text parsing needed
-        base_llm = ChatGroq(model=model, temperature=temperature)
-        return base_llm.with_structured_output(ExtractedEvidence)
+        # json_object response format — broadly supported across Groq models
+        # without needing tool/function calling capability.
+        return ChatGroq(
+            model=model,
+            temperature=temperature,
+            model_kwargs={"response_format": {"type": "json_object"}},
+        )
 
     def extract(self, raw_output: str, agent: str = "") -> ExtractedEvidence:
         """
-        Run a schema-constrained LLM call to extract evidence from raw_output.
+        Run a JSON-mode LLM call to extract evidence from raw_output.
 
         Args:
             raw_output: The raw string output from a single agent step.
@@ -153,22 +168,30 @@ class EvidenceExtractor:
             ]
 
             start_t = time.time()
-            result: ExtractedEvidence = self._llm.invoke(messages)
+            response = self._llm.invoke(messages)
             latency_ms = (time.time() - start_t) * 1000
+
+            # Parse JSON response into ExtractedEvidence
+            raw_json = response.content if hasattr(response, "content") else str(response)
+            parsed = json.loads(raw_json)
+            result = ExtractedEvidence(
+                source_count=int(parsed.get("source_count", 0)),
+                entity_count=int(parsed.get("entity_count", 0)),
+                tool_calls=list(parsed.get("tool_calls", [])),
+            )
 
             log.info(
                 "Extraction LLM call completed",
                 extra={
                     "extra_fields": {
-                        "model": getattr(self._llm, "model_name", "unknown"),
+                        "model": get("llm", "model", "unknown"),
                         "latency_ms": round(latency_ms, 2),
                         "agent": agent,
-                        "cost_estimate": 0.0,  # Groq token counting varies by model, stubbing for now
+                        "cost_estimate": 0.0,
                     }
                 },
             )
 
-            # Stamp schema_version (Pydantic default does this, but enforce it)
             result.schema_version = SCHEMA_VERSION
             return result
 
