@@ -75,11 +75,13 @@ class TestEvidenceExtractorUnit:
         mock_llm = MagicMock()
         # Build a mock message with .content = JSON string (matching real JSON mode response)
         mock_message = MagicMock()
-        mock_message.content = json.dumps({
+        mock_message.content = json.dumps(
+            {
             "source_count": mock_response.source_count,
             "entity_count": mock_response.entity_count,
             "tool_calls": mock_response.tool_calls,
-        })
+            }
+        )
         mock_llm.invoke.return_value = mock_message
         extractor._llm = mock_llm
         return extractor
