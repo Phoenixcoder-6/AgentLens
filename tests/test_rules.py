@@ -15,6 +15,7 @@ Labeled set breakdown (sample_data/labels.json):
   - 4 workflow failures    → skipped_step_v1
   - 4 verification failures → hallucination_v1 + verifier_passthrough_v1
 """
+
 from __future__ import annotations
 
 import json
@@ -83,6 +84,7 @@ def _load_trace(run_id: str) -> RunTrace:
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(scope="module")
 def labels():
     return _load_labels()
@@ -142,11 +144,7 @@ class TestExecutionRules:
 
     @pytest.mark.parametrize(
         "run_id",
-        [
-            r["run_id"]
-            for r in _load_labels()["runs"]
-            if r["category"] == "execution_failure"
-        ],
+        [r["run_id"] for r in _load_labels()["runs"] if r["category"] == "execution_failure"],
     )
     def test_execution_rule_fires(self, run_id, rule_engine):
         trace = _load_trace(run_id)
@@ -159,11 +157,7 @@ class TestExecutionRules:
 
     @pytest.mark.parametrize(
         "run_id",
-        [
-            r["run_id"]
-            for r in _load_labels()["runs"]
-            if r["category"] == "execution_failure"
-        ],
+        [r["run_id"] for r in _load_labels()["runs"] if r["category"] == "execution_failure"],
     )
     def test_execution_evidence_category(self, run_id, rule_engine):
         trace = _load_trace(run_id)
@@ -174,16 +168,12 @@ class TestExecutionRules:
             for e in result.evidence
             if e.rule_match and e.rule_match.category == FailureCategory.EXECUTION
         ]
-        assert len(exec_evidence) > 0, (
-            f"No EXECUTION-category evidence on '{run_id}'"
-        )
+        assert len(exec_evidence) > 0, f"No EXECUTION-category evidence on '{run_id}'"
 
     def test_at_least_one_tool_failure_fires(self, rule_engine):
         """Regression: tool_failure_v1 must fire at least once across all execution runs."""
         execution_ids = [
-            r["run_id"]
-            for r in _load_labels()["runs"]
-            if r["category"] == "execution_failure"
+            r["run_id"] for r in _load_labels()["runs"] if r["category"] == "execution_failure"
         ]
         fired_any = False
         for run_id in execution_ids:
@@ -198,9 +188,7 @@ class TestExecutionRules:
     def test_at_least_one_missing_output_fires(self, rule_engine):
         """Regression: missing_tool_output_v1 must fire at least once."""
         execution_ids = [
-            r["run_id"]
-            for r in _load_labels()["runs"]
-            if r["category"] == "execution_failure"
+            r["run_id"] for r in _load_labels()["runs"] if r["category"] == "execution_failure"
         ]
         fired_any = False
         for run_id in execution_ids:
@@ -266,11 +254,7 @@ class TestWorkflowRules:
 
     @pytest.mark.parametrize(
         "run_id",
-        [
-            r["run_id"]
-            for r in _load_labels()["runs"]
-            if r["category"] == "workflow_failure"
-        ],
+        [r["run_id"] for r in _load_labels()["runs"] if r["category"] == "workflow_failure"],
     )
     def test_workflow_routes_to_p3(self, run_id, workflow_validator):
         """Workflow evidence should route to P3 in the Arbiter."""
@@ -291,11 +275,7 @@ class TestWorkflowRules:
 class TestExecutionArbiterRouting:
     @pytest.mark.parametrize(
         "run_id",
-        [
-            r["run_id"]
-            for r in _load_labels()["runs"]
-            if r["category"] == "execution_failure"
-        ],
+        [r["run_id"] for r in _load_labels()["runs"] if r["category"] == "execution_failure"],
     )
     def test_execution_routes_to_p2(self, run_id, rule_engine):
         trace = _load_trace(run_id)

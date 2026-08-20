@@ -77,9 +77,9 @@ class TestEvidenceExtractorUnit:
         mock_message = MagicMock()
         mock_message.content = json.dumps(
             {
-            "source_count": mock_response.source_count,
-            "entity_count": mock_response.entity_count,
-            "tool_calls": mock_response.tool_calls,
+                "source_count": mock_response.source_count,
+                "entity_count": mock_response.entity_count,
+                "tool_calls": mock_response.tool_calls,
             }
         )
         mock_llm.invoke.return_value = mock_message
