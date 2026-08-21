@@ -1,18 +1,23 @@
 """
-analyzers/evidence_extraction/extractor.py — Tiny Evidence Extractor
-======================================================================
-Day 9: Extract exactly three fields from a raw agent output string
-via a JSON-mode LLM call.
+analyzers/evidence_extraction/extractor.py — Evidence Extractor
+================================================================
+Day 9:  Extract source_count, entity_count, tool_calls.
+Day 20: Broaden extraction to claims, references, numbers, dates.
+        All new fields are extracted in the SAME single LLM call.
+        Token cost is now logged per call for the cost tracker.
 
 Fields extracted:
-    source_count  — number of sources referenced in the output
-    entity_count  — number of named entities mentioned
-    tool_calls    — list of any tool names invoked (empty list if none)
+    source_count   — number of sources / citations referenced
+    entity_count   — number of distinct named entities mentioned
+    tool_calls     — tool names explicitly invoked (empty if none)
+    claims         — key factual claims made in the output
+    references     — explicit citation strings (author/title/URL)
+    numbers        — notable numeric facts (stats, figures, years)
+    dates          — date / time expressions mentioned
 
-Uses JSON mode (response_format: json_object) instead of function calling
-for broad model compatibility across all Groq-hosted models.
-If extraction fails, a safe fallback ExtractedEvidence(0, 0, []) is returned
-and the error is logged.
+Uses JSON mode (response_format: json_object) for broad model
+compatibility across all Groq-hosted models. If extraction fails,
+a safe fallback ExtractedEvidence is returned and the error logged.
 """
 
 from __future__ import annotations
@@ -43,12 +48,15 @@ class ExtractedEvidence(BaseModel):
     Structured evidence extracted from a single agent's output.
     Produced by a JSON-mode LLM call — not text parsing.
 
-    schema_version is stamped so records are traceable across schema upgrades.
+    Day 20 extends the schema with claims, references, numbers, dates.
+    All fields have safe defaults so older callers remain compatible.
     """
 
     schema_version: str = Field(
         default=SCHEMA_VERSION, description="Schema version stamped on every record"
     )
+
+    # ── Original Day-9 fields ────────────────────────────────────────────────
     source_count: int = Field(
         default=0,
         ge=0,
@@ -63,11 +71,49 @@ class ExtractedEvidence(BaseModel):
         default_factory=list,
         description="Names of any tools explicitly invoked during this step. Empty list if none.",
     )
+
+    # ── Day-20 extended fields ───────────────────────────────────────────────
+    claims: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Key factual claims made in the output "
+            "(e.g. 'Apollo 11 landed on July 20, 1969'). "
+            "Max 10 most important claims."
+        ),
+    )
+    references: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Explicit citation strings — author names, book/article titles, URLs, "
+            "or report names. Empty list if none."
+        ),
+    )
+    numbers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Notable numeric facts: statistics, percentages, counts, measurements "
+            "(e.g. '382 kg of lunar rocks', '$1 trillion'). Max 10 items."
+        ),
+    )
+    dates: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Date and time expressions mentioned "
+            "(e.g. 'July 20, 1969', 'early 1970s'). Max 10 items."
+        ),
+    )
+
+    # ── Extraction metadata ──────────────────────────────────────────────────
     extraction_failed: bool = Field(
         default=False, description="True if extraction fell back to defaults due to LLM error"
     )
     error_message: str | None = Field(
         default=None, description="Error details if extraction_failed is True"
+    )
+    token_cost: int = Field(
+        default=0,
+        ge=0,
+        description="Total tokens consumed by this extraction call (prompt + completion).",
     )
 
 
@@ -77,29 +123,37 @@ class ExtractedEvidence(BaseModel):
 
 _SYSTEM_PROMPT = """You are a precise evidence extractor for an AI observability system.
 
-Your job: read the agent output below and extract exactly three facts.
-Return ONLY a valid JSON object with these keys — no explanation, no extra text.
+Your job: read the agent output below and extract ALL of the following fields.
+Return ONLY a valid JSON object — no explanation, no extra text, no markdown.
 
-Rules:
-- source_count: count distinct sources, citations, books, reports, or URLs explicitly listed
-- entity_count: count distinct named entities (people, organizations, cities, technologies, programs)
-- tool_calls: list the name of any tool explicitly called (e.g. "web_search", "calculator").
-  If no tools were called, return an empty list [].
+Field definitions:
+- source_count  : integer — count of distinct sources, citations, books, reports, or URLs
+- entity_count  : integer — count of distinct named entities (people, orgs, cities, technologies)
+- tool_calls    : list[str] — tool names explicitly invoked (e.g. "web_search"). Empty list if none.
+- claims        : list[str] — key factual claims stated in the text. Max 10, most important first.
+- references    : list[str] — explicit citation strings (author, title, URL, or report name). Empty if none.
+- numbers       : list[str] — notable numeric facts, stats, or measurements (e.g. "382 kg", "$1 trillion"). Max 10.
+- dates         : list[str] — date/time expressions mentioned (e.g. "July 20, 1969", "early 1970s"). Max 10.
 
 Return format (JSON only):
 {
   "source_count": <integer>,
   "entity_count": <integer>,
-  "tool_calls": [<string>, ...]
+  "tool_calls": [<string>, ...],
+  "claims": [<string>, ...],
+  "references": [<string>, ...],
+  "numbers": [<string>, ...],
+  "dates": [<string>, ...]
 }
 
-Be precise. Count carefully. When in doubt, undercount rather than overcount."""
+Be precise. Count carefully. When in doubt, undercount rather than overcount.
+For list fields, return [] if nothing applies."""
 
 _USER_PROMPT = """Agent output to analyze:
 
 {output}
 
-Extract source_count, entity_count, and tool_calls from the above. Return valid JSON only."""
+Extract all fields and return valid JSON only."""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -111,6 +165,9 @@ class EvidenceExtractor:
     """
     Extracts structured evidence from a raw agent output string.
 
+    Day 9:  source_count, entity_count, tool_calls
+    Day 20: + claims, references, numbers, dates + token_cost logging
+
     Uses JSON mode (response_format: json_object) for broad model compatibility.
     This avoids the 400 "tool not in request" errors from with_structured_output()
     on models that don't support function calling.
@@ -118,7 +175,7 @@ class EvidenceExtractor:
     Usage:
         extractor = EvidenceExtractor()
         evidence = extractor.extract(raw_output="SOURCES:\\n- Book A\\nENTITIES:\\n- NITI Aayog")
-        # ExtractedEvidence(source_count=1, entity_count=1, tool_calls=[])
+        # ExtractedEvidence(source_count=1, entity_count=1, claims=[...], dates=[...])
     """
 
     def __init__(self) -> None:
@@ -150,7 +207,7 @@ class EvidenceExtractor:
             agent:      Optional agent name for logging context.
 
         Returns:
-            ExtractedEvidence with schema_version stamped.
+            ExtractedEvidence with schema_version and token_cost stamped.
             On LLM failure, returns safe fallback with extraction_failed=True.
         """
         if not raw_output or not raw_output.strip():
@@ -174,10 +231,22 @@ class EvidenceExtractor:
             # Parse JSON response into ExtractedEvidence
             raw_json = response.content if hasattr(response, "content") else str(response)
             parsed = json.loads(raw_json)
+
+            # Extract token cost from response metadata if available
+            token_cost = 0
+            if hasattr(response, "response_metadata"):
+                usage = response.response_metadata.get("token_usage", {})
+                token_cost = int(usage.get("total_tokens", 0))
+
             result = ExtractedEvidence(
                 source_count=int(parsed.get("source_count", 0)),
                 entity_count=int(parsed.get("entity_count", 0)),
                 tool_calls=list(parsed.get("tool_calls", [])),
+                claims=list(parsed.get("claims", [])),
+                references=list(parsed.get("references", [])),
+                numbers=list(parsed.get("numbers", [])),
+                dates=list(parsed.get("dates", [])),
+                token_cost=token_cost,
             )
 
             log.info(
@@ -187,7 +256,11 @@ class EvidenceExtractor:
                         "model": get("llm", "model", "unknown"),
                         "latency_ms": round(latency_ms, 2),
                         "agent": agent,
-                        "cost_estimate": 0.0,
+                        "token_cost": token_cost,
+                        "claims_count": len(result.claims),
+                        "dates_count": len(result.dates),
+                        "numbers_count": len(result.numbers),
+                        "references_count": len(result.references),
                     }
                 },
             )

@@ -1,7 +1,8 @@
 """
-tests/test_evidence_extractor.py — Day 9: Evidence Extractor tests
-====================================================================
-Unit tests: test ExtractedEvidence model, fallback behaviour, schema_version.
+tests/test_evidence_extractor.py — Day 9 + Day 20: Evidence Extractor tests
+=============================================================================
+Unit tests: test ExtractedEvidence model, fallback behaviour, schema_version,
+            and Day-20 extended fields (claims, references, numbers, dates, token_cost).
 Integration test: real LLM call against a known sample output.
 
 Unit tests run without any API key. Integration test requires GROQ_API_KEY.
@@ -9,6 +10,7 @@ Unit tests run without any API key. Integration test requires GROQ_API_KEY.
 
 from __future__ import annotations
 
+import json
 import os
 from unittest.mock import MagicMock
 
@@ -36,13 +38,38 @@ class TestExtractedEvidence:
         assert ev.extraction_failed is False
         assert ev.error_message is None
 
+    # Day 20: new field defaults
+    def test_day20_claims_default_empty(self):
+        ev = ExtractedEvidence()
+        assert ev.claims == []
+
+    def test_day20_references_default_empty(self):
+        ev = ExtractedEvidence()
+        assert ev.references == []
+
+    def test_day20_numbers_default_empty(self):
+        ev = ExtractedEvidence()
+        assert ev.numbers == []
+
+    def test_day20_dates_default_empty(self):
+        ev = ExtractedEvidence()
+        assert ev.dates == []
+
+    def test_day20_token_cost_default_zero(self):
+        ev = ExtractedEvidence()
+        assert ev.token_cost == 0
+
+    def test_day20_token_cost_must_be_non_negative(self):
+        with pytest.raises(ValidationError):
+            ExtractedEvidence(token_cost=-1)
+
     def test_source_count_must_be_non_negative(self):
         with pytest.raises(ValidationError):
             ExtractedEvidence(source_count=-1)
 
     def test_entity_count_must_be_non_negative(self):
         with pytest.raises(ValidationError):
-            ExtractedEvidence(source_count=-1)
+            ExtractedEvidence(entity_count=-1)
 
     def test_tool_calls_is_list(self):
         ev = ExtractedEvidence(tool_calls=["web_search", "calculator"])
@@ -53,6 +80,24 @@ class TestExtractedEvidence:
         ev = ExtractedEvidence(extraction_failed=True, error_message="timeout")
         assert ev.extraction_failed is True
         assert ev.error_message == "timeout"
+
+    def test_day20_round_trip_all_fields(self):
+        """All Day-20 fields survive a model_validate round-trip."""
+        original = ExtractedEvidence(
+            source_count=3,
+            entity_count=5,
+            claims=["Claim A", "Claim B"],
+            references=["Author (2020)"],
+            numbers=["42%", "$1 trillion"],
+            dates=["July 20, 1969"],
+            token_cost=512,
+        )
+        restored = ExtractedEvidence.model_validate(original.model_dump())
+        assert restored.claims == ["Claim A", "Claim B"]
+        assert restored.references == ["Author (2020)"]
+        assert restored.numbers == ["42%", "$1 trillion"]
+        assert restored.dates == ["July 20, 1969"]
+        assert restored.token_cost == 512
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -66,22 +111,29 @@ class TestEvidenceExtractorUnit:
     def _make_extractor_with_mock(self, mock_response: ExtractedEvidence) -> EvidenceExtractor:
         """Create extractor with mocked LLM returning mock_response as JSON content.
 
-        The extractor now uses JSON mode: the LLM returns a message object whose
-        .content is a JSON string. We simulate that here.
+        The extractor uses JSON mode: the LLM returns a message object whose
+        .content is a JSON string. response_metadata carries token usage.
         """
-        import json
-
         extractor = EvidenceExtractor.__new__(EvidenceExtractor)
         mock_llm = MagicMock()
-        # Build a mock message with .content = JSON string (matching real JSON mode response)
+
+        # Build a mock message matching the real JSON mode response shape
         mock_message = MagicMock()
         mock_message.content = json.dumps(
             {
                 "source_count": mock_response.source_count,
                 "entity_count": mock_response.entity_count,
                 "tool_calls": mock_response.tool_calls,
+                "claims": mock_response.claims,
+                "references": mock_response.references,
+                "numbers": mock_response.numbers,
+                "dates": mock_response.dates,
             }
         )
+        # Simulate token usage metadata
+        mock_message.response_metadata = {
+            "token_usage": {"total_tokens": mock_response.token_cost}
+        }
         mock_llm.invoke.return_value = mock_message
         extractor._llm = mock_llm
         return extractor
@@ -129,6 +181,66 @@ class TestEvidenceExtractorUnit:
         extractor = self._make_extractor_with_mock(mock_ev)
         result = extractor.extract("used web_search and calculator")
         assert result.tool_calls == ["web_search", "calculator"]
+
+    # ── Day 20: new field tests ───────────────────────────────────────────────
+
+    def test_day20_claims_extracted(self):
+        mock_ev = ExtractedEvidence(
+            source_count=2,
+            entity_count=3,
+            claims=["Apollo 11 landed July 20, 1969", "Neil Armstrong was first on Moon"],
+        )
+        extractor = self._make_extractor_with_mock(mock_ev)
+        result = extractor.extract("Apollo 11 landed on July 20, 1969...")
+        assert result.claims == ["Apollo 11 landed July 20, 1969", "Neil Armstrong was first on Moon"]
+
+    def test_day20_dates_extracted(self):
+        mock_ev = ExtractedEvidence(
+            source_count=1,
+            entity_count=2,
+            dates=["July 20, 1969", "December 1972"],
+        )
+        extractor = self._make_extractor_with_mock(mock_ev)
+        result = extractor.extract("Apollo 11 landed July 20, 1969. Final mission December 1972.")
+        assert "July 20, 1969" in result.dates
+        assert "December 1972" in result.dates
+
+    def test_day20_numbers_extracted(self):
+        mock_ev = ExtractedEvidence(
+            source_count=1,
+            entity_count=1,
+            numbers=["382 kg", "$1 trillion"],
+        )
+        extractor = self._make_extractor_with_mock(mock_ev)
+        result = extractor.extract("Returned 382 kg of rocks. Worth $1 trillion.")
+        assert "382 kg" in result.numbers
+        assert "$1 trillion" in result.numbers
+
+    def test_day20_references_extracted(self):
+        mock_ev = ExtractedEvidence(
+            source_count=2,
+            entity_count=1,
+            references=["NASA Apollo Program Overview (2023)", "Chaikin, A. - A Man on the Moon"],
+        )
+        extractor = self._make_extractor_with_mock(mock_ev)
+        result = extractor.extract("Sources: NASA (2023), Chaikin...")
+        assert len(result.references) == 2
+
+    def test_day20_token_cost_logged(self):
+        mock_ev = ExtractedEvidence(source_count=1, entity_count=1, token_cost=350)
+        extractor = self._make_extractor_with_mock(mock_ev)
+        result = extractor.extract("some output")
+        assert result.token_cost == 350
+
+    def test_day20_empty_lists_when_not_present(self):
+        """All list fields default to [] when LLM returns nothing."""
+        mock_ev = ExtractedEvidence(source_count=0, entity_count=0)
+        extractor = self._make_extractor_with_mock(mock_ev)
+        result = extractor.extract("No content here.")
+        assert result.claims == []
+        assert result.references == []
+        assert result.numbers == []
+        assert result.dates == []
 
     def test_extract_run_processes_all_steps(self):
         mock_ev = ExtractedEvidence(source_count=3, entity_count=6)
@@ -221,3 +333,38 @@ and private investments. India aims to contribute $1 trillion to GDP by 2035."""
         extractor = EvidenceExtractor()
         result = extractor.extract(self.SAMPLE_RESEARCHER_OUTPUT)
         assert result.schema_version == SCHEMA_VERSION
+
+    # ── Day 20 integration tests ──────────────────────────────────────────────
+
+    def test_real_extraction_claims_non_empty(self):
+        """Real LLM should extract at least one claim from the research output."""
+        extractor = EvidenceExtractor()
+        result = extractor.extract(self.SAMPLE_RESEARCHER_OUTPUT, agent="researcher")
+        assert not result.extraction_failed
+        assert isinstance(result.claims, list)
+        assert len(result.claims) >= 1, f"Expected >=1 claim, got {result.claims}"
+
+    def test_real_extraction_references_non_empty(self):
+        """References list should be populated from the SOURCES section."""
+        extractor = EvidenceExtractor()
+        result = extractor.extract(self.SAMPLE_RESEARCHER_OUTPUT, agent="researcher")
+        assert not result.extraction_failed
+        assert isinstance(result.references, list)
+        assert len(result.references) >= 1, f"Expected >=1 reference, got {result.references}"
+
+    def test_real_extraction_numbers_non_empty(self):
+        """'$1 trillion' and '2035' should be extracted as numbers/dates."""
+        extractor = EvidenceExtractor()
+        result = extractor.extract(self.SAMPLE_RESEARCHER_OUTPUT, agent="researcher")
+        assert not result.extraction_failed
+        # At least one of numbers or dates should capture "$1 trillion" or "2035"
+        all_extracted = result.numbers + result.dates
+        assert len(all_extracted) >= 1, f"Expected numeric/date facts, got numbers={result.numbers} dates={result.dates}"
+
+    def test_real_extraction_token_cost_logged(self):
+        """Token cost must be a non-negative integer after a real LLM call."""
+        extractor = EvidenceExtractor()
+        result = extractor.extract(self.SAMPLE_RESEARCHER_OUTPUT, agent="researcher")
+        assert not result.extraction_failed
+        assert isinstance(result.token_cost, int)
+        assert result.token_cost >= 0
