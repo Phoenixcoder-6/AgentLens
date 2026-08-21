@@ -131,9 +131,7 @@ class TestEvidenceExtractorUnit:
             }
         )
         # Simulate token usage metadata
-        mock_message.response_metadata = {
-            "token_usage": {"total_tokens": mock_response.token_cost}
-        }
+        mock_message.response_metadata = {"token_usage": {"total_tokens": mock_response.token_cost}}
         mock_llm.invoke.return_value = mock_message
         extractor._llm = mock_llm
         return extractor
@@ -192,7 +190,10 @@ class TestEvidenceExtractorUnit:
         )
         extractor = self._make_extractor_with_mock(mock_ev)
         result = extractor.extract("Apollo 11 landed on July 20, 1969...")
-        assert result.claims == ["Apollo 11 landed July 20, 1969", "Neil Armstrong was first on Moon"]
+        assert result.claims == [
+            "Apollo 11 landed July 20, 1969",
+            "Neil Armstrong was first on Moon",
+        ]
 
     def test_day20_dates_extracted(self):
         mock_ev = ExtractedEvidence(
@@ -359,7 +360,9 @@ and private investments. India aims to contribute $1 trillion to GDP by 2035."""
         assert not result.extraction_failed
         # At least one of numbers or dates should capture "$1 trillion" or "2035"
         all_extracted = result.numbers + result.dates
-        assert len(all_extracted) >= 1, f"Expected numeric/date facts, got numbers={result.numbers} dates={result.dates}"
+        assert len(all_extracted) >= 1, (
+            f"Expected numeric/date facts, got numbers={result.numbers} dates={result.dates}"
+        )
 
     def test_real_extraction_token_cost_logged(self):
         """Token cost must be a non-negative integer after a real LLM call."""
