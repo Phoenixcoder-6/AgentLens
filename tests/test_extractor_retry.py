@@ -24,6 +24,7 @@ from config.config_loader import get
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _make_extractor_with_responses(*responses) -> EvidenceExtractor:
     """
     Create a mocked EvidenceExtractor where successive _call_llm calls
@@ -115,8 +116,8 @@ class TestRetryBehaviour:
     def test_malformed_first_retry_succeeds(self):
         valid = _valid_json(source_count=4, entity_count=6)
         extractor = _make_extractor_with_responses(
-            ("not json", 50),   # attempt 1 fails
-            (valid, 120),       # attempt 2 succeeds
+            ("not json", 50),  # attempt 1 fails
+            (valid, 120),  # attempt 2 succeeds
         )
         result = extractor.extract("some output")
         assert not result.extraction_failed
@@ -127,8 +128,8 @@ class TestRetryBehaviour:
     def test_empty_first_retry_succeeds(self):
         valid = _valid_json(source_count=1)
         extractor = _make_extractor_with_responses(
-            ("", 30),           # attempt 1: empty
-            (valid, 90),        # attempt 2: valid
+            ("", 30),  # attempt 1: empty
+            (valid, 90),  # attempt 2: valid
         )
         result = extractor.extract("some output")
         assert not result.extraction_failed
@@ -149,7 +150,7 @@ class TestRetryBehaviour:
         valid = _valid_json(source_count=3)
         extractor = _make_extractor_with_responses(
             Exception("network error"),  # attempt 1 raises
-            (valid, 100),                # attempt 2 succeeds
+            (valid, 100),  # attempt 2 succeeds
         )
         result = extractor.extract("some output")
         assert not result.extraction_failed

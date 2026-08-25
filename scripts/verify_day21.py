@@ -107,39 +107,50 @@ except Exception as e:
 
 # ── Test 5: First attempt malformed → retry → success ─────────────────────────
 total += 1
-valid_json = json.dumps({
-    "source_count": 4, "entity_count": 6, "tool_calls": [],
-    "claims": ["Earth is round"], "references": [], "numbers": [], "dates": [],
-})
+valid_json = json.dumps(
+    {
+        "source_count": 4,
+        "entity_count": 6,
+        "tool_calls": [],
+        "claims": ["Earth is round"],
+        "references": [],
+        "numbers": [],
+        "dates": [],
+    }
+)
 extractor = _make_extractor_with_responses(
-    ("not json at all", 50),   # attempt 1: malformed
-    (valid_json, 120),         # attempt 2: valid
+    ("not json at all", 50),  # attempt 1: malformed
+    (valid_json, 120),  # attempt 2: valid
 )
 result = extractor.extract("some agent output here", agent="researcher")
 if not result.extraction_failed and result.retried and result.source_count == 4:
     print(f"  {PASS} [5] Retry succeeded: retried=True, source_count=4")
     passed += 1
 else:
-    print(f"  {FAIL} [5] Retry result: failed={result.extraction_failed} retried={result.retried} sources={result.source_count}")
+    print(
+        f"  {FAIL} [5] Retry result: failed={result.extraction_failed} retried={result.retried} sources={result.source_count}"
+    )
 
 # ── Test 6: Both attempts malformed → extraction_failed=True ──────────────────
 total += 1
 extractor = _make_extractor_with_responses(
-    ("```json oops", 50),   # attempt 1: malformed
-    ("", 30),               # attempt 2: empty
+    ("```json oops", 50),  # attempt 1: malformed
+    ("", 30),  # attempt 2: empty
 )
 result = extractor.extract("some agent output", agent="writer")
 if result.extraction_failed and result.retried and result.source_count == 0:
     print(f"  {PASS} [6] Double failure: extraction_failed=True, retried=True, no crash")
     passed += 1
 else:
-    print(f"  {FAIL} [6] Double failure result: failed={result.extraction_failed} retried={result.retried}")
+    print(
+        f"  {FAIL} [6] Double failure result: failed={result.extraction_failed} retried={result.retried}"
+    )
 
 # ── Test 7: extraction_failed=True carries token_cost from attempts ────────────
 total += 1
 extractor = _make_extractor_with_responses(
-    ("bad", 40),    # attempt 1 fails
-    ("", 60),       # attempt 2 fails
+    ("bad", 40),  # attempt 1 fails
+    ("", 60),  # attempt 2 fails
 )
 result = extractor.extract("text", agent="verifier")
 if result.extraction_failed and result.token_cost == 100:
@@ -150,10 +161,17 @@ else:
 
 # ── Test 8: retried=False on clean first success ──────────────────────────────
 total += 1
-valid_json = json.dumps({
-    "source_count": 2, "entity_count": 3, "tool_calls": [],
-    "claims": [], "references": [], "numbers": [], "dates": [],
-})
+valid_json = json.dumps(
+    {
+        "source_count": 2,
+        "entity_count": 3,
+        "tool_calls": [],
+        "claims": [],
+        "references": [],
+        "numbers": [],
+        "dates": [],
+    }
+)
 extractor = _make_extractor_with_responses((valid_json, 80))
 result = extractor.extract("clean output", agent="researcher")
 if not result.extraction_failed and not result.retried and result.source_count == 2:
@@ -212,16 +230,20 @@ try:
         analysis = engine.analyze(trace)
 
         # Reasoning rules (researcher_quality_v1, hallucination_v1) should be skipped
-        rule_ids = [
-            e.rule_match.rule_id for e in analysis.evidence if e.rule_match
+        rule_ids = [e.rule_match.rule_id for e in analysis.evidence if e.rule_match]
+        extraction_rules = [
+            r for r in rule_ids if r in ("researcher_quality_v1", "hallucination_v1")
         ]
-        extraction_rules = [r for r in rule_ids if r in ("researcher_quality_v1", "hallucination_v1")]
 
         if not extraction_rules:
-            print(f"  {PASS} [11] RuleEngine skipped extraction-dependent rules when extraction_failed=True")
+            print(
+                f"  {PASS} [11] RuleEngine skipped extraction-dependent rules when extraction_failed=True"
+            )
             passed += 1
         else:
-            print(f"  {FAIL} [11] RuleEngine fired extraction rules despite failure: {extraction_rules}")
+            print(
+                f"  {FAIL} [11] RuleEngine fired extraction rules despite failure: {extraction_rules}"
+            )
 except Exception as e:
     print(f"  {FAIL} [11] RuleEngine skip test error: {e}")
 

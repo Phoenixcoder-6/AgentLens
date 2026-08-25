@@ -295,6 +295,7 @@ class TestEvidenceExtractorIntegration:
     def setup_method(self):
         """Sleep between integration tests to avoid Groq 8000 TPM rate limit."""
         import time
+
         time.sleep(12)
 
     SAMPLE_RESEARCHER_OUTPUT = """SOURCES:

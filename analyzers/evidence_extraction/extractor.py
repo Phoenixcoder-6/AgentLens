@@ -153,8 +153,7 @@ Extract all fields and return valid JSON only."""
 
 # Retry prompt — used when the first response was malformed
 _RETRY_SYSTEM_PROMPT = (
-    _SYSTEM_PROMPT
-    + "\n\nIMPORTANT: Your previous response was not valid JSON. "
+    _SYSTEM_PROMPT + "\n\nIMPORTANT: Your previous response was not valid JSON. "
     "Return ONLY the raw JSON object. No markdown, no code fences, no explanation."
 )
 
@@ -222,6 +221,7 @@ def _rate_limit_wait(exc: Exception) -> float:
     msg = str(exc)
     if "rate_limit_exceeded" in msg or "429" in msg:
         import re
+
         match = re.search(r"try again in (\d+(?:\.\d+)?)s", msg)
         if match:
             return min(float(match.group(1)) + 1.0, 60.0)
@@ -330,11 +330,13 @@ class EvidenceExtractor:
             wait_s = _rate_limit_wait(first_exc)
             log.warning(
                 "Extraction attempt 1 failed — retrying",
-                extra={"extra_fields": {
-                    "error": str(first_exc),
-                    "agent": agent,
-                    "retry_wait_s": wait_s,
-                }},
+                extra={
+                    "extra_fields": {
+                        "error": str(first_exc),
+                        "agent": agent,
+                        "retry_wait_s": wait_s,
+                    }
+                },
             )
             retried = True
             if wait_s > 0:
