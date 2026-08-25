@@ -3,21 +3,12 @@ analyzers/evidence_extraction/extractor.py — Evidence Extractor
 ================================================================
 Day 9:  Extract source_count, entity_count, tool_calls.
 Day 20: Broaden extraction to claims, references, numbers, dates.
-        All new fields are extracted in the SAME single LLM call.
-        Token cost is now logged per call for the cost tracker.
+        Token cost logged per call.
+Day 21: Retry-once on malformed/empty JSON response.
+        extraction_max_tokens read from config.yaml (no hardcoding).
+        extraction_failed=True skips downstream rules gracefully.
 
-Fields extracted:
-    source_count   — number of sources / citations referenced
-    entity_count   — number of distinct named entities mentioned
-    tool_calls     — tool names explicitly invoked (empty if none)
-    claims         — key factual claims made in the output
-    references     — explicit citation strings (author/title/URL)
-    numbers        — notable numeric facts (stats, figures, years)
-    dates          — date / time expressions mentioned
-
-Uses JSON mode (response_format: json_object) for broad model
-compatibility across all Groq-hosted models. If extraction fails,
-a safe fallback ExtractedEvidence is returned and the error logged.
+All new fields are extracted in the SAME single LLM call — no extra cost.
 """
 
 from __future__ import annotations
@@ -49,6 +40,7 @@ class ExtractedEvidence(BaseModel):
     Produced by a JSON-mode LLM call — not text parsing.
 
     Day 20 extends the schema with claims, references, numbers, dates.
+    Day 21 adds token_cost and retry metadata.
     All fields have safe defaults so older callers remain compatible.
     """
 
@@ -115,6 +107,10 @@ class ExtractedEvidence(BaseModel):
         ge=0,
         description="Total tokens consumed by this extraction call (prompt + completion).",
     )
+    retried: bool = Field(
+        default=False,
+        description="True if a retry was needed due to a malformed first response.",
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -155,6 +151,83 @@ _USER_PROMPT = """Agent output to analyze:
 
 Extract all fields and return valid JSON only."""
 
+# Retry prompt — used when the first response was malformed
+_RETRY_SYSTEM_PROMPT = (
+    _SYSTEM_PROMPT
+    + "\n\nIMPORTANT: Your previous response was not valid JSON. "
+    "Return ONLY the raw JSON object. No markdown, no code fences, no explanation."
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _parse_response(raw_json: str) -> dict:
+    """
+    Parse and validate a raw JSON string from the LLM.
+
+    Raises:
+        ValueError: if the string is empty, not valid JSON, or missing
+                    required integer keys.
+    """
+    raw_json = raw_json.strip()
+    if not raw_json:
+        raise ValueError("LLM returned empty response")
+
+    parsed = json.loads(raw_json)  # raises json.JSONDecodeError on bad JSON
+
+    # Validate that numeric fields are actually integers (not strings/None)
+    for key in ("source_count", "entity_count"):
+        val = parsed.get(key, 0)
+        if not isinstance(val, int):
+            raise ValueError(f"Field '{key}' must be an integer, got {type(val).__name__}: {val!r}")
+
+    return parsed
+
+
+def _build_evidence(parsed: dict, token_cost: int, retried: bool) -> ExtractedEvidence:
+    """Hydrate a parsed JSON dict into an ExtractedEvidence object."""
+    return ExtractedEvidence(
+        source_count=int(parsed.get("source_count", 0)),
+        entity_count=int(parsed.get("entity_count", 0)),
+        tool_calls=list(parsed.get("tool_calls", [])),
+        claims=list(parsed.get("claims", [])),
+        references=list(parsed.get("references", [])),
+        numbers=list(parsed.get("numbers", [])),
+        dates=list(parsed.get("dates", [])),
+        token_cost=token_cost,
+        retried=retried,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Rate-limit backoff helper
+# ─────────────────────────────────────────────────────────────────────────────
+
+_RATE_LIMIT_DEFAULT_WAIT_S = 15  # fallback wait when we can't parse the suggested time
+
+
+def _rate_limit_wait(exc: Exception) -> float:
+    """
+    Return seconds to sleep before retrying.
+
+    - If the exception is a Groq 429 rate-limit error, parse the suggested
+      wait time from the error message (e.g. "Please try again in 7.19s").
+      Add a 1-second buffer and cap at 60s.
+    - For all other errors (JSON parse, type validation, network) return 0
+      so the retry fires immediately.
+    """
+    msg = str(exc)
+    if "rate_limit_exceeded" in msg or "429" in msg:
+        import re
+        match = re.search(r"try again in (\d+(?:\.\d+)?)s", msg)
+        if match:
+            return min(float(match.group(1)) + 1.0, 60.0)
+        return float(_RATE_LIMIT_DEFAULT_WAIT_S)
+    return 0.0
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # EvidenceExtractor
@@ -167,40 +240,65 @@ class EvidenceExtractor:
 
     Day 9:  source_count, entity_count, tool_calls
     Day 20: + claims, references, numbers, dates + token_cost logging
+    Day 21: + retry-once on malformed JSON + extraction_max_tokens from config
 
     Uses JSON mode (response_format: json_object) for broad model compatibility.
-    This avoids the 400 "tool not in request" errors from with_structured_output()
-    on models that don't support function calling.
+    On malformed first response → retries once with a stricter prompt.
+    On two consecutive failures → returns extraction_failed=True fallback.
+    Downstream rules check extraction_failed before using extraction data.
 
     Usage:
         extractor = EvidenceExtractor()
         evidence = extractor.extract(raw_output="SOURCES:\\n- Book A\\nENTITIES:\\n- NITI Aayog")
-        # ExtractedEvidence(source_count=1, entity_count=1, claims=[...], dates=[...])
     """
 
     def __init__(self) -> None:
         self._llm = self._build_llm()
 
     def _build_llm(self):
-        """Build an LLM in JSON mode for structured extraction."""
+        """Build an LLM in JSON mode. max_tokens pulled from config."""
         from dotenv import load_dotenv
 
         load_dotenv()
 
         model = get("llm", "model", "openai/gpt-oss-120b")
         temperature = float(get("llm", "temperature", 0.0))
+        max_tokens = int(get("llm", "extraction_max_tokens", 1024))
 
-        # json_object response format — broadly supported across Groq models
-        # without needing tool/function calling capability.
         return ChatGroq(
             model=model,
             temperature=temperature,
+            max_tokens=max_tokens,
             model_kwargs={"response_format": {"type": "json_object"}},
         )
+
+    def _call_llm(self, system: str, user_content: str) -> tuple[str, int]:
+        """
+        Invoke the LLM and return (raw_content_string, total_tokens).
+        Raises on network/API errors.
+        """
+        messages = [
+            SystemMessage(content=system),
+            HumanMessage(content=user_content),
+        ]
+        response = self._llm.invoke(messages)
+        raw = response.content if hasattr(response, "content") else str(response)
+
+        token_cost = 0
+        if hasattr(response, "response_metadata"):
+            usage = response.response_metadata.get("token_usage", {})
+            token_cost = int(usage.get("total_tokens", 0))
+
+        return raw, token_cost
 
     def extract(self, raw_output: str, agent: str = "") -> ExtractedEvidence:
         """
         Run a JSON-mode LLM call to extract evidence from raw_output.
+
+        Day 21 behaviour:
+        - On malformed/empty first response → retry once with stricter prompt.
+        - On second failure → return extraction_failed=True (no crash).
+        - extraction_failed=True signals downstream rules to skip themselves.
 
         Args:
             raw_output: The raw string output from a single agent step.
@@ -208,7 +306,6 @@ class EvidenceExtractor:
 
         Returns:
             ExtractedEvidence with schema_version and token_cost stamped.
-            On LLM failure, returns safe fallback with extraction_failed=True.
         """
         if not raw_output or not raw_output.strip():
             return ExtractedEvidence(
@@ -217,65 +314,80 @@ class EvidenceExtractor:
 
         # Truncate very long outputs to stay within token limits
         truncated = raw_output[:4000] if len(raw_output) > 4000 else raw_output
+        user_content = _USER_PROMPT.format(output=truncated)
 
+        start_t = time.time()
+        retried = False
+        total_tokens = 0
+
+        # ── Attempt 1 ────────────────────────────────────────────────────────
         try:
-            messages = [
-                SystemMessage(content=_SYSTEM_PROMPT),
-                HumanMessage(content=_USER_PROMPT.format(output=truncated)),
-            ]
+            raw, tokens = self._call_llm(_SYSTEM_PROMPT, user_content)
+            total_tokens += tokens
+            parsed = _parse_response(raw)
 
-            start_t = time.time()
-            response = self._llm.invoke(messages)
-            latency_ms = (time.time() - start_t) * 1000
-
-            # Parse JSON response into ExtractedEvidence
-            raw_json = response.content if hasattr(response, "content") else str(response)
-            parsed = json.loads(raw_json)
-
-            # Extract token cost from response metadata if available
-            token_cost = 0
-            if hasattr(response, "response_metadata"):
-                usage = response.response_metadata.get("token_usage", {})
-                token_cost = int(usage.get("total_tokens", 0))
-
-            result = ExtractedEvidence(
-                source_count=int(parsed.get("source_count", 0)),
-                entity_count=int(parsed.get("entity_count", 0)),
-                tool_calls=list(parsed.get("tool_calls", [])),
-                claims=list(parsed.get("claims", [])),
-                references=list(parsed.get("references", [])),
-                numbers=list(parsed.get("numbers", [])),
-                dates=list(parsed.get("dates", [])),
-                token_cost=token_cost,
-            )
-
-            log.info(
-                "Extraction LLM call completed",
-                extra={
-                    "extra_fields": {
-                        "model": get("llm", "model", "unknown"),
-                        "latency_ms": round(latency_ms, 2),
-                        "agent": agent,
-                        "token_cost": token_cost,
-                        "claims_count": len(result.claims),
-                        "dates_count": len(result.dates),
-                        "numbers_count": len(result.numbers),
-                        "references_count": len(result.references),
-                    }
-                },
-            )
-
-            result.schema_version = SCHEMA_VERSION
-            return result
-
-        except Exception as exc:
+        except Exception as first_exc:
+            wait_s = _rate_limit_wait(first_exc)
             log.warning(
-                "Extraction LLM call failed",
-                extra={"extra_fields": {"error": str(exc), "agent": agent}},
+                "Extraction attempt 1 failed — retrying",
+                extra={"extra_fields": {
+                    "error": str(first_exc),
+                    "agent": agent,
+                    "retry_wait_s": wait_s,
+                }},
             )
-            return ExtractedEvidence(
-                extraction_failed=True, error_message=f"{type(exc).__name__}: {exc}"
-            )
+            retried = True
+            if wait_s > 0:
+                time.sleep(wait_s)
+
+            # ── Attempt 2 (retry with stricter prompt) ────────────────────────
+            try:
+                raw, tokens = self._call_llm(_RETRY_SYSTEM_PROMPT, user_content)
+                total_tokens += tokens
+                parsed = _parse_response(raw)
+
+            except Exception as second_exc:
+                latency_ms = (time.time() - start_t) * 1000
+                log.warning(
+                    "Extraction failed after retry",
+                    extra={
+                        "extra_fields": {
+                            "error": str(second_exc),
+                            "agent": agent,
+                            "latency_ms": round(latency_ms, 2),
+                            "token_cost": total_tokens,
+                        }
+                    },
+                )
+                return ExtractedEvidence(
+                    extraction_failed=True,
+                    error_message=f"Retry failed: {type(second_exc).__name__}: {second_exc}",
+                    token_cost=total_tokens,
+                    retried=True,
+                )
+
+        latency_ms = (time.time() - start_t) * 1000
+        result = _build_evidence(parsed, total_tokens, retried)
+
+        log.info(
+            "Extraction LLM call completed",
+            extra={
+                "extra_fields": {
+                    "model": get("llm", "model", "unknown"),
+                    "latency_ms": round(latency_ms, 2),
+                    "agent": agent,
+                    "token_cost": total_tokens,
+                    "retried": retried,
+                    "claims_count": len(result.claims),
+                    "dates_count": len(result.dates),
+                    "numbers_count": len(result.numbers),
+                    "references_count": len(result.references),
+                }
+            },
+        )
+
+        result.schema_version = SCHEMA_VERSION
+        return result
 
     def extract_run(self, steps: list[dict]) -> dict[int, ExtractedEvidence]:
         """
@@ -289,7 +401,6 @@ class EvidenceExtractor:
         """
         results = {}
         for step in steps:
-            # Support both NormalizedStep objects and plain dicts
             step_num = step["step"] if isinstance(step, dict) else step.step
             raw_output = step.get("raw_output", "") if isinstance(step, dict) else step.raw_output
             agent = step.get("agent", "") if isinstance(step, dict) else step.agent

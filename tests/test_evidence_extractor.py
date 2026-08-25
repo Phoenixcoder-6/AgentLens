@@ -287,7 +287,15 @@ class TestEvidenceExtractorIntegration:
 
     Run with:
         pytest tests/test_evidence_extractor.py -m integration -v
+
+    A 12s sleep between tests prevents hitting Groq's 8000 TPM limit when
+    running the full integration suite back-to-back.
     """
+
+    def setup_method(self):
+        """Sleep between integration tests to avoid Groq 8000 TPM rate limit."""
+        import time
+        time.sleep(12)
 
     SAMPLE_RESEARCHER_OUTPUT = """SOURCES:
 - "Artificial Intelligence: A Modern Approach" by Stuart Russell and Peter Norvig (book, 2020)

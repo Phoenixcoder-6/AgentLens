@@ -9,8 +9,8 @@ llm:
   provider: "groq"                          # groq | openai | local
   model: "openai/gpt-oss-120b"              # Groq model ID
   temperature: 0.0                          # Deterministic output for extraction
-  max_tokens: 2048
-  timeout_seconds: 30
+  extraction_max_tokens: 1024               # Token budget for evidence extraction calls
+  explanation_max_tokens: 1024             # Token budget for LLM explainer calls
   retry_attempts: 1                         # Retry once on malformed extraction output
 
 # ─────────────────────────────────────────────

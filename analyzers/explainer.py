@@ -139,7 +139,7 @@ class LLMExplainer:
         return ChatGroq(
             model=get("llm", "model"),
             temperature=0.0,
-            max_tokens=1024,
+            max_tokens=int(get("llm", "explanation_max_tokens", 1024)),
             api_key=SecretStr(api_key),
         )
 

@@ -77,7 +77,7 @@ def _build_llm() -> ChatGroq:
     return ChatGroq(
         model=get("llm", "model"),
         temperature=get("llm", "temperature"),
-        max_tokens=get("llm", "max_tokens"),
+        max_tokens=int(get("llm", "explanation_max_tokens", 1024)),
         api_key=SecretStr(api_key),
     )
 
