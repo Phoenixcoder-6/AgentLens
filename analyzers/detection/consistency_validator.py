@@ -65,9 +65,7 @@ class ConsistencyValidator(Analyzer):
 
         # Load config thresholds
         reasoning_cfg = config_loader.get("arbiter", "reasoning", {})
-        entity_gain_threshold: int = reasoning_cfg.get(
-            "hallucination_entity_gain_threshold", 0
-        )
+        entity_gain_threshold: int = reasoning_cfg.get("hallucination_entity_gain_threshold", 0)
 
         # ── Run LLM extraction only if API key present ────────────────────────
         extractor = None
@@ -111,10 +109,7 @@ class ConsistencyValidator(Analyzer):
             and not ver_ev.extraction_failed
         ):
             entity_gain = wr_ev.entity_count - res_ev.entity_count
-            if (
-                wr_ev.entity_count == ver_ev.entity_count
-                and entity_gain > entity_gain_threshold
-            ):
+            if wr_ev.entity_count == ver_ev.entity_count and entity_gain > entity_gain_threshold:
                 evidence.append(
                     self._make_record(
                         rule_id="verifier_passthrough_v1",

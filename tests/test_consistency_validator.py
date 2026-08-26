@@ -216,7 +216,8 @@ class TestVerifierPassthrough:
             result = validator.analyze(trace)
 
         passthrough_records = [
-            e for e in result.evidence
+            e
+            for e in result.evidence
             if e.rule_match and e.rule_match.rule_id == "verifier_passthrough_v1"
         ]
         assert len(passthrough_records) == 1
@@ -323,8 +324,7 @@ class TestClaimDrift:
             result = validator.analyze(trace)
 
         drift_records = [
-            e for e in result.evidence
-            if e.rule_match and e.rule_match.rule_id == "claim_drift_v1"
+            e for e in result.evidence if e.rule_match and e.rule_match.rule_id == "claim_drift_v1"
         ]
         assert len(drift_records) == 1
         assert drift_records[0].rule_match.category == FailureCategory.VERIFICATION
