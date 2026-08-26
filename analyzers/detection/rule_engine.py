@@ -1,7 +1,15 @@
 """
-analyzers/detection/rule_engine.py
+analyzers/detection/rule_engine.py — Day 18, updated Day 22
+============================================================
+Implements Execution and Reasoning deterministic rules only.
 
-Implements Execution, Reasoning, and Verification deterministic rules.
+Day 22: Verification rules (verifier_passthrough_v1) moved to
+        consistency_validator.py. RuleEngine now has a single,
+        clear scope: Execution + Reasoning.
+
+Rules:
+  Execution:  missing_tool_output_v1, tool_failure_v1
+  Reasoning:  researcher_quality_v1, hallucination_v1
 """
 
 from __future__ import annotations
@@ -82,15 +90,14 @@ class RuleEngine(Analyzer):
             # Find researcher and writer steps
             researcher_steps = [s for s in trace.steps if s.agent == "researcher"]
             writer_steps = [s for s in trace.steps if s.agent == "writer"]
-            verifier_steps = [s for s in trace.steps if s.agent == "verifier"]
+            # Note: verifier step collection moved to consistency_validator.py (Day 22)
 
             res_step = researcher_steps[-1] if researcher_steps else None
             wr_step = writer_steps[-1] if writer_steps else None
-            ver_step = verifier_steps[-1] if verifier_steps else None
 
             res_ev = extractor.extract(res_step.output, agent="researcher") if res_step else None
             wr_ev = extractor.extract(wr_step.output, agent="writer") if wr_step else None
-            ver_ev = extractor.extract(ver_step.output, agent="verifier") if ver_step else None
+            # Note: verifier extraction is done in consistency_validator.py (Day 22 split)
 
             # Reasoning: researcher_quality_v1
             if res_step and res_ev and not res_ev.extraction_failed:
@@ -125,36 +132,9 @@ class RuleEngine(Analyzer):
                             step_idx=wr_step.step,
                         )
                     )
-                elif entity_gain <= entity_gain_threshold and res_ev.source_count < min_sources:
-                    # If writer didn't hallucinate but sources were low, researcher is to blame. (Covered above but we can emphasize).
-                    pass
 
-            # Verification: verifier_passthrough_v1
-            if (
-                ver_step
-                and wr_ev
-                and ver_ev
-                and not wr_ev.extraction_failed
-                and not ver_ev.extraction_failed
-            ):
-                entity_gain = 0
-                if res_ev and not res_ev.extraction_failed:
-                    entity_gain = wr_ev.entity_count - res_ev.entity_count
-
-                if (
-                    wr_ev.entity_count == ver_ev.entity_count
-                    and entity_gain > entity_gain_threshold
-                ):
-                    # Verifier passed hallucinated output unchanged
-                    evidence.append(
-                        self._make_record(
-                            rule_id="verifier_passthrough_v1",
-                            category=FailureCategory.VERIFICATION,
-                            description="Verifier passed through hallucinated entities unchallenged.",
-                            agent="verifier",
-                            step_idx=ver_step.step,
-                        )
-                    )
+            # Note: verifier_passthrough_v1 and claim_drift_v1 are owned by
+            # consistency_validator.py (Day 22 split).
 
         return AnalysisResult(evidence=evidence, analyzer_id=self.analyzer_id)
 
