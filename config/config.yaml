@@ -7,11 +7,14 @@
 # ─────────────────────────────────────────────
 llm:
   provider: "groq"                          # groq | openai | local
-  model: "openai/gpt-oss-120b"              # Groq model ID
+  model: "openai/gpt-oss-120b"              # Groq primary model ID
+  fallback_model: "llama-3.3-70b-versatile" # Groq fallback model ID if primary fails
   temperature: 0.0                          # Deterministic output for extraction
   extraction_max_tokens: 1024               # Token budget for evidence extraction calls
   explanation_max_tokens: 1024             # Token budget for LLM explainer calls
   retry_attempts: 1                         # Retry once on malformed extraction output
+  cache_enabled: true                       # Store/retrieve LLM calls in SQLite cache
+  cache_ttl_hours: 24                       # Cache lifetime in hours
 
 # ─────────────────────────────────────────────
 # Storage

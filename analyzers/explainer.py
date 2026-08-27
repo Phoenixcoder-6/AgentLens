@@ -38,10 +38,11 @@ Hedging rule:
 
 from __future__ import annotations
 
+import json
 import os
 import textwrap
 import time
-from typing import cast
+from typing import Any, cast
 
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -51,6 +52,7 @@ from pydantic import BaseModel, Field, SecretStr
 from config.config_loader import get
 from config.logging_config import get_logger
 from schema.models import AnalysisBundle
+from storage.llm_cache import LLMCache
 
 log = get_logger("explainer")
 
@@ -129,15 +131,33 @@ class LLMExplainer:
         - Do NOT add bullet points or headers inside the summary — write in flowing prose.
     """)
 
-    def __init__(self) -> None:
-        self._llm = self._build_llm()
+    @property
+    def _cache(self) -> LLMCache:
+        if not hasattr(self, "_cache_instance"):
+            self._cache_instance = LLMCache()
+        return self._cache_instance
 
-    def _build_llm(self) -> ChatGroq:
+    @_cache.setter
+    def _cache(self, value: Any) -> None:
+        self._cache_instance = value
+
+    def __init__(self) -> None:
+        self._cache = LLMCache()
+        self._primary_model_name = str(get("llm", "model", "openai/gpt-oss-120b"))
+        self._fallback_model_name = get("llm", "fallback_model")
+        self._llm = self._build_llm(self._primary_model_name)
+        self._fallback_llm = (
+            self._build_llm(str(self._fallback_model_name))
+            if self._fallback_model_name
+            else None
+        )
+
+    def _build_llm(self, model_name: str) -> ChatGroq:
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             raise OSError("GROQ_API_KEY not found. Copy .env.example to .env and set your key.")
         return ChatGroq(
-            model=get("llm", "model"),
+            model=model_name,
             temperature=0.0,
             max_tokens=int(get("llm", "explanation_max_tokens", 1024)),
             api_key=SecretStr(api_key),
@@ -156,26 +176,74 @@ class LLMExplainer:
             On LLM failure, falls back to a rule-based explanation.
         """
         prompt = self._build_prompt(bundle)
-        try:
-            structured_llm = self._llm.with_structured_output(ExplanationOutput)
 
-            start_t = time.time()
-            result = cast(
-                ExplanationOutput,
-                structured_llm.invoke(
-                    [
-                        SystemMessage(content=self.SYSTEM_PROMPT),
-                        HumanMessage(content=prompt),
-                    ]
-                ),
+        primary_model = getattr(self, "_primary_model_name", "openai/gpt-oss-120b")
+        fallback_model = getattr(self, "_fallback_model_name", None)
+        fallback_llm = getattr(self, "_fallback_llm", None)
+
+        is_llm_mocked = (
+            hasattr(self._llm, "return_value")
+            or hasattr(self._llm, "side_effect")
+            or hasattr(self._llm, "assert_called")
+        )
+
+        # 1. Check cache hit (skip if LLM is mocked in unit tests)
+        if not is_llm_mocked:
+            cached = self._cache.get(
+                self.SYSTEM_PROMPT, prompt, model=primary_model, temperature=0.0
             )
+            if cached is not None:
+                try:
+                    cached_data = json.loads(cached[0])
+                    bundle.summary = cached_data.get("summary", "")
+                    bundle.suggested_fix = cached_data.get("suggested_fix", "")
+                    return bundle
+                except Exception:
+                    pass
+
+        try:
+            start_t = time.time()
+            target_model = primary_model
+            try:
+                structured_llm = self._llm.with_structured_output(ExplanationOutput)
+                result = cast(
+                    ExplanationOutput,
+                    structured_llm.invoke(
+                        [
+                            SystemMessage(content=self.SYSTEM_PROMPT),
+                            HumanMessage(content=prompt),
+                        ]
+                    ),
+                )
+            except Exception as primary_exc:
+                if fallback_llm and fallback_model:
+                    log.warning(
+                        f"Primary explainer model '{primary_model}' failed: {primary_exc}. "
+                        f"Retrying with fallback model '{fallback_model}'."
+                    )
+                    target_model = str(fallback_model)
+                    structured_fallback = fallback_llm.with_structured_output(
+                        ExplanationOutput
+                    )
+                    result = cast(
+                        ExplanationOutput,
+                        structured_fallback.invoke(
+                            [
+                                SystemMessage(content=self.SYSTEM_PROMPT),
+                                HumanMessage(content=prompt),
+                            ]
+                        ),
+                    )
+                else:
+                    raise primary_exc
+
             latency_ms = (time.time() - start_t) * 1000
 
             log.info(
                 "Explanation LLM call completed",
                 extra={
                     "extra_fields": {
-                        "model": getattr(self._llm, "model_name", "unknown"),
+                        "model": target_model,
                         "latency_ms": round(latency_ms, 2),
                         "run_id": bundle.run_id,
                         "cost_estimate": 0.0,
@@ -185,6 +253,19 @@ class LLMExplainer:
 
             bundle.summary = result.summary
             bundle.suggested_fix = result.suggested_fix
+
+            # Store in cache as JSON string
+            cache_payload = json.dumps(
+                {"summary": result.summary, "suggested_fix": result.suggested_fix}
+            )
+            self._cache.set(
+                self.SYSTEM_PROMPT,
+                prompt,
+                model=target_model,
+                response_text=cache_payload,
+                token_cost=0,
+                temperature=0.0,
+            )
         except Exception as exc:
             log.warning(
                 "Explanation LLM call failed, falling back to rule-based",

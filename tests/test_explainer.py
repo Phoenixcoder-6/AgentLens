@@ -334,6 +334,8 @@ class TestExplainerIntegration:
             confidence=0.75,
         )
         explainer = LLMExplainer()
+        explainer._cache = MagicMock()
+        explainer._cache.get.return_value = None
         result = explainer.explain(bundle)
 
         assert result.summary is not None

@@ -80,7 +80,7 @@ def normalized_run(sample_run) -> NormalizedRun:
 class TestDatabaseManagerInit:
     def test_initialize_creates_all_tables(self, tmp_db):
         counts = tmp_db.table_counts()
-        assert set(counts.keys()) == {"runs", "steps", "analysis", "metrics"}
+        assert set(counts.keys()) == {"runs", "steps", "analysis", "metrics", "llm_cache"}
 
     def test_initialize_is_idempotent(self, tmp_db):
         """Calling initialize() twice should not raise."""

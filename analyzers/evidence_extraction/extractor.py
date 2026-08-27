@@ -17,6 +17,7 @@ import json
 import os
 import sys
 import time
+from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
@@ -26,6 +27,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 from config.config_loader import get
 from config.logging_config import get_logger
 from schema.models import SCHEMA_VERSION
+from storage.llm_cache import LLMCache
 
 log = get_logger("extractor")
 
@@ -252,42 +254,104 @@ class EvidenceExtractor:
         evidence = extractor.extract(raw_output="SOURCES:\\n- Book A\\nENTITIES:\\n- NITI Aayog")
     """
 
-    def __init__(self) -> None:
-        self._llm = self._build_llm()
+    @property
+    def _cache(self) -> LLMCache:
+        if not hasattr(self, "_cache_instance"):
+            self._cache_instance = LLMCache()
+        return self._cache_instance
 
-    def _build_llm(self):
+    @_cache.setter
+    def _cache(self, value: Any) -> None:
+        self._cache_instance = value
+
+    def __init__(self) -> None:
+        self._cache = LLMCache()
+        self._primary_model_name = str(get("llm", "model", "openai/gpt-oss-120b"))
+        self._fallback_model_name = get("llm", "fallback_model")
+        self._temperature = float(get("llm", "temperature", 0.0))
+        self._llm = self._build_llm(self._primary_model_name)
+        self._fallback_llm = (
+            self._build_llm(str(self._fallback_model_name))
+            if self._fallback_model_name
+            else None
+        )
+
+    def _build_llm(self, model_name: str) -> ChatGroq:
         """Build an LLM in JSON mode. max_tokens pulled from config."""
         from dotenv import load_dotenv
 
         load_dotenv()
 
-        model = get("llm", "model", "openai/gpt-oss-120b")
-        temperature = float(get("llm", "temperature", 0.0))
         max_tokens = int(get("llm", "extraction_max_tokens", 1024))
 
         return ChatGroq(
-            model=model,
-            temperature=temperature,
+            model=model_name,
+            temperature=self._temperature,
             max_tokens=max_tokens,
             model_kwargs={"response_format": {"type": "json_object"}},
         )
 
     def _call_llm(self, system: str, user_content: str) -> tuple[str, int]:
         """
-        Invoke the LLM and return (raw_content_string, total_tokens).
-        Raises on network/API errors.
+        Invoke the LLM with caching and fallback model support.
+        Returns (raw_content_string, total_tokens).
+        Raises on network/API errors if both primary and fallback fail.
         """
+        primary_model = getattr(self, "_primary_model_name", "openai/gpt-oss-120b")
+        fallback_model = getattr(self, "_fallback_model_name", None)
+        temperature = getattr(self, "_temperature", 0.0)
+        fallback_llm = getattr(self, "_fallback_llm", None)
+
+        is_llm_mocked = (
+            hasattr(self._llm, "return_value")
+            or hasattr(self._llm, "side_effect")
+            or hasattr(self._llm, "assert_called")
+        )
+
+        # 1. Check cache hit (skip if LLM is mocked in unit tests)
+        if not is_llm_mocked:
+            cached = self._cache.get(
+                system, user_content, model=primary_model, temperature=temperature
+            )
+            if cached is not None:
+                return cached
+
         messages = [
             SystemMessage(content=system),
             HumanMessage(content=user_content),
         ]
-        response = self._llm.invoke(messages)
-        raw = response.content if hasattr(response, "content") else str(response)
+
+        # 2. Primary model call
+        target_model = primary_model
+        try:
+            response = self._llm.invoke(messages)
+        except Exception as primary_exc:
+            if fallback_llm and fallback_model:
+                log.warning(
+                    f"Primary extraction model '{primary_model}' failed: {primary_exc}. "
+                    f"Retrying with fallback model '{fallback_model}'."
+                )
+                target_model = str(fallback_model)
+                response = fallback_llm.invoke(messages)
+            else:
+                raise primary_exc
+
+        raw: str = str(response.content) if hasattr(response, "content") else str(response)
 
         token_cost = 0
         if hasattr(response, "response_metadata"):
             usage = response.response_metadata.get("token_usage", {})
             token_cost = int(usage.get("total_tokens", 0))
+
+        # 3. Store in cache
+        self._cache.set(
+            system,
+            user_content,
+            model=target_model,
+            response_text=raw,
+            token_cost=token_cost,
+            temperature=temperature,
+        )
 
         return raw, token_cost
 

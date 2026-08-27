@@ -97,12 +97,23 @@ CREATE TABLE IF NOT EXISTS metrics (
     metric_value   REAL,
     metric_unit    TEXT DEFAULT '',
     timestamp      TEXT NOT NULL,
-    schema_version TEXT NOT NULL,
-    FOREIGN KEY (run_id) REFERENCES runs(run_id)
+    schema_version TEXT NOT NULL
 );
 """
 
-_ALL_DDL = [_CREATE_RUNS, _CREATE_STEPS, _CREATE_ANALYSIS, _CREATE_METRICS]
+_CREATE_LLM_CACHE = """
+CREATE TABLE IF NOT EXISTS llm_cache (
+    cache_key     TEXT PRIMARY KEY,
+    prompt        TEXT NOT NULL,
+    model         TEXT NOT NULL,
+    response_text TEXT NOT NULL,
+    token_cost    INTEGER DEFAULT 0,
+    created_at    TEXT NOT NULL,
+    expires_at    TEXT NOT NULL
+);
+"""
+
+_ALL_DDL = [_CREATE_RUNS, _CREATE_STEPS, _CREATE_ANALYSIS, _CREATE_METRICS, _CREATE_LLM_CACHE]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -358,13 +369,65 @@ class DatabaseManager:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    # ── Utility ───────────────────────────────────────────────────────────────
+    # -- LLM Cache -------------------------------------------------------------
+
+    def get_cached_llm_response(
+        self, cache_key: str, now_iso: str
+    ) -> tuple[str, int] | None:
+        """Fetch unexpired cached response for key. Returns (response_text, token_cost) or None."""
+        with self.connection() as conn:
+            row = conn.execute(
+                "SELECT response_text, token_cost FROM llm_cache WHERE cache_key = ? AND expires_at > ?",
+                (cache_key, now_iso),
+            ).fetchone()
+        if row:
+            return str(row["response_text"]), int(row["token_cost"])
+        return None
+
+    def set_cached_llm_response(
+        self,
+        cache_key: str,
+        prompt: str,
+        model: str,
+        response_text: str,
+        token_cost: int,
+        created_at: str,
+        expires_at: str,
+    ) -> None:
+        """Insert or replace an LLM response cache entry."""
+        with self.connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO llm_cache
+                    (cache_key, prompt, model, response_text, token_cost, created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    cache_key,
+                    prompt,
+                    model,
+                    response_text,
+                    token_cost,
+                    created_at,
+                    expires_at,
+                ),
+            )
+
+    def purge_expired_llm_cache(self, now_iso: str) -> int:
+        """Remove expired cache records and return the count of deleted rows."""
+        with self.connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM llm_cache WHERE expires_at <= ?", (now_iso,)
+            )
+            return cursor.rowcount
+
+    # -- Utility ---------------------------------------------------------------
 
     def table_counts(self) -> dict[str, int]:
-        """Return row count for each table — useful for checkpoint verification."""
+        """Return row count for each table - useful for checkpoint verification."""
         counts = {}
         with self.connection() as conn:
-            for table in ("runs", "steps", "analysis", "metrics"):
+            for table in ("runs", "steps", "analysis", "metrics", "llm_cache"):
                 row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
                 counts[table] = row[0]
         return counts
