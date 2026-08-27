@@ -77,7 +77,9 @@ class TestExtractionGracefulDegradation:
 
     def test_consistency_validator_skips_rules_on_extraction_failure(self):
         """ConsistencyValidator skips verifier_passthrough_v1 and claim_drift_v1 when extraction_failed=True."""
-        trace = _make_trace(_make_step("researcher", 1), _make_step("writer", 2), _make_step("verifier", 3))
+        trace = _make_trace(
+            _make_step("researcher", 1), _make_step("writer", 2), _make_step("verifier", 3)
+        )
 
         failed_ev = ExtractedEvidence(extraction_failed=True, error_message="Mocked failure")
 

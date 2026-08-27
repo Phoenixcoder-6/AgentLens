@@ -271,9 +271,7 @@ class EvidenceExtractor:
         self._temperature = float(get("llm", "temperature", 0.0))
         self._llm = self._build_llm(self._primary_model_name)
         self._fallback_llm = (
-            self._build_llm(str(self._fallback_model_name))
-            if self._fallback_model_name
-            else None
+            self._build_llm(str(self._fallback_model_name)) if self._fallback_model_name else None
         )
 
     def _build_llm(self, model_name: str) -> ChatGroq:

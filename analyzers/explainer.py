@@ -147,9 +147,7 @@ class LLMExplainer:
         self._fallback_model_name = get("llm", "fallback_model")
         self._llm = self._build_llm(self._primary_model_name)
         self._fallback_llm = (
-            self._build_llm(str(self._fallback_model_name))
-            if self._fallback_model_name
-            else None
+            self._build_llm(str(self._fallback_model_name)) if self._fallback_model_name else None
         )
 
     def _build_llm(self, model_name: str) -> ChatGroq:
@@ -222,9 +220,7 @@ class LLMExplainer:
                         f"Retrying with fallback model '{fallback_model}'."
                     )
                     target_model = str(fallback_model)
-                    structured_fallback = fallback_llm.with_structured_output(
-                        ExplanationOutput
-                    )
+                    structured_fallback = fallback_llm.with_structured_output(ExplanationOutput)
                     result = cast(
                         ExplanationOutput,
                         structured_fallback.invoke(

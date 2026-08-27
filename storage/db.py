@@ -371,9 +371,7 @@ class DatabaseManager:
 
     # -- LLM Cache -------------------------------------------------------------
 
-    def get_cached_llm_response(
-        self, cache_key: str, now_iso: str
-    ) -> tuple[str, int] | None:
+    def get_cached_llm_response(self, cache_key: str, now_iso: str) -> tuple[str, int] | None:
         """Fetch unexpired cached response for key. Returns (response_text, token_cost) or None."""
         with self.connection() as conn:
             row = conn.execute(
@@ -416,9 +414,7 @@ class DatabaseManager:
     def purge_expired_llm_cache(self, now_iso: str) -> int:
         """Remove expired cache records and return the count of deleted rows."""
         with self.connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM llm_cache WHERE expires_at <= ?", (now_iso,)
-            )
+            cursor = conn.execute("DELETE FROM llm_cache WHERE expires_at <= ?", (now_iso,))
             return cursor.rowcount
 
     # -- Utility ---------------------------------------------------------------

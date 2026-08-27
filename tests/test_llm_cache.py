@@ -67,6 +67,7 @@ class TestLLMCacheUnit:
         cache.set("sys", "user2", "modelA", "resp2", token_cost=10, ttl_hours=24)
 
         from datetime import datetime
+
         now_iso = datetime.now(UTC).isoformat()
         purged = temp_db.purge_expired_llm_cache(now_iso)
         assert purged == 1

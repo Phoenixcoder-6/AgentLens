@@ -58,6 +58,7 @@ def main() -> int:
     total += 1
     try:
         from storage.db import _CREATE_LLM_CACHE
+
         if "llm_cache" in _CREATE_LLM_CACHE:
             print(f"  {PASS} [1] _CREATE_LLM_CACHE table DDL present")
             passed += 1
@@ -115,6 +116,7 @@ def main() -> int:
         cache.set("sys", "user_exp", "modelA", "expired_text", token_cost=10, ttl_hours=-1)
         miss = cache.get("sys", "user_exp", "modelA")
         from datetime import datetime
+
         purged = db.purge_expired_llm_cache(datetime.now(UTC).isoformat())
         if miss is None and purged >= 1:
             print(f"  {PASS} [5] Cache expiration and purge verified (purged={purged})")
@@ -188,7 +190,9 @@ def main() -> int:
     # ── Test 9: RuleEngine skips extraction rules on failure ─────────────────
     total += 1
     try:
-        step = AgentStep(run_id="r1", step=1, agent="researcher", output="out", status=StepStatus.SUCCESS)
+        step = AgentStep(
+            run_id="r1", step=1, agent="researcher", output="out", status=StepStatus.SUCCESS
+        )
         trace = RunTrace(run_id="r1", workflow="wf", steps=[step])
 
         failed_ev = ExtractedEvidence(extraction_failed=True, error_message="Failed")
@@ -213,7 +217,9 @@ def main() -> int:
     # ── Test 10: ConsistencyValidator skips extraction rules on failure ──────
     total += 1
     try:
-        step = AgentStep(run_id="r1", step=1, agent="verifier", output="out", status=StepStatus.SUCCESS)
+        step = AgentStep(
+            run_id="r1", step=1, agent="verifier", output="out", status=StepStatus.SUCCESS
+        )
         trace = RunTrace(run_id="r1", workflow="wf", steps=[step])
 
         failed_ev = ExtractedEvidence(extraction_failed=True, error_message="Failed")
@@ -228,7 +234,9 @@ def main() -> int:
 
         rule_ids = [e.rule_match.rule_id for e in analysis.evidence if e.rule_match]
         if "verifier_passthrough_v1" not in rule_ids and "claim_drift_v1" not in rule_ids:
-            print(f"  {PASS} [10] ConsistencyValidator skipped extraction rules when extraction_failed=True")
+            print(
+                f"  {PASS} [10] ConsistencyValidator skipped extraction rules when extraction_failed=True"
+            )
             passed += 1
         else:
             print(f"  {FAIL} [10] ConsistencyValidator fired rules despite failure: {rule_ids}")
@@ -239,8 +247,11 @@ def main() -> int:
     total += 1
     try:
         bundle = AnalysisBundle(
-            run_id="r1", primary_cause=FailureCategory.REASONING,
-            priority_level=PriorityLevel.P2, primary_agent="writer", grounded=False
+            run_id="r1",
+            primary_cause=FailureCategory.REASONING,
+            priority_level=PriorityLevel.P2,
+            primary_agent="writer",
+            grounded=False,
         )
         with patch("os.getenv", return_value="fake_key"):
             explainer = LLMExplainer()
@@ -265,7 +276,9 @@ def main() -> int:
                 print(f"  {PASS} [11] LLMExplainer invoked fallback model when primary failed")
                 passed += 1
             else:
-                print(f"  {FAIL} [11] LLMExplainer fallback model call failed: summary={res_b.summary}")
+                print(
+                    f"  {FAIL} [11] LLMExplainer fallback model call failed: summary={res_b.summary}"
+                )
     except Exception as e:
         print(f"  {FAIL} [11] Explainer fallback model error: {e}")
 
@@ -273,8 +286,11 @@ def main() -> int:
     total += 1
     try:
         bundle = AnalysisBundle(
-            run_id="r1", primary_cause=FailureCategory.REASONING,
-            priority_level=PriorityLevel.P2, primary_agent="writer", grounded=False
+            run_id="r1",
+            primary_cause=FailureCategory.REASONING,
+            priority_level=PriorityLevel.P2,
+            primary_agent="writer",
+            grounded=False,
         )
         with patch("os.getenv", return_value="fake_key"):
             explainer = LLMExplainer()
@@ -282,12 +298,16 @@ def main() -> int:
             explainer._cache.get.return_value = None
 
             explainer._llm = MagicMock()
-            explainer._llm.with_structured_output.side_effect = RuntimeError("All LLM services down")
+            explainer._llm.with_structured_output.side_effect = RuntimeError(
+                "All LLM services down"
+            )
             explainer._fallback_llm = None
 
             res_b = explainer.explain(bundle)
             if res_b.summary and res_b.suggested_fix:
-                print(f"  {PASS} [12] LLMExplainer degrades gracefully to rule-based explanation on total failure")
+                print(
+                    f"  {PASS} [12] LLMExplainer degrades gracefully to rule-based explanation on total failure"
+                )
                 passed += 1
             else:
                 print(f"  {FAIL} [12] Explainer total failure did not generate fallback summary")
