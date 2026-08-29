@@ -122,17 +122,21 @@ class GraphAligner:
         matched_count = sum(1 for p in aligned_pairs if p.status == AlignmentStatus.MATCHED)
         missing_in_a = sum(1 for p in aligned_pairs if p.status == AlignmentStatus.MISSING_IN_A)
         missing_in_b = sum(1 for p in aligned_pairs if p.status == AlignmentStatus.MISSING_IN_B)
-        is_fully = (missing_in_a == 0 and missing_in_b == 0)
+        is_fully = missing_in_a == 0 and missing_in_b == 0
 
         # Build human-readable summary
         summary_parts = [
             f"Aligned {matched_count} matched steps between '{trace_a.run_id}' and '{trace_b.run_id}'."
         ]
         if missing_in_a > 0:
-            missing_a_agents = [p.agent for p in aligned_pairs if p.status == AlignmentStatus.MISSING_IN_A]
+            missing_a_agents = [
+                p.agent for p in aligned_pairs if p.status == AlignmentStatus.MISSING_IN_A
+            ]
             summary_parts.append(f"Missing in Trace A: {missing_a_agents}.")
         if missing_in_b > 0:
-            missing_b_agents = [p.agent for p in aligned_pairs if p.status == AlignmentStatus.MISSING_IN_B]
+            missing_b_agents = [
+                p.agent for p in aligned_pairs if p.status == AlignmentStatus.MISSING_IN_B
+            ]
             summary_parts.append(f"Missing in Trace B: {missing_b_agents}.")
 
         summary = " ".join(summary_parts)

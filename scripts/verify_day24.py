@@ -62,6 +62,7 @@ def main() -> int:
             GraphAlignmentResult,
             align_traces,
         )
+
         print(f"  {PASS} [1] diff_engine package and alignment models imported successfully")
         passed += 1
     except Exception as e:
@@ -84,8 +85,12 @@ def main() -> int:
     # ── Test 3: Identical trace alignment ────────────────────────────────────
     total += 1
     try:
-        t1 = _make_trace("r1", _make_step("researcher", 1), _make_step("writer", 2), _make_step("verifier", 3))
-        t2 = _make_trace("r2", _make_step("researcher", 1), _make_step("writer", 2), _make_step("verifier", 3))
+        t1 = _make_trace(
+            "r1", _make_step("researcher", 1), _make_step("writer", 2), _make_step("verifier", 3)
+        )
+        t2 = _make_trace(
+            "r2", _make_step("researcher", 1), _make_step("writer", 2), _make_step("verifier", 3)
+        )
         res = align_traces(t1, t2)
         if res.matched_count == 3 and res.is_fully_aligned:
             print(f"  {PASS} [3] Identical traces aligned with 100% MATCHED steps")
@@ -98,7 +103,9 @@ def main() -> int:
     # ── Test 4: Missing step in Trace B ──────────────────────────────────────
     total += 1
     try:
-        t1 = _make_trace("r1", _make_step("researcher", 1), _make_step("writer", 2), _make_step("verifier", 3))
+        t1 = _make_trace(
+            "r1", _make_step("researcher", 1), _make_step("writer", 2), _make_step("verifier", 3)
+        )
         t2 = _make_trace("r2", _make_step("researcher", 1), _make_step("writer", 2))
         res = align_traces(t1, t2)
         missing_b = [p for p in res.pairs if p.status == AlignmentStatus.MISSING_IN_B]
@@ -114,7 +121,9 @@ def main() -> int:
     total += 1
     try:
         t1 = _make_trace("r1", _make_step("researcher", 1), _make_step("writer", 2))
-        t2 = _make_trace("r2", _make_step("researcher", 1), _make_step("writer", 2), _make_step("verifier", 3))
+        t2 = _make_trace(
+            "r2", _make_step("researcher", 1), _make_step("writer", 2), _make_step("verifier", 3)
+        )
         res = align_traces(t1, t2)
         missing_a = [p for p in res.pairs if p.status == AlignmentStatus.MISSING_IN_A]
         if len(missing_a) == 1 and missing_a[0].agent == "verifier":
@@ -129,7 +138,9 @@ def main() -> int:
     total += 1
     try:
         t1 = _make_trace("r1", _make_step("researcher", 1), _make_step("writer", 2))
-        t2 = _make_trace("r2", _make_step("researcher", 1), _make_step("editor", 2), _make_step("writer", 3))
+        t2 = _make_trace(
+            "r2", _make_step("researcher", 1), _make_step("editor", 2), _make_step("writer", 3)
+        )
         res = align_traces(t1, t2)
         matched = [p.agent for p in res.get_matched_pairs()]
         if "researcher" in matched and "writer" in matched and res.missing_in_a_count == 1:

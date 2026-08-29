@@ -22,7 +22,9 @@ from diff_engine import (
 from schema.models import AgentStep, RunTrace, StepStatus
 
 
-def _make_step(agent: str, step: int, output: str = "", parent_step: str | None = None) -> AgentStep:
+def _make_step(
+    agent: str, step: int, output: str = "", parent_step: str | None = None
+) -> AgentStep:
     return AgentStep(
         run_id="test_run",
         step=step,
