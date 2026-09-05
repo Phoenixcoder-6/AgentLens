@@ -56,12 +56,31 @@ class AnalysisState:
 
 
 @dataclass
+class DiffRow:
+    agent: str
+    match_status: str  # MATCHED | MISSING_IN_A | MISSING_IN_B
+    lat_a: float
+    lat_b: float
+    lat_delta: float        # lat_b - lat_a  (positive = B slower)
+    tok_a: int
+    tok_b: int
+    tok_delta: int          # tok_b - tok_a
+    sim: float              # [0,1] cosine similarity (0 if missing)
+    diverged: bool
+    method: str             # "cosine" | "jaccard" | "n/a"
+
+
+@dataclass
 class DiffResult:
     run_a: str
     run_b: str
-    steps: list[dict]  # [{agent, lat_a, lat_b, tok_a, tok_b, similarity}]
-    first_divergence: str  # agent name where divergence starts
-    overall_similarity: float
+    steps: list[dict]  # kept for backward-compat – mirrors DiffRow fields as dicts
+    rows: list[DiffRow] = field(default_factory=list)
+    first_divergence: str = "(none)"   # agent name where divergence starts
+    overall_similarity: float = 0.0
+    matched_count: int = 0
+    missing_in_a_count: int = 0
+    missing_in_b_count: int = 0
 
 
 _db: DatabaseManager | None = None
@@ -322,49 +341,129 @@ def get_metrics_data() -> dict:
     return result
 
 
+def _load_run_trace(run_id: str) -> RunTrace | None:
+    """Load a full RunTrace from DB trace_json."""
+    db = get_db()
+    row = db.get_run(run_id)
+    if not row or not row.get("trace_json"):
+        return None
+    return RunTrace(**json.loads(row["trace_json"]))
+
+
 def compute_diff(run_id_a: str, run_id_b: str) -> DiffResult:
-    """Align two runs by agent identity and compute similarity."""
-    steps_a = {s["agent"]: s for s in get_trace_steps(run_id_a)}
-    steps_b = {s["agent"]: s for s in get_trace_steps(run_id_b)}
-    agents = list(steps_a.keys())
+    """
+    Day 26: Align two runs using GraphAligner (Day 24) and score semantic
+    similarity using SemanticSimilarityEngine (Day 25).
 
-    def _sim(a: str, b: str) -> float:
-        if not a or not b:
-            return 0.0
-        s1, s2 = set(a.split()), set(b.split())
-        if not s1 and not s2:
-            return 1.0
-        return len(s1 & s2) / max(len(s1 | s2), 1)
+    Falls back to empty rows if either trace cannot be loaded.
+    """
+    from diff_engine import align_traces, score_similarity
 
-    rows = []
-    first_div = ""
-    for ag in agents:
-        sa = steps_a.get(ag, {})
-        sb = steps_b.get(ag, {})
-        out_a = sa.get("output", "")
-        out_b = sb.get("output", "")
-        sim = _sim(out_a, out_b)
-        if sim < 0.85 and not first_div:
-            first_div = ag
-        rows.append(
-            {
-                "agent": ag,
-                "lat_a": sa.get("latency_ms", 0) or 0,
-                "lat_b": sb.get("latency_ms", 0) or 0,
-                "tok_a": sa.get("tokens_total", 0) or 0,
-                "tok_b": sb.get("tokens_total", 0) or 0,
-                "sim": sim,
-            }
+    trace_a = _load_run_trace(run_id_a)
+    trace_b = _load_run_trace(run_id_b)
+
+    if trace_a is None or trace_b is None:
+        return DiffResult(
+            run_a=run_id_a,
+            run_b=run_id_b,
+            steps=[],
+            rows=[],
+            first_divergence="(trace not found)",
+            overall_similarity=0.0,
         )
 
-    overall = sum(r["sim"] for r in rows) / len(rows) if rows else 0
+    # Step 1: Graph-based alignment (by agent identity + parent/child topology)
+    alignment = align_traces(trace_a, trace_b)
+
+    # Step 2: Semantic similarity for all MATCHED step pairs
+    sim_report = score_similarity(alignment)
+
+    # Build a lookup from agent → StepSimilarityScore
+    sim_by_agent = {s.agent: s for s in sim_report.scores}
+
+    # Build per-step latency/token lookups from DB (fast, avoids re-parsing JSON)
+    db = get_db()
+
+    def _step_metrics(run_id: str) -> dict[str, dict]:
+        """Map agent → {lat, tok} from DB step rows."""
+        result: dict[str, dict] = {}
+        for s in db.get_steps_for_run(run_id):
+            ag = s.get("agent", "")
+            result[ag] = {
+                "lat": float(s.get("latency_ms") or 0),
+                "tok": int(s.get("tokens_total") or 0),
+            }
+        return result
+
+    metrics_a = _step_metrics(run_id_a)
+    metrics_b = _step_metrics(run_id_b)
+
+    diff_rows: list[DiffRow] = []
+    legacy_steps: list[dict] = []
+
+    for pair in alignment.pairs:
+        agent = pair.agent
+        status = pair.status.value  # "MATCHED" | "MISSING_IN_A" | "MISSING_IN_B"
+
+        m_a = metrics_a.get(agent, {"lat": 0.0, "tok": 0})
+        m_b = metrics_b.get(agent, {"lat": 0.0, "tok": 0})
+        lat_a = m_a["lat"] if pair.step_a else 0.0
+        lat_b = m_b["lat"] if pair.step_b else 0.0
+        tok_a = m_a["tok"] if pair.step_a else 0
+        tok_b = m_b["tok"] if pair.step_b else 0
+
+        if status == "MATCHED" and agent in sim_by_agent:
+            sc = sim_by_agent[agent]
+            sim = sc.similarity
+            diverged = sc.diverged
+            method = sc.method
+        else:
+            sim = 0.0
+            diverged = status != "MATCHED"
+            method = "n/a"
+
+        row = DiffRow(
+            agent=agent,
+            match_status=status,
+            lat_a=lat_a,
+            lat_b=lat_b,
+            lat_delta=lat_b - lat_a,
+            tok_a=tok_a,
+            tok_b=tok_b,
+            tok_delta=tok_b - tok_a,
+            sim=sim,
+            diverged=diverged,
+            method=method,
+        )
+        diff_rows.append(row)
+
+        # Build backward-compat legacy dict for existing UI code
+        legacy_steps.append({
+            "agent": agent,
+            "lat_a": lat_a,
+            "lat_b": lat_b,
+            "tok_a": tok_a,
+            "tok_b": tok_b,
+            "sim": sim,
+            "match_status": status,
+            "lat_delta": lat_b - lat_a,
+            "tok_delta": tok_b - tok_a,
+            "diverged": diverged,
+            "method": method,
+        })
+
     return DiffResult(
         run_a=run_id_a,
         run_b=run_id_b,
-        steps=rows,
-        first_divergence=first_div or "(none)",
-        overall_similarity=overall,
+        steps=legacy_steps,
+        rows=diff_rows,
+        first_divergence=sim_report.first_divergence_agent or "(none)",
+        overall_similarity=sim_report.average_similarity,
+        matched_count=alignment.matched_count,
+        missing_in_a_count=alignment.missing_in_a_count,
+        missing_in_b_count=alignment.missing_in_b_count,
     )
+
 
 
 def total_cost_estimate() -> float:

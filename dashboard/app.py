@@ -773,7 +773,9 @@ def diff_page():
 
     with ui.element("div").classes("al-content"):
         ui.html(
-            '<div class="al-section" style="margin-bottom:16px;">Diff Viewer — compare two runs</div>'
+            f'<div class="al-section" style="margin-bottom:16px;">Diff Viewer'
+            f'<span style="font-size:11px;color:{TEXT_MUTED};font-weight:400;margin-left:10px;">'
+            f"Graph-aligned · Semantic similarity (all-MiniLM-L6-v2)</span></div>"
         )
 
         runs = state.list_runs(limit=50)
@@ -784,15 +786,21 @@ def diff_page():
             )
             return
 
-        sel_a = ui.select(run_ids, label="Run A", value=run_ids[0]).style(
-            f"background:{CARD};color:{TEXT};min-width:240px;"
-        )
-        ui.html('<div style="height:12px;"></div>')
-        sel_b = ui.select(
-            run_ids, label="Run B", value=run_ids[1] if len(run_ids) > 1 else run_ids[0]
-        ).style(f"background:{CARD};color:{TEXT};min-width:240px;")
+        # ── Run selectors ──────────────────────────────────────────────────
+        with ui.element("div").style("display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;"):
+            sel_a = ui.select(run_ids, label="Run A (baseline)", value=run_ids[0]).style(
+                f"background:{CARD};color:{TEXT};min-width:240px;"
+            )
+            sel_b = ui.select(
+                run_ids, label="Run B (comparison)",
+                value=run_ids[1] if len(run_ids) > 1 else run_ids[0],
+            ).style(f"background:{CARD};color:{TEXT};min-width:240px;")
+            ui.button("Compute Diff", on_click=lambda: compute()).style(
+                f"background:{PURPLE};color:#fff;border-radius:7px;"
+                f"padding:9px 22px;font-weight:600;align-self:flex-end;"
+            )
 
-        result_area = ui.element("div").style("margin-top:20px;")
+        result_area = ui.element("div").style("margin-top:24px;")
 
         async def compute():
             result_area.clear()
@@ -801,30 +809,54 @@ def diff_page():
                     f"display:flex;gap:10px;align-items:center;color:{TEXT_MUTED};"
                 ):
                     ui.spinner(size="sm").style(f"color:{PURPLE};")
-                    ui.label("Computing diff…")
+                    ui.label("Aligning runs and computing similarity…")
 
             diff = await run.io_bound(state.compute_diff, sel_a.value, sel_b.value)
             result_area.clear()
 
             with result_area:
-                # Overall similarity
+                # ── Summary stat cards ─────────────────────────────────────
                 sim_pct = diff.overall_similarity * 100
                 sim_col = GREEN if sim_pct > 80 else AMBER if sim_pct > 50 else RED
+
+                first_div = diff.first_divergence
+                first_div_col = RED if first_div not in ("(none)", "(trace not found)") else GREEN
+
                 ui.html(f"""
-                <div style="display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap;">
+                <div style="display:flex;gap:14px;margin-bottom:22px;flex-wrap:wrap;">
                   <div class="al-stat">
                     <div class="al-stat-label">Overall Similarity</div>
-                    <div class="al-stat-value" style="color:{sim_col};">{sim_pct:.0f}%</div>
+                    <div class="al-stat-value" style="color:{sim_col};">{sim_pct:.1f}%</div>
                   </div>
                   <div class="al-stat">
                     <div class="al-stat-label">First Divergence</div>
-                    <div class="al-stat-value" style="color:{RED};font-size:18px;">{diff.first_divergence}</div>
+                    <div class="al-stat-value" style="color:{first_div_col};font-size:18px;">{first_div}</div>
+                  </div>
+                  <div class="al-stat">
+                    <div class="al-stat-label">Matched Steps</div>
+                    <div class="al-stat-value" style="color:{GREEN};">{diff.matched_count}</div>
+                  </div>
+                  <div class="al-stat">
+                    <div class="al-stat-label">Missing in A</div>
+                    <div class="al-stat-value" style="color:{AMBER if diff.missing_in_a_count else TEXT_MUTED};">
+                      {diff.missing_in_a_count}
+                    </div>
+                  </div>
+                  <div class="al-stat">
+                    <div class="al-stat-label">Missing in B</div>
+                    <div class="al-stat-value" style="color:{AMBER if diff.missing_in_b_count else TEXT_MUTED};">
+                      {diff.missing_in_b_count}
+                    </div>
                   </div>
                 </div>
                 """)
 
-                # Per-agent comparison
-                DCOLS = "100px 1fr 1fr 80px"
+                if not diff.steps:
+                    ui.html(f'<div style="color:{TEXT_MUTED};">No steps to compare.</div>')
+                    return
+
+                # ── Per-agent comparison table ─────────────────────────────
+                DCOLS = "130px 1fr 1fr 90px 80px 80px 100px"
                 with ui.element("div").style(
                     f"background:{CARD};border:1px solid {BORDER};border-radius:10px;overflow:hidden;"
                 ):
@@ -834,8 +866,11 @@ def diff_page():
                                 font-size:10px;font-weight:600;letter-spacing:1px;
                                 text-transform:uppercase;color:{TEXT_MUTED};">
                       <span>Agent</span>
-                      <span>Run A (latency / tokens)</span>
-                      <span>Run B (latency / tokens)</span>
+                      <span>Run A (lat / tok)</span>
+                      <span>Run B (lat / tok)</span>
+                      <span>Lat Δ</span>
+                      <span>Tok Δ</span>
+                      <span>Method</span>
                       <span>Similarity</span>
                     </div>
                     """)
@@ -843,31 +878,77 @@ def diff_page():
                         ag = row["agent"]
                         col = STEP_COLOR.get(ag, GRAY)
                         sc = row["sim"] * 100
-                        s_col = GREEN if sc > 80 else AMBER if sc > 50 else RED
+                        status = row.get("match_status", "MATCHED")
+
+                        # Row background: divergence highlight, missing step hint
                         is_div = ag == diff.first_divergence
-                        div_bg = f"background:{RED}18;" if is_div else ""
+                        if status == "MISSING_IN_B":
+                            row_style = f"background:{AMBER}18;"
+                            status_badge = f'<span style="font-size:10px;background:{AMBER}33;color:{AMBER};padding:1px 5px;border-radius:4px;margin-left:4px;">−B</span>'
+                        elif status == "MISSING_IN_A":
+                            row_style = f"background:{CYAN}15;"
+                            status_badge = f'<span style="font-size:10px;background:{CYAN}33;color:{CYAN};padding:1px 5px;border-radius:4px;margin-left:4px;">−A</span>'
+                        elif is_div:
+                            row_style = f"background:{RED}18;"
+                            status_badge = f'<span style="font-size:10px;background:{RED}33;color:{RED};padding:1px 5px;border-radius:4px;margin-left:4px;">↑ div</span>'
+                        else:
+                            row_style = ""
+                            status_badge = ""
+
+                        # Similarity color + bar
+                        if status != "MATCHED":
+                            s_col = TEXT_MUTED
+                            sim_bar = f'<span style="color:{TEXT_MUTED};font-size:12px;">—</span>'
+                        else:
+                            s_col = GREEN if sc > 80 else AMBER if sc > 50 else RED
+                            bar_w = max(4, int(sc))
+                            sim_bar = (
+                                f'<div style="display:flex;align-items:center;gap:6px;">'
+                                f'<div style="width:{bar_w}px;height:6px;border-radius:3px;background:{s_col};"></div>'
+                                f'<span style="font-size:13px;font-weight:600;color:{s_col};">{sc:.0f}%</span>'
+                                f'</div>'
+                            )
+
+                        # Delta display helpers
+                        lat_delta = row.get("lat_delta", 0)
+                        tok_delta = row.get("tok_delta", 0)
+                        lat_d_col = RED if lat_delta > 500 else AMBER if lat_delta > 0 else GREEN if lat_delta < 0 else TEXT_MUTED
+                        tok_d_col = RED if tok_delta > 200 else AMBER if tok_delta > 0 else GREEN if tok_delta < 0 else TEXT_MUTED
+                        lat_d_str = f'+{fmt_ms(lat_delta)}' if lat_delta > 0 else (f'{fmt_ms(lat_delta)}' if lat_delta < 0 else '—')
+                        tok_d_str = f'+{int(tok_delta):,}' if tok_delta > 0 else (f'{int(tok_delta):,}' if tok_delta < 0 else '—')
+
+                        method = row.get("method", "—")
+
                         ui.html(f"""
                         <div style="display:grid;grid-template-columns:{DCOLS};
-                                    padding:12px 20px;border-bottom:1px solid {BORDER};{div_bg}">
+                                    padding:12px 20px;border-bottom:1px solid {BORDER};{row_style}">
                           <span style="font-size:12px;font-weight:600;color:{col};">
-                            {ag}{" ← diverge" if is_div else ""}
+                            {ag}{status_badge}
                           </span>
                           <span style="font-size:12px;color:{TEXT_MUTED};">
-                            {fmt_ms(row["lat_a"])} / {row["tok_a"]:,}
+                            {fmt_ms(row['lat_a'])} / {int(row['tok_a']):,}
                           </span>
                           <span style="font-size:12px;color:{TEXT_MUTED};">
-                            {fmt_ms(row["lat_b"])} / {row["tok_b"]:,}
+                            {fmt_ms(row['lat_b'])} / {int(row['tok_b']):,}
                           </span>
-                          <span style="font-size:13px;font-weight:600;color:{s_col};">
-                            {sc:.0f}%
-                          </span>
+                          <span style="font-size:12px;color:{lat_d_col};">{lat_d_str}</span>
+                          <span style="font-size:12px;color:{tok_d_col};">{tok_d_str}</span>
+                          <span style="font-size:11px;color:{TEXT_MUTED};">{method}</span>
+                          {sim_bar}
                         </div>
                         """)
 
-        ui.html('<div style="height:16px;"></div>')
-        ui.button("Compute Diff", on_click=compute).style(
-            f"background:{PURPLE};color:#fff;border-radius:7px;padding:9px 20px;font-weight:600;"
-        )
+                # ── Legend ─────────────────────────────────────────────────
+                ui.html(f"""
+                <div style="margin-top:12px;display:flex;gap:18px;flex-wrap:wrap;font-size:11px;color:{TEXT_MUTED};">
+                  <span><span style="color:{GREEN};">■</span> &gt;80% similar</span>
+                  <span><span style="color:{AMBER};">■</span> 50–80% (drift)</span>
+                  <span><span style="color:{RED};">■</span> &lt;50% (diverged)</span>
+                  <span><span style="background:{AMBER}18;padding:0 4px;border-radius:3px;">−B</span> missing in Run B</span>
+                  <span><span style="background:{CYAN}15;padding:0 4px;border-radius:3px;">−A</span> missing in Run A</span>
+                  <span><span style="background:{RED}18;padding:0 4px;border-radius:3px;">↑ div</span> first divergence</span>
+                </div>
+                """)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
