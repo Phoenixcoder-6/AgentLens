@@ -61,13 +61,13 @@ class DiffRow:
     match_status: str  # MATCHED | MISSING_IN_A | MISSING_IN_B
     lat_a: float
     lat_b: float
-    lat_delta: float        # lat_b - lat_a  (positive = B slower)
+    lat_delta: float  # lat_b - lat_a  (positive = B slower)
     tok_a: int
     tok_b: int
-    tok_delta: int          # tok_b - tok_a
-    sim: float              # [0,1] cosine similarity (0 if missing)
+    tok_delta: int  # tok_b - tok_a
+    sim: float  # [0,1] cosine similarity (0 if missing)
     diverged: bool
-    method: str             # "cosine" | "jaccard" | "n/a"
+    method: str  # "cosine" | "jaccard" | "n/a"
 
 
 @dataclass
@@ -76,7 +76,7 @@ class DiffResult:
     run_b: str
     steps: list[dict]  # kept for backward-compat – mirrors DiffRow fields as dicts
     rows: list[DiffRow] = field(default_factory=list)
-    first_divergence: str = "(none)"   # agent name where divergence starts
+    first_divergence: str = "(none)"  # agent name where divergence starts
     overall_similarity: float = 0.0
     matched_count: int = 0
     missing_in_a_count: int = 0
@@ -438,19 +438,21 @@ def compute_diff(run_id_a: str, run_id_b: str) -> DiffResult:
         diff_rows.append(row)
 
         # Build backward-compat legacy dict for existing UI code
-        legacy_steps.append({
-            "agent": agent,
-            "lat_a": lat_a,
-            "lat_b": lat_b,
-            "tok_a": tok_a,
-            "tok_b": tok_b,
-            "sim": sim,
-            "match_status": status,
-            "lat_delta": lat_b - lat_a,
-            "tok_delta": tok_b - tok_a,
-            "diverged": diverged,
-            "method": method,
-        })
+        legacy_steps.append(
+            {
+                "agent": agent,
+                "lat_a": lat_a,
+                "lat_b": lat_b,
+                "tok_a": tok_a,
+                "tok_b": tok_b,
+                "sim": sim,
+                "match_status": status,
+                "lat_delta": lat_b - lat_a,
+                "tok_delta": tok_b - tok_a,
+                "diverged": diverged,
+                "method": method,
+            }
+        )
 
     return DiffResult(
         run_a=run_id_a,
@@ -463,7 +465,6 @@ def compute_diff(run_id_a: str, run_id_b: str) -> DiffResult:
         missing_in_a_count=alignment.missing_in_a_count,
         missing_in_b_count=alignment.missing_in_b_count,
     )
-
 
 
 def total_cost_estimate() -> float:

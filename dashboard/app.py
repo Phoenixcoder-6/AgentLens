@@ -792,7 +792,8 @@ def diff_page():
                 f"background:{CARD};color:{TEXT};min-width:240px;"
             )
             sel_b = ui.select(
-                run_ids, label="Run B (comparison)",
+                run_ids,
+                label="Run B (comparison)",
                 value=run_ids[1] if len(run_ids) > 1 else run_ids[0],
             ).style(f"background:{CARD};color:{TEXT};min-width:240px;")
             ui.button("Compute Diff", on_click=lambda: compute()).style(
@@ -906,16 +907,40 @@ def diff_page():
                                 f'<div style="display:flex;align-items:center;gap:6px;">'
                                 f'<div style="width:{bar_w}px;height:6px;border-radius:3px;background:{s_col};"></div>'
                                 f'<span style="font-size:13px;font-weight:600;color:{s_col};">{sc:.0f}%</span>'
-                                f'</div>'
+                                f"</div>"
                             )
 
                         # Delta display helpers
                         lat_delta = row.get("lat_delta", 0)
                         tok_delta = row.get("tok_delta", 0)
-                        lat_d_col = RED if lat_delta > 500 else AMBER if lat_delta > 0 else GREEN if lat_delta < 0 else TEXT_MUTED
-                        tok_d_col = RED if tok_delta > 200 else AMBER if tok_delta > 0 else GREEN if tok_delta < 0 else TEXT_MUTED
-                        lat_d_str = f'+{fmt_ms(lat_delta)}' if lat_delta > 0 else (f'{fmt_ms(lat_delta)}' if lat_delta < 0 else '—')
-                        tok_d_str = f'+{int(tok_delta):,}' if tok_delta > 0 else (f'{int(tok_delta):,}' if tok_delta < 0 else '—')
+                        lat_d_col = (
+                            RED
+                            if lat_delta > 500
+                            else AMBER
+                            if lat_delta > 0
+                            else GREEN
+                            if lat_delta < 0
+                            else TEXT_MUTED
+                        )
+                        tok_d_col = (
+                            RED
+                            if tok_delta > 200
+                            else AMBER
+                            if tok_delta > 0
+                            else GREEN
+                            if tok_delta < 0
+                            else TEXT_MUTED
+                        )
+                        lat_d_str = (
+                            f"+{fmt_ms(lat_delta)}"
+                            if lat_delta > 0
+                            else (f"{fmt_ms(lat_delta)}" if lat_delta < 0 else "—")
+                        )
+                        tok_d_str = (
+                            f"+{int(tok_delta):,}"
+                            if tok_delta > 0
+                            else (f"{int(tok_delta):,}" if tok_delta < 0 else "—")
+                        )
 
                         method = row.get("method", "—")
 
@@ -926,10 +951,10 @@ def diff_page():
                             {ag}{status_badge}
                           </span>
                           <span style="font-size:12px;color:{TEXT_MUTED};">
-                            {fmt_ms(row['lat_a'])} / {int(row['tok_a']):,}
+                            {fmt_ms(row["lat_a"])} / {int(row["tok_a"]):,}
                           </span>
                           <span style="font-size:12px;color:{TEXT_MUTED};">
-                            {fmt_ms(row['lat_b'])} / {int(row['tok_b']):,}
+                            {fmt_ms(row["lat_b"])} / {int(row["tok_b"]):,}
                           </span>
                           <span style="font-size:12px;color:{lat_d_col};">{lat_d_str}</span>
                           <span style="font-size:12px;color:{tok_d_col};">{tok_d_str}</span>

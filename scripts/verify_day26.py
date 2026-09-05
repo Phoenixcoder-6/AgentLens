@@ -60,7 +60,9 @@ def main() -> int:
         assert hasattr(dr, "matched_count")
         assert hasattr(dr, "missing_in_a_count")
         assert hasattr(dr, "missing_in_b_count")
-        print(f"  {PASS} [1] DiffResult has rows, matched_count, missing_in_a_count, missing_in_b_count fields")
+        print(
+            f"  {PASS} [1] DiffResult has rows, matched_count, missing_in_a_count, missing_in_b_count fields"
+        )
         passed += 1
     except Exception as e:
         print(f"  {FAIL} [1] DiffResult fields: {e}")
@@ -69,10 +71,17 @@ def main() -> int:
     total += 1
     try:
         row = DiffRow(
-            agent="researcher", match_status="MATCHED",
-            lat_a=100.0, lat_b=150.0, lat_delta=50.0,
-            tok_a=500, tok_b=600, tok_delta=100,
-            sim=0.92, diverged=False, method="cosine",
+            agent="researcher",
+            match_status="MATCHED",
+            lat_a=100.0,
+            lat_b=150.0,
+            lat_delta=50.0,
+            tok_a=500,
+            tok_b=600,
+            tok_delta=100,
+            sim=0.92,
+            diverged=False,
+            method="cosine",
         )
         assert row.agent == "researcher"
         assert row.lat_delta == 50.0
@@ -121,7 +130,9 @@ def main() -> int:
             total += 1
             assert isinstance(result, DiffResult)
             assert isinstance(result.rows, list)
-            print(f"  {PASS} [3] compute_diff returns DiffResult with rows (len={len(result.rows)})")
+            print(
+                f"  {PASS} [3] compute_diff returns DiffResult with rows (len={len(result.rows)})"
+            )
             passed += 1
 
             # 4. matched_count == 2 (both agents matched)
@@ -146,7 +157,9 @@ def main() -> int:
             total += 1
             assert result.missing_in_b_count == 0
             assert result.missing_in_a_count == 0
-            print(f"  {PASS} [7] missing_in_a={result.missing_in_a_count}, missing_in_b={result.missing_in_b_count}")
+            print(
+                f"  {PASS} [7] missing_in_a={result.missing_in_a_count}, missing_in_b={result.missing_in_b_count}"
+            )
             passed += 1
 
             # 8. Legacy steps dict has lat_delta and tok_delta
@@ -162,6 +175,7 @@ def main() -> int:
         except Exception as e:
             print(f"  {FAIL} [3-8] compute_diff failed: {e}")
             import traceback
+
             traceback.print_exc()
 
     # ── 9. _load_run_trace returns None for missing run_id ────────────────────
@@ -178,11 +192,13 @@ def main() -> int:
 
     # ── 10. Missing step handling (trace_b missing writer) ────────────────────
     total += 1
-    trace_a2 = _make_trace("run_c",
+    trace_a2 = _make_trace(
+        "run_c",
         _make_step("researcher", 1, "Research output"),
         _make_step("writer", 2, "Write output"),
     )
-    trace_b2 = _make_trace("run_d",
+    trace_b2 = _make_trace(
+        "run_d",
         _make_step("researcher", 1, "Research output"),
     )
 
