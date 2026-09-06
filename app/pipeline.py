@@ -1,5 +1,5 @@
 """
-app/pipeline.py — AgentLens Reference Pipeline
+app/pipeline.py — AgentLens Reference Pipeline 
 ===============================================
 A three-agent LangGraph pipeline used as the reference workflow for
 AgentLens observability and failure attribution.
