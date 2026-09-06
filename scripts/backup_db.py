@@ -88,7 +88,9 @@ def backup_database(
 
 def _prune_old_backups(out_dir: Path, stem: str, keep: int, quiet: bool = False) -> None:
     """Delete oldest backups, keeping only the most recent `keep` files."""
-    pattern = re.compile(rf"^{re.escape(stem)}_\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}-\d{{2}}-\d{{2}}\.db$")
+    pattern = re.compile(
+        rf"^{re.escape(stem)}_\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}-\d{{2}}-\d{{2}}\.db$"
+    )
     backups = sorted(
         [f for f in out_dir.iterdir() if f.is_file() and pattern.match(f.name)],
         key=lambda f: f.name,

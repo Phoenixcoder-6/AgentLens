@@ -156,9 +156,7 @@ class StatisticalDetector:
 
     # ── Internal helpers ───────────────────────────────────────────────────────
 
-    def _build_baselines(
-        self, exclude_run_id: str | None = None
-    ) -> dict[str, AgentBaseline]:
+    def _build_baselines(self, exclude_run_id: str | None = None) -> dict[str, AgentBaseline]:
         """
         Aggregate steps from all runs (optionally excluding one) into
         per-agent latency and token distributions.
@@ -204,9 +202,7 @@ class StatisticalDetector:
 
         return baselines
 
-    def _check_step(
-        self, step: dict[str, Any], baseline: AgentBaseline
-    ) -> list[EvidenceRecord]:
+    def _check_step(self, step: dict[str, Any], baseline: AgentBaseline) -> list[EvidenceRecord]:
         """Check one step dict against a baseline and return any EvidenceRecords."""
         evidence: list[EvidenceRecord] = []
         agent = step.get("agent", "")
@@ -235,7 +231,11 @@ class StatisticalDetector:
                 category=FailureCategory.EXECUTION,
                 description=(
                     f"Latency outlier: {latency:.0f}ms is "
-                    + (f"{display_z:.1f}\u03c3 above mean " if lat_z != float("inf") else "above the constant baseline ")
+                    + (
+                        f"{display_z:.1f}\u03c3 above mean "
+                        if lat_z != float("inf")
+                        else "above the constant baseline "
+                    )
                     + f"({baseline.latency_mean:.0f}ms ± {baseline.latency_std:.0f}ms) "
                     f"for agent '{agent}' across {baseline.n_runs} historical runs"
                 ),
@@ -278,7 +278,11 @@ class StatisticalDetector:
                 category=FailureCategory.EXECUTION,
                 description=(
                     f"Token outlier: {int(tokens)} tokens is "
-                    + (f"{display_tok_z:.1f}\u03c3 above mean " if tok_z != float("inf") else "above the constant baseline ")
+                    + (
+                        f"{display_tok_z:.1f}\u03c3 above mean "
+                        if tok_z != float("inf")
+                        else "above the constant baseline "
+                    )
                     + f"({baseline.token_mean:.0f} \u00b1 {baseline.token_std:.0f}) "
                     f"for agent '{agent}' across {baseline.n_runs} historical runs"
                 ),

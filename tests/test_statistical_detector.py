@@ -90,6 +90,7 @@ class TestStatsHelpers:
         # Sample stddev (n-1 denominator) of [2, 4, 4, 4, 5, 5, 7, 9]
         # Population stddev = 2.0, but sample stddev = sqrt(sum_sq/(n-1)) ≈ 2.138
         import math as _math
+
         values = [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0]
         m = sum(values) / len(values)
         expected = _math.sqrt(sum((x - m) ** 2 for x in values) / (len(values) - 1))
@@ -204,9 +205,7 @@ class TestAnomalyDetection:
         report = detector.analyze_run("run_spike")
 
         assert report.has_anomalies
-        lat_anomalies = [
-            e for e in report.anomalies if "Latency outlier" in e.description
-        ]
+        lat_anomalies = [e for e in report.anomalies if "Latency outlier" in e.description]
         assert len(lat_anomalies) >= 1
         anomaly = lat_anomalies[0]
         assert anomaly.source == EvidenceSource.STATISTICAL_ANOMALY

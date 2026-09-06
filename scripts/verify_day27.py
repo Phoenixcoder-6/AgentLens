@@ -52,7 +52,19 @@ def _seed_run(db, run_id: str, latencies: list, tokens: list, agents: list | Non
     db.insert_run(run_id, "pipeline", TS, "SUCCESS", sum(latencies), sum(tokens), SCHEMA_VER)
     for i, (lat, tok) in enumerate(zip(latencies, tokens, strict=False)):
         agent = _agents[i % len(_agents)]
-        db.insert_step(run_id, i+1, agent, "SUCCESS", lat, tok//3, tok-tok//3*2, tok, "", TS, SCHEMA_VER)
+        db.insert_step(
+            run_id,
+            i + 1,
+            agent,
+            "SUCCESS",
+            lat,
+            tok // 3,
+            tok - tok // 3 * 2,
+            tok,
+            "",
+            TS,
+            SCHEMA_VER,
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -61,9 +73,13 @@ def _seed_run(db, run_id: str, latencies: list, tokens: list, agents: list | Non
 print("\n[1] schema.models — EvidenceSource.STATISTICAL_ANOMALY")
 try:
     from schema.models import EvidenceSource  # type: ignore[import]
+
     has_source = hasattr(EvidenceSource, "STATISTICAL_ANOMALY")
-    check("EvidenceSource.STATISTICAL_ANOMALY exists", has_source,
-          str(EvidenceSource.STATISTICAL_ANOMALY) if has_source else "MISSING")
+    check(
+        "EvidenceSource.STATISTICAL_ANOMALY exists",
+        has_source,
+        str(EvidenceSource.STATISTICAL_ANOMALY) if has_source else "MISSING",
+    )
 except Exception as e:
     check("EvidenceSource.STATISTICAL_ANOMALY exists", False, str(e))
 
@@ -74,10 +90,10 @@ print("\n[2] analyzers.arbiter — STATISTICAL_ANOMALY → P4")
 try:
     from analyzers.arbiter import SOURCE_TO_PRIORITY  # type: ignore[import]
     from schema.models import PriorityLevel  # type: ignore[import]
+
     src = EvidenceSource.STATISTICAL_ANOMALY
     mapped = SOURCE_TO_PRIORITY.get(src)
-    check("STATISTICAL_ANOMALY mapped to P4",
-          mapped == PriorityLevel.P4, f"got {mapped}")
+    check("STATISTICAL_ANOMALY mapped to P4", mapped == PriorityLevel.P4, f"got {mapped}")
 except Exception as e:
     check("STATISTICAL_ANOMALY mapped to P4", False, str(e))
 
@@ -87,6 +103,7 @@ except Exception as e:
 print("\n[3] analyzers.detection — StatisticalDetector importable")
 try:
     from analyzers.detection import StatisticalDetector  # type: ignore[import]
+
     check("StatisticalDetector importable", True, "ok")
 except Exception as e:
     check("StatisticalDetector importable", False, str(e))
@@ -98,6 +115,7 @@ except Exception as e:
 print("\n[4] StatisticalDetector — no baselines below min threshold")
 try:
     from storage.db import DatabaseManager  # type: ignore[import]
+
     with tempfile.TemporaryDirectory() as td:
         db = DatabaseManager(db_path=os.path.join(td, "test.db"))
         db.initialize()
@@ -106,8 +124,11 @@ try:
             _seed_run(db, f"r{i}", [100.0], [500], ["researcher"])
         detector = StatisticalDetector(db)
         baselines = detector.get_baselines()
-        check("No baselines with 3 runs (min=5)", len(baselines) == 0,
-              f"got {len(baselines)} baselines")
+        check(
+            "No baselines with 3 runs (min=5)",
+            len(baselines) == 0,
+            f"got {len(baselines)} baselines",
+        )
 except Exception as e:
     check("No baselines with 3 runs (min=5)", False, str(e))
 
@@ -124,11 +145,16 @@ try:
         detector = StatisticalDetector(db)
         baselines = detector.get_baselines()
         bl = baselines.get("researcher")
-        ok = (bl is not None
-              and abs(bl.latency_mean - 200.0) < 1.0
-              and abs(bl.token_mean - 1000.0) < 1.0)
-        check("Baseline mean=200ms tokens=1000 with 6 runs", ok,
-              f"mean={bl.latency_mean:.1f}" if bl else "no baseline")
+        ok = (
+            bl is not None
+            and abs(bl.latency_mean - 200.0) < 1.0
+            and abs(bl.token_mean - 1000.0) < 1.0
+        )
+        check(
+            "Baseline mean=200ms tokens=1000 with 6 runs",
+            ok,
+            f"mean={bl.latency_mean:.1f}" if bl else "no baseline",
+        )
 except Exception as e:
     check("Correct baseline with 6 runs", False, str(e))
 
@@ -152,8 +178,11 @@ try:
             and len(lat_anomalies) >= 1
             and lat_anomalies[0].source == EvidenceSource.STATISTICAL_ANOMALY
         )
-        check("Latency outlier detected with correct source", ok,
-              f"{len(lat_anomalies)} lat anomaly(s)")
+        check(
+            "Latency outlier detected with correct source",
+            ok,
+            f"{len(lat_anomalies)} lat anomaly(s)",
+        )
 except Exception as e:
     check("Latency outlier flagged", False, str(e))
 
@@ -172,9 +201,13 @@ try:
         detector = StatisticalDetector(db)
         report = detector.analyze_run("run_tok")
         tok_anomalies = [e for e in report.anomalies if "Token" in e.description]
-        ok = len(tok_anomalies) >= 1 and tok_anomalies[0].source == EvidenceSource.STATISTICAL_ANOMALY
-        check("Token outlier detected with correct source", ok,
-              f"{len(tok_anomalies)} tok anomaly(s)")
+        ok = (
+            len(tok_anomalies) >= 1
+            and tok_anomalies[0].source == EvidenceSource.STATISTICAL_ANOMALY
+        )
+        check(
+            "Token outlier detected with correct source", ok, f"{len(tok_anomalies)} tok anomaly(s)"
+        )
 except Exception as e:
     check("Token outlier flagged", False, str(e))
 
@@ -194,8 +227,11 @@ try:
         _seed_run(db, "run_normal", [103.0], [500], ["researcher"])
         detector = StatisticalDetector(db)
         report = detector.analyze_run("run_normal")
-        check("Normal step produces no anomaly", not report.has_anomalies,
-              f"{len(report.anomalies)} anomalies")
+        check(
+            "Normal step produces no anomaly",
+            not report.has_anomalies,
+            f"{len(report.anomalies)} anomalies",
+        )
 except Exception as e:
     check("Normal step produces no anomaly", False, str(e))
 
@@ -205,12 +241,15 @@ except Exception as e:
 print("\n[9] StatisticalDetector — confidence clamped to [0.5, 0.99]")
 try:
     from analyzers.detection.statistical_detector import _confidence_from_z  # type: ignore[import]
+
     c_at_thresh = _confidence_from_z(2.5, 2.5)
     c_very_high = _confidence_from_z(100.0, 2.5)
-    ok = (abs(c_at_thresh - 0.5) < 0.01
-          and c_very_high <= 0.99)
-    check("_confidence_from_z boundary values correct", ok,
-          f"at-threshold={c_at_thresh:.3f}, extreme={c_very_high:.3f}")
+    ok = abs(c_at_thresh - 0.5) < 0.01 and c_very_high <= 0.99
+    check(
+        "_confidence_from_z boundary values correct",
+        ok,
+        f"at-threshold={c_at_thresh:.3f}, extreme={c_very_high:.3f}",
+    )
 except Exception as e:
     check("Confidence boundary check", False, str(e))
 
@@ -220,9 +259,14 @@ except Exception as e:
 print("\n[10] AgentBaseline.active property")
 try:
     from analyzers.detection.statistical_detector import AgentBaseline  # type: ignore[import]
+
     bl = AgentBaseline(
-        agent="test", n_runs=5, latency_mean=100.0, latency_std=10.0,
-        token_mean=500.0, token_std=50.0
+        agent="test",
+        n_runs=5,
+        latency_mean=100.0,
+        latency_std=10.0,
+        token_mean=500.0,
+        token_std=50.0,
     )
     check("AgentBaseline.active=True when n_runs>=1", bl.active is True, f"n_runs={bl.n_runs}")
 except Exception as e:
@@ -234,6 +278,7 @@ except Exception as e:
 print("\n[11] scripts.backup_db — creates valid DB backup")
 try:
     from scripts.backup_db import backup_database  # type: ignore[import]
+
     with tempfile.TemporaryDirectory() as td:
         # Create a minimal source DB
         src_path = os.path.join(td, "source.db")
@@ -251,8 +296,9 @@ try:
         rows = bconn.execute("SELECT id FROM test").fetchall()
         bconn.close()
         ok = dest.exists() and rows == [(1,)]
-        check("backup_database creates valid consistent backup", ok,
-              f"file={dest.name}, rows={rows}")
+        check(
+            "backup_database creates valid consistent backup", ok, f"file={dest.name}, rows={rows}"
+        )
 except Exception as e:
     check("backup_db creates valid DB file", False, str(e))
 
@@ -262,13 +308,17 @@ except Exception as e:
 print("\n[12] Alembic — versions directory contains migration file")
 try:
     versions_dir = ROOT / "alembic" / "versions"
-    migration_files = [
-        f for f in versions_dir.iterdir()
-        if f.suffix == ".py" and not f.name.startswith("__")
-    ] if versions_dir.exists() else []
+    migration_files = (
+        [f for f in versions_dir.iterdir() if f.suffix == ".py" and not f.name.startswith("__")]
+        if versions_dir.exists()
+        else []
+    )
     ok = len(migration_files) >= 1
-    check("At least one Alembic migration file exists", ok,
-          f"found: {[f.name for f in migration_files]}")
+    check(
+        "At least one Alembic migration file exists",
+        ok,
+        f"found: {[f.name for f in migration_files]}",
+    )
 except Exception as e:
     check("Alembic versions directory check", False, str(e))
 

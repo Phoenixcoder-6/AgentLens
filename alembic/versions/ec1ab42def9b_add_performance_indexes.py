@@ -35,21 +35,13 @@ def upgrade() -> None:
     """Add performance indexes to high-frequency query columns."""
     # Use op.execute() — the correct Alembic pattern for raw DDL.
     # op.execute() uses the current migration connection automatically.
-    op.execute(sa.text(
-        "CREATE INDEX IF NOT EXISTS ix_runs_timestamp ON runs (timestamp DESC)"
-    ))
-    op.execute(sa.text(
-        "CREATE INDEX IF NOT EXISTS ix_analysis_run_id ON analysis (run_id)"
-    ))
-    op.execute(sa.text(
-        "CREATE INDEX IF NOT EXISTS ix_llm_cache_key ON llm_cache (cache_key)"
-    ))
-    op.execute(sa.text(
-        "CREATE INDEX IF NOT EXISTS ix_llm_cache_expires_at ON llm_cache (expires_at)"
-    ))
-    op.execute(sa.text(
-        "CREATE INDEX IF NOT EXISTS ix_steps_run_id ON steps (run_id)"
-    ))
+    op.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_runs_timestamp ON runs (timestamp DESC)"))
+    op.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_analysis_run_id ON analysis (run_id)"))
+    op.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_llm_cache_key ON llm_cache (cache_key)"))
+    op.execute(
+        sa.text("CREATE INDEX IF NOT EXISTS ix_llm_cache_expires_at ON llm_cache (expires_at)")
+    )
+    op.execute(sa.text("CREATE INDEX IF NOT EXISTS ix_steps_run_id ON steps (run_id)"))
 
 
 def downgrade() -> None:
