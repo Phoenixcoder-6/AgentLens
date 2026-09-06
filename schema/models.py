@@ -101,6 +101,7 @@ class EvidenceSource(StrEnum):
     WORKFLOW_VALIDATOR = "workflow_validator"
     CONSISTENCY_VALIDATOR = "consistency_validator"
     METRICS_ANALYZER = "metrics_analyzer"
+    STATISTICAL_ANOMALY = "statistical_anomaly"  # Day 27 — P4 stddev outlier detector
     EVIDENCE_EXTRACTION = "evidence_extraction"
     DIFF_ENGINE = "diff_engine"
     GROUND_TRUTH = "ground_truth"

@@ -57,11 +57,18 @@ copy .env.example .env
 # 6. Run the verification smoke test
 python verify_groq.py
 
-# 7. Run the dashboard
+# 7. Apply database migrations (indexes and future schema changes)
+alembic upgrade head
+
+# 8. Run the dashboard
 streamlit run dashboard/app.py
 ```
 
 > **Windows note:** Using conda (not pip venv) is required on Windows to ensure PyTorch's C++ runtime DLLs are correctly installed alongside the package.
+
+> **Database migrations:** AgentLens uses [Alembic](https://alembic.sqlalchemy.org/) for schema migrations.
+> After pulling new code, always run `alembic upgrade head` to apply pending migrations.
+> Migration files live in `alembic/versions/` and are version-controlled alongside the source code.
 
 ## Design Principles
 

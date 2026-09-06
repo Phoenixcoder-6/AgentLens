@@ -70,6 +70,7 @@ SOURCE_TO_PRIORITY: dict[EvidenceSource, PriorityLevel] = {
     EvidenceSource.WORKFLOW_VALIDATOR: PriorityLevel.P3,
     EvidenceSource.CONSISTENCY_VALIDATOR: PriorityLevel.P3,
     EvidenceSource.METRICS_ANALYZER: PriorityLevel.P4,
+    EvidenceSource.STATISTICAL_ANOMALY: PriorityLevel.P4,  # Day 27 — stddev outlier detector
     EvidenceSource.EVIDENCE_EXTRACTION: PriorityLevel.P4,  # supporting evidence only
     EvidenceSource.DIFF_ENGINE: PriorityLevel.P4,  # supporting evidence only
 }

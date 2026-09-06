@@ -7,12 +7,18 @@ Day 22: Three focused analyzers, each implementing the Analyzer interface.
   WorkflowValidator     → Workflow ordering + skipped-step rules
   ConsistencyValidator  → Verification + cross-step claim consistency rules
 
-Import all three from here for convenience:
+Day 27: Statistical outlier detector added.
+
+  StatisticalDetector   → Per-agent latency/token stddev anomaly detection (P4)
+
+Import all from here for convenience:
     from analyzers.detection import RuleEngine, WorkflowValidator, ConsistencyValidator
+    from analyzers.detection import StatisticalDetector
 """
 
 from analyzers.detection.consistency_validator import ConsistencyValidator
 from analyzers.detection.rule_engine import RuleEngine
+from analyzers.detection.statistical_detector import StatisticalDetector
 from analyzers.detection.workflow_validator import WorkflowValidator
 
-__all__ = ["RuleEngine", "WorkflowValidator", "ConsistencyValidator"]
+__all__ = ["RuleEngine", "WorkflowValidator", "ConsistencyValidator", "StatisticalDetector"]
