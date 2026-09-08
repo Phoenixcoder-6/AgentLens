@@ -26,6 +26,7 @@ from storage.db import DatabaseManager
 db = DatabaseManager()
 db.initialize()
 
+
 def create_verifier_spike_run():
     """Case 1: Verifier suffers a 45-second latency spike (P4 Statistical Outlier)."""
     run_id = f"run_weird_verifier_{uuid.uuid4().hex[:4]}"
@@ -40,8 +41,10 @@ def create_verifier_spike_run():
             tokens=TokenUsage(prompt=300, completion=200, total=500),
             handoff=HandoffState(
                 input_state={"topic": "Quantum Encryption Key Distribution"},
-                output_state={"research_findings": "Quantum Key Distribution (QKD) relies on photons. Key protocol: BB84 created by Bennett and Brassard in 1984. 3 sources cited."},
-            )
+                output_state={
+                    "research_findings": "Quantum Key Distribution (QKD) relies on photons. Key protocol: BB84 created by Bennett and Brassard in 1984. 3 sources cited."
+                },
+            ),
         ),
         AgentStep(
             step_id=2,
@@ -50,21 +53,27 @@ def create_verifier_spike_run():
             latency_ms=1800.0,
             tokens=TokenUsage(prompt=400, completion=400, total=800),
             handoff=HandoffState(
-                input_state={"research_findings": "Quantum Key Distribution (QKD) relies on photons. Key protocol: BB84 created by Bennett and Brassard in 1984. 3 sources cited."},
-                output_state={"written_report": "Quantum Key Distribution (QKD) uses photon polarization to establish secure keys. Designed by Bennett and Brassard in 1984 (BB84 protocol). Cited 3 sources."},
-            )
+                input_state={
+                    "research_findings": "Quantum Key Distribution (QKD) relies on photons. Key protocol: BB84 created by Bennett and Brassard in 1984. 3 sources cited."
+                },
+                output_state={
+                    "written_report": "Quantum Key Distribution (QKD) uses photon polarization to establish secure keys. Designed by Bennett and Brassard in 1984 (BB84 protocol). Cited 3 sources."
+                },
+            ),
         ),
         AgentStep(
             step_id=3,
             agent="verifier",
             status=StepStatus.SUCCESS,
             latency_ms=45000.0,  # 45 SECONDS! HUGE ANOMALY!
-            tokens=TokenUsage(prompt=8000, completion=4000, total=12000), # 12K TOKENS!
+            tokens=TokenUsage(prompt=8000, completion=4000, total=12000),  # 12K TOKENS!
             handoff=HandoffState(
-                input_state={"written_report": "Quantum Key Distribution (QKD) uses photon polarization..."},
+                input_state={
+                    "written_report": "Quantum Key Distribution (QKD) uses photon polarization..."
+                },
                 output_state={"verification_result": "APPROVED", "verified": True},
-            )
-        )
+            ),
+        ),
     ]
 
     trace = RunTrace(
@@ -74,11 +83,16 @@ def create_verifier_spike_run():
         status=StepStatus.SUCCESS,
         steps=steps,
         total_latency_ms=48000.0,
-        total_tokens=13300
+        total_tokens=13300,
     )
 
     # Save to DB
-    db.save_run(run_id=run_id, workflow="research_report_pipeline", timestamp=now.isoformat(), status="success")
+    db.save_run(
+        run_id=run_id,
+        workflow="research_report_pipeline",
+        timestamp=now.isoformat(),
+        status="success",
+    )
     for s in steps:
         db.save_step(
             run_id=run_id,
@@ -88,7 +102,7 @@ def create_verifier_spike_run():
             latency_ms=s.latency_ms,
             tokens_prompt=s.tokens.prompt,
             tokens_completion=s.tokens.completion,
-            tokens_total=s.tokens.total
+            tokens_total=s.tokens.total,
         )
 
     # Save trace_json
@@ -113,7 +127,7 @@ def create_researcher_failure_run():
             handoff=HandoffState(
                 input_state={"topic": "Autonomous Mars Rover Navigation"},
                 output_state={"research_findings": "", "source_count": 0, "entity_count": 0},
-            )
+            ),
         ),
         AgentStep(
             step_id=2,
@@ -123,8 +137,10 @@ def create_researcher_failure_run():
             tokens=TokenUsage(prompt=300, completion=500, total=800),
             handoff=HandoffState(
                 input_state={"research_findings": ""},
-                output_state={"written_report": "Mars rovers use cameras and lidar for autonomous navigation across Martian terrain. NASA Curiosity and Perseverance rovers use AutoNav algorithm."},
-            )
+                output_state={
+                    "written_report": "Mars rovers use cameras and lidar for autonomous navigation across Martian terrain. NASA Curiosity and Perseverance rovers use AutoNav algorithm."
+                },
+            ),
         ),
         AgentStep(
             step_id=3,
@@ -135,8 +151,8 @@ def create_researcher_failure_run():
             handoff=HandoffState(
                 input_state={"written_report": "Mars rovers use cameras and lidar..."},
                 output_state={"verification_result": "UNVERIFIED", "verified": False},
-            )
-        )
+            ),
+        ),
     ]
 
     trace = RunTrace(
@@ -146,10 +162,15 @@ def create_researcher_failure_run():
         status=StepStatus.FAILURE,
         steps=steps,
         total_latency_ms=4100.0,
-        total_tokens=1500
+        total_tokens=1500,
     )
 
-    db.save_run(run_id=run_id, workflow="research_report_pipeline", timestamp=now.isoformat(), status="failure")
+    db.save_run(
+        run_id=run_id,
+        workflow="research_report_pipeline",
+        timestamp=now.isoformat(),
+        status="failure",
+    )
     for s in steps:
         db.save_step(
             run_id=run_id,
@@ -159,7 +180,7 @@ def create_researcher_failure_run():
             latency_ms=s.latency_ms,
             tokens_prompt=s.tokens.prompt,
             tokens_completion=s.tokens.completion,
-            tokens_total=s.tokens.total
+            tokens_total=s.tokens.total,
         )
 
     trace_dict = trace.model_dump(mode="json")
@@ -186,6 +207,7 @@ def main():
         print(f"  👉 Primary Cause : {st2.bundle.primary_cause.value}")
         print(f"  👉 Primary Agent : {st2.bundle.primary_agent}")
         print(f"  👉 Priority      : {st2.bundle.priority_level.value}")
+
 
 if __name__ == "__main__":
     main()
