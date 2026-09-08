@@ -9,11 +9,18 @@ Run: python -m dashboard.app
 from __future__ import annotations
 
 import json
+import sys
+from pathlib import Path
 
-from nicegui import app, run, ui
+# Ensure project root is in sys.path
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
-import dashboard.state as state
-from dashboard.theme import (
+from nicegui import app, run, ui  # noqa: E402
+
+import dashboard.state as state  # noqa: E402
+from dashboard.theme import (  # noqa: E402
     AMBER,
     BG,
     BG_SIDEBAR,

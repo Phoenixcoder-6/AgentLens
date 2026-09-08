@@ -65,8 +65,10 @@ if researcher_ev and writer_ev:
     )
     print(f"  Verdict    : {result.verdict}")
     print(f"  Confidence : {result.confidence:.0%}")
-    print(f"  source     : {result.source_diff.researcher_value} → {result.source_diff.writer_value}  ({result.source_diff.signal})")
-    print(f"  entity     : {result.entity_diff.researcher_value} → {result.entity_diff.writer_value}  ({result.entity_diff.signal})")
+    if result.source_diff:
+        print(f"  source     : {result.source_diff.researcher_value} → {result.source_diff.writer_value}  ({result.source_diff.signal})")
+    if result.entity_diff:
+        print(f"  entity     : {result.entity_diff.researcher_value} → {result.entity_diff.writer_value}  ({result.entity_diff.signal})")
     evidence_record = evidence_from_information_loss(result)
 else:
     print("  [SKIP] Could not find researcher/writer steps")

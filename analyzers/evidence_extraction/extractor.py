@@ -173,9 +173,19 @@ def _parse_response(raw_json: str) -> dict:
         ValueError: if the string is empty, not valid JSON, or missing
                     required integer keys.
     """
+    import re
+
     raw_json = raw_json.strip()
     if not raw_json:
         raise ValueError("LLM returned empty response")
+
+    # Strip thinking tags <think>...</think> if present
+    raw_json = re.sub(r"<think>.*?</think>", "", raw_json, flags=re.DOTALL).strip()
+
+    # Extract JSON string between the first '{' and last '}'
+    match = re.search(r"\{.*\}", raw_json, flags=re.DOTALL)
+    if match:
+        raw_json = match.group(0)
 
     parsed = json.loads(raw_json)  # raises json.JSONDecodeError on bad JSON
 
@@ -286,7 +296,6 @@ class EvidenceExtractor:
             model=model_name,
             temperature=self._temperature,
             max_tokens=max_tokens,
-            model_kwargs={"response_format": {"type": "json_object"}},
         )
 
     def _call_llm(self, system: str, user_content: str) -> tuple[str, int]:
