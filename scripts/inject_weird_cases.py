@@ -8,10 +8,12 @@ Generates 2 "weird" test cases to demonstrate AgentLens diagnosing:
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import UTC, datetime
-import json
 
+from analyzers.detection import StatisticalDetector
+from dashboard.state import run_full_analysis
 from schema.models import (
     AgentStep,
     HandoffState,
@@ -20,9 +22,6 @@ from schema.models import (
     TokenUsage,
 )
 from storage.db import DatabaseManager
-from analyzers.detection import StatisticalDetector
-from analyzers.arbiter import Arbiter
-from dashboard.state import run_full_analysis
 
 db = DatabaseManager()
 db.initialize()
@@ -31,7 +30,7 @@ def create_verifier_spike_run():
     """Case 1: Verifier suffers a 45-second latency spike (P4 Statistical Outlier)."""
     run_id = f"run_weird_verifier_{uuid.uuid4().hex[:4]}"
     now = datetime.now(UTC)
-    
+
     steps = [
         AgentStep(
             step_id=1,
@@ -67,7 +66,7 @@ def create_verifier_spike_run():
             )
         )
     ]
-    
+
     trace = RunTrace(
         run_id=run_id,
         workflow="research_report_pipeline",
@@ -77,7 +76,7 @@ def create_verifier_spike_run():
         total_latency_ms=48000.0,
         total_tokens=13300
     )
-    
+
     # Save to DB
     db.save_run(run_id=run_id, workflow="research_report_pipeline", timestamp=now.isoformat(), status="success")
     for s in steps:
@@ -91,7 +90,7 @@ def create_verifier_spike_run():
             tokens_completion=s.tokens.completion,
             tokens_total=s.tokens.total
         )
-    
+
     # Save trace_json
     trace_dict = trace.model_dump(mode="json")
     db.update_run_trace(run_id, json.dumps(trace_dict))
@@ -102,7 +101,7 @@ def create_researcher_failure_run():
     """Case 2: Researcher fails and returns 0 sources/0 findings."""
     run_id = f"run_weird_researcher_{uuid.uuid4().hex[:4]}"
     now = datetime.now(UTC)
-    
+
     steps = [
         AgentStep(
             step_id=1,
@@ -139,7 +138,7 @@ def create_researcher_failure_run():
             )
         )
     ]
-    
+
     trace = RunTrace(
         run_id=run_id,
         workflow="research_report_pipeline",
@@ -149,7 +148,7 @@ def create_researcher_failure_run():
         total_latency_ms=4100.0,
         total_tokens=1500
     )
-    
+
     db.save_run(run_id=run_id, workflow="research_report_pipeline", timestamp=now.isoformat(), status="failure")
     for s in steps:
         db.save_step(
@@ -162,7 +161,7 @@ def create_researcher_failure_run():
             tokens_completion=s.tokens.completion,
             tokens_total=s.tokens.total
         )
-    
+
     trace_dict = trace.model_dump(mode="json")
     db.update_run_trace(run_id, json.dumps(trace_dict))
     return run_id
@@ -170,7 +169,7 @@ def create_researcher_failure_run():
 
 def main():
     print("Generating Weird Test Cases...\n")
-    
+
     run1 = create_verifier_spike_run()
     print(f"[WEIRD CASE 1] Created run: {run1}")
     detector = StatisticalDetector(db)
@@ -178,7 +177,7 @@ def main():
     print(f"  Detector Anomalies: {len(report1.anomalies)}")
     for a in report1.anomalies:
         print(f"  👉 [{a.agent.upper()}] {a.description}")
-        
+
     print()
     run2 = create_researcher_failure_run()
     print(f"[WEIRD CASE 2] Created run: {run2}")
