@@ -13,7 +13,7 @@ from analyzers.detection.information_loss import InformationLossResult, Informat
 from analyzers.evidence_extraction.extractor import EvidenceExtractor, ExtractedEvidence
 from analyzers.explainer import LLMExplainer
 from normalizer.normalizer import Normalizer
-from schema.models import AnalysisBundle, RunTrace
+from schema.models import AnalysisBundle, EvidenceRecord, RunTrace
 from storage.db import DatabaseManager
 
 # ── Module-level analysis cache (process lifetime) ────────────────────────────
@@ -191,14 +191,14 @@ def get_trace_steps(run_id: str) -> list[dict]:
     return data.get("steps", [])
 
 
-def run_full_analysis(run_id: str) -> AnalysisState:
+def run_full_analysis(run_id: str, db: DatabaseManager | None = None) -> AnalysisState:
     """Days 9-12 pipeline. Caches result by run_id."""
     if run_id in _analysis_cache:
         return _analysis_cache[run_id]
 
     state = AnalysisState()
     try:
-        db = get_db()
+        db = db or get_db()
         row = db.get_run(run_id)
         if not row or not row.get("trace_json"):
             state.error = "trace_json not found"
@@ -216,6 +216,7 @@ def run_full_analysis(run_id: str) -> AnalysisState:
         r_ev = state.extracted.get("researcher")
         w_ev = state.extracted.get("writer")
 
+        all_ev: list[EvidenceRecord] = []
         if r_ev and w_ev:
             state.loss_result = InformationLossRule().evaluate(
                 researcher_evidence=r_ev,
@@ -223,10 +224,19 @@ def run_full_analysis(run_id: str) -> AnalysisState:
                 run_id=run_id,
             )
             ev_rec = evidence_from_information_loss(state.loss_result)
-            all_ev = [e for e in [ev_rec] if e is not None]
-            state.bundle = Arbiter().run(run_id=run_id, evidence=all_ev)
-        else:
-            state.error = "Missing researcher or writer step"
+            if ev_rec:
+                all_ev.append(ev_rec)
+
+        # Day 27/28: Include StatisticalDetector anomalies
+        try:
+            from analyzers.detection.statistical_detector import StatisticalDetector
+
+            stat_report = StatisticalDetector(db).analyze_run(run_id)
+            all_ev.extend(stat_report.anomalies)
+        except Exception:
+            pass
+
+        state.bundle = Arbiter().run(run_id=run_id, evidence=all_ev)
 
     except Exception as exc:
         state.error = str(exc)

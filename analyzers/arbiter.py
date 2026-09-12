@@ -266,9 +266,28 @@ def determine_primary_cause(
             verdict_reason=f"P3 Workflow violation: {best.rule_match.rule_id if best.rule_match else 'unknown'} (confidence={best.confidence:.0%})",
         )
 
-    # ── P4: statistical anomaly (reserved — Day 27) ───────────────────────────
-    # p4_evidence = [e for e in evidence if e.source == EvidenceSource.METRICS_ANALYZER]
-    # → Day 27
+    # ── P4: statistical anomaly ───────────────────────────────────────────────
+    p4_evidence = [
+        e
+        for e in evidence
+        if e.source in (EvidenceSource.STATISTICAL_ANOMALY, EvidenceSource.METRICS_ANALYZER)
+    ]
+    if p4_evidence:
+        best = sorted(p4_evidence, key=lambda e: -e.confidence)[0]
+        category = (
+            best.rule_match.category
+            if (best.rule_match and best.rule_match.category)
+            else FailureCategory.PERFORMANCE
+        )
+        return _make_bundle(
+            run_id=run_id,
+            primary_cause=category,
+            priority=PriorityLevel.P4,
+            grounded=True,
+            evidence=evidence,
+            primary_agent=best.agent,
+            verdict_reason=f"P4 Statistical anomaly: {best.description} (confidence={best.confidence:.0%})",
+        )
 
     # ── P5: fallback — evidence present but nothing matched ───────────────────
     return _make_bundle(
@@ -278,7 +297,7 @@ def determine_primary_cause(
         grounded=is_grounded,
         evidence=evidence,
         primary_agent=None,
-        verdict_reason="No P2 rule matched — P5 fallback.",
+        verdict_reason="No rule matched — P5 fallback.",
     )
 
 
