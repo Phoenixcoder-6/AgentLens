@@ -72,6 +72,7 @@ class FailureCategory(StrEnum):
     REASONING = "reasoning"
     WORKFLOW = "workflow"
     VERIFICATION = "verification"
+    PERFORMANCE = "performance"
     UNKNOWN = "unknown"
 
 
