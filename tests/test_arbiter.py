@@ -337,15 +337,18 @@ class TestP5Fallback:
     def test_p5_no_primary_agent(self):
         assert determine_primary_cause([], RUN_ID).primary_agent is None
 
-    def test_p5_on_metrics_only_evidence(self):
-        """Day 12 MVP: METRICS_ANALYZER evidence falls through to P5."""
+    def test_metrics_only_evidence_resolves_to_p4(self):
+        """Day 28: METRICS_ANALYZER evidence resolves to P4 (statistical anomaly tier).
+        Day 12 had this as P5 fallback, but Day 28 expanded the P4 block to include
+        METRICS_ANALYZER so that latency/token spikes get a proper priority verdict.
+        """
         ev = EvidenceRecord(
             source=EvidenceSource.METRICS_ANALYZER,
             description="latency spike",
             confidence=0.9,
         )
         bundle = determine_primary_cause([ev], RUN_ID)
-        assert bundle.priority_level == PriorityLevel.P5
+        assert bundle.priority_level == PriorityLevel.P4
 
     def test_p5_always_returns_bundle(self):
         bundle = determine_primary_cause([], RUN_ID)
