@@ -64,7 +64,9 @@ def main() -> None:
 
     # ── Check 02: LIMITATIONS.md exists and contains long-tail proof ───────────
     limitations_path = _ROOT / "LIMITATIONS.md"
-    has_limitations = limitations_path.exists() and "Long-Tail Proof" in limitations_path.read_text(encoding="utf-8")
+    has_limitations = limitations_path.exists() and "Long-Tail Proof" in limitations_path.read_text(
+        encoding="utf-8"
+    )
     _check(
         2,
         "LIMITATIONS.md exists and contains Long-Tail Evaluation",
@@ -117,7 +119,10 @@ def main() -> None:
 
     # ── Check 06: StatisticalDetector latency outlier detection on writer step ─
     report = detector.analyze_run(run_id)
-    lat_anom = next((a for a in report.anomalies if a.agent == "writer" and "latency" in a.description.lower()), None)
+    lat_anom = next(
+        (a for a in report.anomalies if a.agent == "writer" and "latency" in a.description.lower()),
+        None,
+    )
     _check(
         6,
         "StatisticalDetector detects latency outlier on writer step",
@@ -126,7 +131,10 @@ def main() -> None:
     )
 
     # ── Check 07: StatisticalDetector token explosion detection on writer step
-    tok_anom = next((a for a in report.anomalies if a.agent == "writer" and "token" in a.description.lower()), None)
+    tok_anom = next(
+        (a for a in report.anomalies if a.agent == "writer" and "token" in a.description.lower()),
+        None,
+    )
     _check(
         7,
         "StatisticalDetector detects token explosion on writer step",
@@ -137,10 +145,7 @@ def main() -> None:
     # ── Check 08: Arbiter P4 priority assignment & primary agent attribution ──
     evidence_records = report.anomalies
     bundle = Arbiter().run(run_id=run_id, evidence=evidence_records)
-    correct_arbiter = (
-        bundle.priority_level == PriorityLevel.P4
-        and bundle.primary_agent == "writer"
-    )
+    correct_arbiter = bundle.priority_level == PriorityLevel.P4 and bundle.primary_agent == "writer"
     _check(
         8,
         "Arbiter assigns P4 priority & attributes primary_agent='writer'",
@@ -178,7 +183,9 @@ def main() -> None:
 
     # ── Final Summary ─────────────────────────────────────────────────────────
     print("============================================================")
-    print(f"Day 28 verification: {_CHECKS_PASSED}/{_TOTAL_CHECKS} checks passed ({_CHECKS_PASSED/_TOTAL_CHECKS:.0%})")
+    print(
+        f"Day 28 verification: {_CHECKS_PASSED}/{_TOTAL_CHECKS} checks passed ({_CHECKS_PASSED / _TOTAL_CHECKS:.0%})"
+    )
     if _CHECKS_PASSED == _TOTAL_CHECKS:
         print("🎉 All checks passed — Day 28 complete!")
         print("   Week 5 (Diff Engine & Hardening) is 100% COMPLETE!")

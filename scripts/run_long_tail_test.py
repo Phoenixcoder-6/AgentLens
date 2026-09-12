@@ -43,10 +43,14 @@ def build_historical_baselines(db: DatabaseManager) -> None:
                 agent="researcher",
                 status=StepStatus.SUCCESS,
                 latency_ms=1800.0 + i * 50.0,
-                tokens=TokenUsage(prompt=600 + i * 10, completion=400 + i * 10, total=1000 + i * 20),
+                tokens=TokenUsage(
+                    prompt=600 + i * 10, completion=400 + i * 10, total=1000 + i * 20
+                ),
                 handoff=HandoffState(
                     input_state={"topic": "Quantum Computing 2030"},
-                    output_state={"research_findings": "Qubits, fault-tolerant quantum computing by 2030. 4 sources."},
+                    output_state={
+                        "research_findings": "Qubits, fault-tolerant quantum computing by 2030. 4 sources."
+                    },
                 ),
             ),
             AgentStep(
@@ -55,10 +59,16 @@ def build_historical_baselines(db: DatabaseManager) -> None:
                 agent="writer",
                 status=StepStatus.SUCCESS,
                 latency_ms=2200.0 + i * 50.0,
-                tokens=TokenUsage(prompt=700 + i * 10, completion=500 + i * 10, total=1200 + i * 20),
+                tokens=TokenUsage(
+                    prompt=700 + i * 10, completion=500 + i * 10, total=1200 + i * 20
+                ),
                 handoff=HandoffState(
-                    input_state={"research_findings": "Qubits, fault-tolerant quantum computing by 2030. 4 sources."},
-                    output_state={"written_report": "By 2030, fault-tolerant quantum computing will transform cryptography using qubits. 4 sources cited."},
+                    input_state={
+                        "research_findings": "Qubits, fault-tolerant quantum computing by 2030. 4 sources."
+                    },
+                    output_state={
+                        "written_report": "By 2030, fault-tolerant quantum computing will transform cryptography using qubits. 4 sources cited."
+                    },
                 ),
             ),
             AgentStep(
@@ -112,7 +122,9 @@ def create_long_tail_run(db: DatabaseManager) -> str:
             tokens=TokenUsage(prompt=620, completion=410, total=1030),
             handoff=HandoffState(
                 input_state={"topic": "Fusion Energy Commercialization"},
-                output_state={"research_findings": "ITER reactor in France, Tokamak magnetic confinement, target net energy gain Q > 10. 5 sources cited."},
+                output_state={
+                    "research_findings": "ITER reactor in France, Tokamak magnetic confinement, target net energy gain Q > 10. 5 sources cited."
+                },
             ),
         ),
         AgentStep(
@@ -121,9 +133,13 @@ def create_long_tail_run(db: DatabaseManager) -> str:
             agent="writer",
             status=StepStatus.SUCCESS,
             latency_ms=22500.0,  # 22.5 SECONDS! (5.5x Baseline Mean)
-            tokens=TokenUsage(prompt=2500, completion=7000, total=9500),  # 9,500 TOKENS! (6.0x Baseline Mean)
+            tokens=TokenUsage(
+                prompt=2500, completion=7000, total=9500
+            ),  # 9,500 TOKENS! (6.0x Baseline Mean)
             handoff=HandoffState(
-                input_state={"research_findings": "ITER reactor in France, Tokamak magnetic confinement..."},
+                input_state={
+                    "research_findings": "ITER reactor in France, Tokamak magnetic confinement..."
+                },
                 output_state={
                     "written_report": (
                         "Commercial fusion energy relies on Tokamak magnetic confinement systems such as ITER in France. "
@@ -191,6 +207,7 @@ def main() -> None:
     info_rule = InformationLossRule()
     # Mock evidence matching researcher -> writer (no info loss)
     from analyzers.evidence_extraction.extractor import ExtractedEvidence
+
     res_ev = ExtractedEvidence(source_count=5, entity_count=8)
     wri_ev = ExtractedEvidence(source_count=5, entity_count=8)
     loss_res = info_rule.evaluate(run_id=run_id, researcher_evidence=res_ev, writer_evidence=wri_ev)

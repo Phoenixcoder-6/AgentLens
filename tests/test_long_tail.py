@@ -54,7 +54,9 @@ def db_with_baselines(tmp_path):
                 agent="researcher",
                 status=StepStatus.SUCCESS,
                 latency_ms=1800.0 + i * 50.0,
-                tokens=TokenUsage(prompt=600 + i * 10, completion=400 + i * 10, total=1000 + i * 20),
+                tokens=TokenUsage(
+                    prompt=600 + i * 10, completion=400 + i * 10, total=1000 + i * 20
+                ),
                 handoff=HandoffState(
                     input_state={"topic": "Quantum"},
                     output_state={"research_findings": "Findings text. 4 sources."},
@@ -66,7 +68,9 @@ def db_with_baselines(tmp_path):
                 agent="writer",
                 status=StepStatus.SUCCESS,
                 latency_ms=2000.0 + i * 50.0,
-                tokens=TokenUsage(prompt=700 + i * 10, completion=500 + i * 10, total=1200 + i * 20),
+                tokens=TokenUsage(
+                    prompt=700 + i * 10, completion=500 + i * 10, total=1200 + i * 20
+                ),
                 handoff=HandoffState(
                     input_state={"research_findings": "Findings text. 4 sources."},
                     output_state={"written_report": "Written report text. 4 sources."},
@@ -96,9 +100,10 @@ def test_long_tail_bypasses_deterministic_rules(db_with_baselines):
     res_ev = ExtractedEvidence(source_count=5, entity_count=8)
     wri_ev = ExtractedEvidence(source_count=5, entity_count=8)
 
-
     info_rule = InformationLossRule()
-    res = info_rule.evaluate(run_id="run_long_tail_test", researcher_evidence=res_ev, writer_evidence=wri_ev)
+    res = info_rule.evaluate(
+        run_id="run_long_tail_test", researcher_evidence=res_ev, writer_evidence=wri_ev
+    )
 
     assert res.verdict == "PASS"
     assert not res.has_information_loss
