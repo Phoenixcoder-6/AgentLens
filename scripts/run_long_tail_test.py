@@ -221,7 +221,9 @@ def main() -> None:
     report = detector.analyze_run(run_id)
     print(f"   Statistical Anomalies Detected: {len(report.anomalies)}")
     for e in report.anomalies:
-        print(f"   ⚡ [{e.agent.upper()}] Source={e.source.value} | Confidence={e.confidence:.0%}")
+        agent_label = e.agent.upper() if e.agent else "UNKNOWN"
+        print(f"   ⚡ [{agent_label}] Source={e.source.value} | Confidence={e.confidence:.0%}")
+        # print(f"   ⚡ [{e.agent.upper()}] Source={e.source.value} | Confidence={e.confidence:.0%}")
         print(f"      Description: {e.description}")
 
     # 5. Evaluate Arbiter
