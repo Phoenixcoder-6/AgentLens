@@ -34,6 +34,7 @@ from dashboard.theme import (  # noqa: E402
     PRIORITY_COLOR,
     PURPLE,
     RED,
+    ROW_TINT_P,
     STEP_COLOR,
     TEXT,
     TEXT_DIM,
@@ -44,8 +45,10 @@ from dashboard.theme import (  # noqa: E402
     cause_badge,
     fmt_ms,
     priority_badge,
+    priority_row_bg,
     row_bg,
     rule_badge,
+    stale_badge,
     verdict_badge,
 )
 
@@ -139,88 +142,193 @@ def runs_page():
     nav_bar("runs")
 
     with ui.element("div").classes("al-content"):
-        runs = state.list_runs(limit=50)
+        # ── Filter state ──────────────────────────────────────────────────────
+        agents = ["All agents"] + state.get_unique_agents()
+        filter_agent = {"v": "All agents"}
+        filter_verdict = {"v": "All"}
+        filter_date_from = {"v": ""}
+        filter_date_to = {"v": ""}
+        filter_sort = {"v": "date"}
 
-        # ── Filter bar ────────────────────────────────────────────────────────
+        SORT_OPTIONS = {
+            "Newest first": "date",
+            "Highest priority": "priority",
+            "Slowest runs": "latency",
+        }
+
+        # ── Section header ─────────────────────────────────────────────────────
         with ui.element("div").style(
-            "display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;"
+            "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;"
         ):
             ui.html('<div class="al-section">Run Explorer</div>')
-            # (filters are cosmetic for MVP; full filtering = Day 22)
-            ui.html("""
-            <div style="display:flex;gap:8px;">
-              <select class="al-select"><option>All agents</option><option>researcher</option><option>writer</option><option>verifier</option></select>
-              <select class="al-select"><option>All time</option><option>Last 7 days</option><option>Last 30 days</option></select>
-            </div>
-            """)
 
-        # ── Stat cards ────────────────────────────────────────────────────────
-        analyzed = [r for r in runs if state.get_cached(r.run_id)]
-        warnings = sum(
-            1
-            for r in runs
-            if state.get_cached(r.run_id)
-            and state.get_cached(r.run_id).loss_result
-            and state.get_cached(r.run_id).loss_result.verdict != "PASS"
+        # ── Functional Filter bar ─────────────────────────────────────────────
+        with ui.element("div").style(
+            f"display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;"
+            f"margin-bottom:20px;padding:14px 16px;"
+            f"background:{CARD};border:1px solid {BORDER};border-radius:10px;"
+        ):
+            with ui.element("div").style("display:flex;flex-direction:column;gap:4px;"):
+                ui.html(f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">Agent</span>')
+                agent_select = ui.select(
+                    agents,
+                    value="All agents",
+                ).style(
+                    f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
+                    f"padding:5px 10px;font-size:12px;color:{TEXT};min-width:140px;"
+                ).props("dense outlined")
+
+            with ui.element("div").style("display:flex;flex-direction:column;gap:4px;"):
+                ui.html(f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">Verdict</span>')
+                verdict_select = ui.select(
+                    ["All", "P1", "P2", "P3", "P4", "P5", "UNANALYZED"],
+                    value="All",
+                ).style(
+                    f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
+                    f"padding:5px 10px;font-size:12px;color:{TEXT};min-width:120px;"
+                ).props("dense outlined")
+
+            with ui.element("div").style("display:flex;flex-direction:column;gap:4px;"):
+                ui.html(f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">From</span>')
+                date_from = ui.input(placeholder="YYYY-MM-DD").style(
+                    f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
+                    f"padding:5px 10px;font-size:12px;color:{TEXT};width:130px;"
+                ).props("dense outlined")
+
+            with ui.element("div").style("display:flex;flex-direction:column;gap:4px;"):
+                ui.html(f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">To</span>')
+                date_to = ui.input(placeholder="YYYY-MM-DD").style(
+                    f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
+                    f"padding:5px 10px;font-size:12px;color:{TEXT};width:130px;"
+                ).props("dense outlined")
+
+            with ui.element("div").style("display:flex;flex-direction:column;gap:4px;"):
+                ui.html(f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">Sort</span>')
+                sort_select = ui.select(
+                    list(SORT_OPTIONS.keys()),
+                    value="Newest first",
+                ).style(
+                    f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
+                    f"padding:5px 10px;font-size:12px;color:{TEXT};min-width:140px;"
+                ).props("dense outlined")
+
+            ui.element("div").style("flex:1;")  # spacer
+
+            apply_btn = ui.button("Apply").style(
+                f"background:{PURPLE}22;color:{PURPLE};border:1px solid {PURPLE}44;"
+                f"border-radius:7px;padding:6px 16px;font-size:12px;font-weight:600;"
+            )
+            reset_btn = ui.button("Reset").style(
+                f"background:transparent;color:{TEXT_MUTED};border:1px solid {BORDER};"
+                f"border-radius:7px;padding:6px 14px;font-size:12px;"
+            )
+
+        # ── Stat cards container (live-updatable) ─────────────────────────────
+        stats_container = ui.element("div").style(
+            "display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;"
         )
-        avg_lat = (sum(r.latency_ms for r in runs) / len(runs)) if runs else 0
-        total_tok = sum(r.tokens_total for r in runs)
 
-        with ui.element("div").style("display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;"):
-            for label, val, color, sub in [
-                ("Total Runs", str(len(runs)), PURPLE, f"{len(analyzed)} analyzed"),
-                ("Avg Latency", fmt_ms(avg_lat), CYAN, "per pipeline run"),
-                ("Total Tokens", f"{total_tok:,}", AMBER, f"~${total_tok * 0.000005:.3f} est."),
-                ("Warnings", str(warnings), RED if warnings else GREEN, "from analyzed runs"),
-            ]:
-                ui.html(f"""
-                <div class="al-stat">
-                  <div class="al-stat-label">{label}</div>
-                  <div class="al-stat-value" style="color:{color};">{val}</div>
-                  <div class="al-stat-sub">{sub}</div>
-                </div>
-                """)
+        def _render_stat_cards(runs: list[state.RunRow]):
+            stats_container.clear()
+            agg = state.get_aggregate_stats(runs)
+            avg_lat = agg["avg_latency"]
+            total_tok = agg["total_tokens"]
+            top_agent = agg["top_failing_agent"] or "—"
 
-        # ── Runs table ────────────────────────────────────────────────────────
-        COLS = "2fr 1.8fr 120px 80px"
-        with ui.element("div").classes("al-table"):
-            # Header
-            ui.html(f"""
-            <div class="al-thead" style="grid-template-columns:{COLS};">
-              <span>Run / Topic</span>
-              <span>Primary Cause</span>
-              <span>Verdict</span>
-              <span>Latency</span>
-            </div>
-            """)
+            with stats_container:
+                for label, val, color, sub in [
+                    ("Total Runs", str(agg["total"]), PURPLE, f"{agg['analyzed']} analyzed"),
+                    ("Avg Latency", fmt_ms(avg_lat), CYAN, "per pipeline run"),
+                    ("Total Tokens", f"{total_tok:,}", AMBER, f"~${total_tok * 0.000005:.3f} est."),
+                    ("P1/P2 Issues", str(agg["p1_p2_count"]), RED if agg["p1_p2_count"] else GREEN, f"Top blamed: {top_agent}"),
+                ]:
+                    ui.html(f"""
+                    <div class="al-stat">
+                      <div class="al-stat-label">{label}</div>
+                      <div class="al-stat-value" style="color:{color};">{val}</div>
+                      <div class="al-stat-sub">{sub}</div>
+                    </div>
+                    """)
 
-            if not runs:
-                ui.html(f"""
-                <div style="padding:48px;text-align:center;color:{TEXT_MUTED};">
-                  <div style="font-size:36px;margin-bottom:12px;">🔬</div>
-                  <div>No pipeline runs yet.</div>
-                  <div style="font-size:12px;margin-top:8px;">
-                    Run: <code style="color:{PURPLE};">python app/main.py --topic "..."</code>
-                  </div>
-                </div>
-                """)
+        # ── Runs table container (re-renderable) ──────────────────────────────
+        COLS = "2fr 1.5fr 90px 100px 80px 60px"
+        table_container = ui.element("div")
 
-            for r in runs:
-                _run_row(r, COLS)
+        def _render_table(runs: list[state.RunRow]):
+            table_container.clear()
+            with table_container:
+                with ui.element("div").classes("al-table"):
+                    ui.html(f"""
+                    <div class="al-thead" style="grid-template-columns:{COLS};">
+                      <span>Run / Topic</span>
+                      <span>Primary Cause</span>
+                      <span>Priority</span>
+                      <span>Verdict</span>
+                      <span>Latency</span>
+                      <span title="Stale verdict">⚠</span>
+                    </div>
+                    """)
+
+                    if not runs:
+                        ui.html(f"""
+                        <div style="padding:48px;text-align:center;color:{TEXT_MUTED};">
+                          <div style="font-size:36px;margin-bottom:12px;">🔬</div>
+                          <div>No runs match current filters.</div>
+                          <div style="font-size:12px;margin-top:8px;">
+                            Run: <code style="color:{PURPLE};">python app/main.py --topic "..."</code>
+                          </div>
+                        </div>
+                        """)
+
+                    for r in runs:
+                        _run_row(r, COLS, stats_container, _render_stat_cards)
+
+        # Initial render
+        initial_runs = state.list_runs(limit=50)
+        _render_stat_cards(initial_runs)
+        _render_table(initial_runs)
+
+        # ── Filter / Reset handlers ───────────────────────────────────────────
+        def apply_filters():
+            sort_key = SORT_OPTIONS.get(sort_select.value, "date")
+            runs = state.list_runs(
+                limit=200,
+                agent_filter=agent_select.value if agent_select.value != "All agents" else None,
+                verdict_filter=verdict_select.value if verdict_select.value != "All" else None,
+                date_from=date_from.value or None,
+                date_to=date_to.value or None,
+                sort_by=sort_key,
+            )
+            _render_stat_cards(runs)
+            _render_table(runs)
+
+        def reset_filters():
+            agent_select.set_value("All agents")
+            verdict_select.set_value("All")
+            date_from.set_value("")
+            date_to.set_value("")
+            sort_select.set_value("Newest first")
+            runs = state.list_runs(limit=50)
+            _render_stat_cards(runs)
+            _render_table(runs)
+
+        apply_btn.on("click", lambda _: apply_filters())
+        reset_btn.on("click", lambda _: reset_filters())
 
 
-def _run_row(r: state.RunRow, cols: str):
+def _run_row(
+    r: state.RunRow,
+    cols: str,
+    stats_container=None,
+    render_stat_cards_fn=None,
+):
+
     cached = state.get_cached(r.run_id)
     bundle = cached.bundle if cached else None
     loss = cached.loss_result if cached else None
 
-    # Determine tint from verdict
-    verdict = (
-        loss.verdict
-        if loss
-        else ("PASS" if bundle and bundle.priority_level.value == "P5" else "UNKNOWN")
-    )
-    bg = row_bg(verdict)
+    # Day 29: Use priority-level row tint (P1=crimson … P5=faint green)
+    bg = priority_row_bg(r.verdict_level)
 
     # Primary cause display
     if bundle:
@@ -233,11 +341,20 @@ def _run_row(r: state.RunRow, cols: str):
     else:
         cause_disp = f'<span style="color:{TEXT_DIM};">—</span>'
 
+    # Priority badge column
+    if bundle:
+        priority_disp = priority_badge(bundle.priority_level.value)
+    else:
+        priority_disp = f'<span style="color:{TEXT_DIM};font-size:12px;">—</span>'
+
     verdict_disp = (
-        verdict_badge(verdict, bundle.grounded if bundle else False)
+        verdict_badge(loss.verdict if loss else "UNKNOWN", bundle.grounded if bundle else False)
         if bundle
         else f'<span style="color:{TEXT_DIM};font-size:12px;">Unanalyzed</span>'
     )
+
+    # Stale badge column
+    stale_disp = stale_badge() if r.stale_verdict else ""
 
     # Row container
     row_el = (
@@ -250,15 +367,19 @@ def _run_row(r: state.RunRow, cols: str):
             <div>
               <div style="font-size:13px;font-weight:500;">{r.topic or r.workflow}</div>
               <div class="al-mono" style="font-size:10px;color:{TEXT_MUTED};margin-top:3px;">{r.run_id}</div>
+              <div style="font-size:10px;color:{TEXT_DIM};margin-top:2px;">{r.timestamp}</div>
             </div>
             """)
-        # Keep references so we can update after on-demand analysis
         with ui.element("div").classes("al-tcell"):
             cause_el = ui.html(f'<div style="font-size:13px;line-height:1.5;">{cause_disp}</div>')
+        with ui.element("div").classes("al-tcell"):
+            priority_el = ui.html(priority_disp)
         with ui.element("div").classes("al-tcell"):
             verdict_el = ui.html(verdict_disp)
         with ui.element("div").classes("al-tcell"):
             ui.html(f'<span style="font-size:13px;">{fmt_ms(r.latency_ms)}</span>')
+        with ui.element("div").classes("al-tcell"):
+            stale_el = ui.html(stale_disp)
 
     # Inline expansion panel (hidden by default)
     expansion = ui.element("div").classes("al-expansion")
@@ -268,7 +389,12 @@ def _run_row(r: state.RunRow, cols: str):
         if bundle:
             _inline_verdict_panel(bundle, loss, r.run_id)
         else:
-            _inline_analyze_panel(r.run_id, expansion, row_el, cols, cause_el, verdict_el)
+            _inline_analyze_panel(
+                r.run_id, expansion, row_el, cols, cause_el, verdict_el,
+                priority_el=priority_el,
+                stats_container=stats_container,
+                render_stat_cards_fn=render_stat_cards_fn,
+            )
 
     # Click row → toggle expansion
     row_el.on("click", lambda e, exp=expansion: exp.set_visibility(not exp.visible))
@@ -348,7 +474,15 @@ def _inline_verdict_panel(bundle, loss, run_id: str):
 
 
 def _inline_analyze_panel(
-    run_id: str, expansion, row_el, cols: str, cause_el=None, verdict_el=None
+    run_id: str,
+    expansion,
+    row_el,
+    cols: str,
+    cause_el=None,
+    verdict_el=None,
+    priority_el=None,
+    stats_container=None,
+    render_stat_cards_fn=None,
 ):
     content_area = ui.element("div")
 
@@ -373,11 +507,8 @@ def _inline_analyze_panel(
                 # ── Update the row cells so the table reflects the verdict ──
                 bundle = result.bundle
                 loss = result.loss_result
-                verdict = (
-                    loss.verdict
-                    if loss
-                    else ("PASS" if bundle.priority_level.value == "P5" else "UNKNOWN")
-                )
+                p_level = bundle.priority_level.value
+                verdict = loss.verdict if loss else ("PASS" if p_level == "P5" else "UNKNOWN")
 
                 # Update cause cell
                 if cause_el is not None:
@@ -391,13 +522,22 @@ def _inline_analyze_panel(
                         f'<div style="font-size:13px;line-height:1.5;">{new_cause}</div>'
                     )
 
+                # Update priority badge cell (Day 29)
+                if priority_el is not None:
+                    priority_el.set_content(priority_badge(p_level))
+
                 # Update verdict cell
                 if verdict_el is not None:
                     verdict_el.set_content(verdict_badge(verdict, bundle.grounded))
 
-                # Update row background tint
-                new_bg = row_bg(verdict)
+                # Update row background tint using priority level (Day 29)
+                new_bg = priority_row_bg(p_level)
                 row_el.style(f"background:{new_bg};grid-template-columns:{cols};")
+
+                # Refresh stat cards if callback provided (Day 29)
+                if render_stat_cards_fn is not None:
+                    refreshed_runs = state.list_runs(limit=50)
+                    render_stat_cards_fn(refreshed_runs)
 
     with content_area:
         ui.button("▶  Analyze this run", on_click=analyze).style(
@@ -1330,6 +1470,26 @@ if __name__ in {"__main__", "__mp_main__"}:
     assets_dir = os.path.join(os.path.dirname(__file__), "assets")
     app.add_static_files("/assets", assets_dir)
 
+    # ── Mount REST API (Day 29) ───────────────────────────────────────────────
+    try:
+        from api.router import health_router, router as api_router
+        from fastapi import FastAPI as _FastAPI
+
+        _api_app = _FastAPI(
+            title="AgentLens API",
+            docs_url="/docs",
+            redoc_url="/redoc",
+            openapi_url="/openapi.json",
+        )
+        _api_app.include_router(api_router)
+        app.mount("/api", _api_app)
+
+        _health_app = _FastAPI()
+        _health_app.include_router(health_router)
+        app.mount("/health", _health_app)
+    except Exception as _mount_err:
+        print(f"[Warning] REST API mount failed: {_mount_err}")
+
     ui.run(
         title="AgentLens",
         host="127.0.0.1",
@@ -1340,3 +1500,4 @@ if __name__ in {"__main__", "__mp_main__"}:
         if os.path.exists(os.path.join(assets_dir, "logo.png"))
         else "🔬",
     )
+

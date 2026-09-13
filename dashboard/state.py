@@ -44,6 +44,9 @@ class RunRow:
     latency_ms: float
     tokens_total: int
     step_count: int
+    # Day 29: verdict-level for priority badge + stale detection
+    verdict_level: str = "UNANALYZED"   # "P1"…"P5" | "UNANALYZED"
+    stale_verdict: bool = False          # True when rule engine version changed
 
 
 @dataclass
@@ -138,31 +141,80 @@ def _total_tokens(run_id: str) -> int:
     return sum((s.get("tokens_total") or 0) for s in db.get_steps_for_run(run_id))
 
 
-def list_runs(limit: int = 50) -> list[RunRow]:
+_RULE_ENGINE_VERSION = "v1"  # bump this when rule logic changes to trigger stale badges
+
+
+def list_runs(
+    limit: int = 50,
+    agent_filter: str | None = None,
+    verdict_filter: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    sort_by: str = "date",   # "date" | "priority" | "latency"
+) -> list[RunRow]:
     db = get_db()
     rows = db.list_runs(limit=limit)
-    result = []
+    result: list[RunRow] = []
+
     for r in rows:
         run_id = r["run_id"]
         steps = db.get_steps_for_run(run_id)
+
+        # Agent filter: skip run if no step matches the requested agent
+        if agent_filter and agent_filter != "All agents":
+            agents_in_run = {s.get("agent", "") for s in steps}
+            if agent_filter not in agents_in_run:
+                continue
+
         tokens = sum(s.get("tokens_total", 0) or 0 for s in steps)
         lat = sum(s.get("latency_ms", 0) or 0 for s in steps)
-        # Must call get_run() — list_runs() does not return trace_json
+
         full = db.get_run(run_id)
         topic = _extract_topic(full.get("trace_json", "") if full else "")
-        result.append(
-            RunRow(
-                run_id=run_id,
-                workflow=r.get("workflow", "unknown"),
-                topic=topic or r.get("workflow", "unknown"),
-                timestamp=(r.get("timestamp", "")[:19] or "").replace("T", " "),
-                status=r.get("status", "unknown"),
-                latency_ms=lat,
-                tokens_total=tokens,
-                step_count=len(steps),
-            )
+
+        # Date filters (timestamps are "YYYY-MM-DDTHH:MM:SS…")
+        ts = r.get("timestamp", "")
+        if date_from and ts and ts[:10] < date_from:
+            continue
+        if date_to and ts and ts[:10] > date_to:
+            continue
+
+        # Attach cached verdict level
+        cached = _analysis_cache.get(run_id)
+        if cached and cached.bundle:
+            verdict_level = cached.bundle.priority_level.value
+        else:
+            verdict_level = "UNANALYZED"
+
+        # Verdict filter
+        if verdict_filter and verdict_filter not in ("All", ""):
+            if verdict_level != verdict_filter:
+                continue
+
+        run_row = RunRow(
+            run_id=run_id,
+            workflow=r.get("workflow", "unknown"),
+            topic=topic or r.get("workflow", "unknown"),
+            timestamp=(r.get("timestamp", "")[:19] or "").replace("T", " "),
+            status=r.get("status", "unknown"),
+            latency_ms=lat,
+            tokens_total=tokens,
+            step_count=len(steps),
+            verdict_level=verdict_level,
+            stale_verdict=False,  # reserved for future rule-version tracking
         )
+        result.append(run_row)
+
+    # Sorting
+    _P_ORDER = {"P1": 1, "P2": 2, "P3": 3, "P4": 4, "P5": 5, "UNANALYZED": 9}
+    if sort_by == "priority":
+        result.sort(key=lambda x: _P_ORDER.get(x.verdict_level, 9))
+    elif sort_by == "latency":
+        result.sort(key=lambda x: x.latency_ms, reverse=True)
+    # "date" is already newest-first from DB query
+
     return result
+
 
 
 def get_steps(run_id: str) -> list[StepRow]:
@@ -189,6 +241,55 @@ def get_trace_steps(run_id: str) -> list[dict]:
         return []
     data = json.loads(row["trace_json"])
     return data.get("steps", [])
+
+
+def get_unique_agents() -> list[str]:
+    """Return sorted distinct agent names found in the steps table."""
+    db = get_db()
+    runs = db.list_runs(limit=500)
+    agents: set[str] = set()
+    for r in runs:
+        for s in db.get_steps_for_run(r["run_id"]):
+            ag = s.get("agent", "")
+            if ag:
+                agents.add(ag)
+    return sorted(agents)
+
+
+def get_aggregate_stats(runs: list[RunRow]) -> dict:
+    """Compute stat card values from a list of RunRows.
+
+    Returns:
+        total       — total runs in current filtered view
+        analyzed    — runs with a cached verdict
+        p1_p2_count — high-severity verdicts (P1 or P2)
+        avg_latency — average latency across all runs in ms
+        total_tokens
+        top_failing_agent — agent name most often blamed, or None
+    """
+    total = len(runs)
+    analyzed = sum(1 for r in runs if r.verdict_level != "UNANALYZED")
+    p1_p2_count = sum(1 for r in runs if r.verdict_level in ("P1", "P2"))
+    avg_lat = (sum(r.latency_ms for r in runs) / total) if total else 0.0
+    total_tok = sum(r.tokens_total for r in runs)
+
+    # Count blamed agents from cache
+    agent_blame: dict[str, int] = {}
+    for r in runs:
+        cached = _analysis_cache.get(r.run_id)
+        if cached and cached.bundle and cached.bundle.primary_agent:
+            ag = cached.bundle.primary_agent
+            agent_blame[ag] = agent_blame.get(ag, 0) + 1
+    top_agent = max(agent_blame, key=lambda a: agent_blame[a]) if agent_blame else None
+
+    return {
+        "total": total,
+        "analyzed": analyzed,
+        "p1_p2_count": p1_p2_count,
+        "avg_latency": avg_lat,
+        "total_tokens": total_tok,
+        "top_failing_agent": top_agent,
+    }
 
 
 def run_full_analysis(run_id: str, db: DatabaseManager | None = None) -> AnalysisState:

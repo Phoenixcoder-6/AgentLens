@@ -31,6 +31,16 @@ ROW_TINT = {
     "UNKNOWN": "transparent",
 }
 
+# Day 29: Priority-level row tints (used when verdict_level is P1–P5)
+ROW_TINT_P = {
+    "P1": "rgba(180, 20,  20,  0.22)",   # bright crimson — critical
+    "P2": "rgba(160, 80,  0,   0.18)",   # dark amber — high
+    "P3": "rgba(0,   100, 150, 0.12)",   # deep cyan — medium
+    "P4": "rgba(100, 50,  200, 0.10)",   # muted purple — low
+    "P5": "rgba(20,  120, 40,  0.05)",   # faint green — pass
+    "UNANALYZED": "transparent",
+}
+
 # ── Badge colours ─────────────────────────────────────────────────────────────
 VERDICT_COLOR = {"PASS": GREEN, "WARNING": AMBER, "FAIL": RED, "UNKNOWN": GRAY}
 PRIORITY_COLOR = {"P1": RED, "P2": AMBER, "P3": CYAN, "P4": PURPLE, "P5": GRAY}
@@ -328,6 +338,20 @@ def rule_badge(rule_id: str) -> str:
 
 def row_bg(verdict: str) -> str:
     return ROW_TINT.get(verdict, "transparent")
+
+
+def priority_row_bg(verdict_level: str) -> str:
+    """Map a P-level string (P1…P5 | UNANALYZED) to a background tint."""
+    return ROW_TINT_P.get(verdict_level, "transparent")
+
+
+def stale_badge() -> str:
+    """Amber ⚠ badge shown when a verdict was produced with an older rule version."""
+    return (
+        f'<span class="al-badge" title="Verdict from older rule version — re-analyze to refresh" '
+        f'style="background:{AMBER}1a;color:{AMBER};border:1px solid {AMBER}44;cursor:help;">'
+        f'<span style="font-size:10px;">⚠</span>Stale</span>'
+    )
 
 
 def fmt_ms(ms: float) -> str:
