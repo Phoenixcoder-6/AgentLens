@@ -34,7 +34,6 @@ from dashboard.theme import (  # noqa: E402
     PRIORITY_COLOR,
     PURPLE,
     RED,
-    ROW_TINT_P,
     STEP_COLOR,
     TEXT,
     TEXT_DIM,
@@ -46,7 +45,6 @@ from dashboard.theme import (  # noqa: E402
     fmt_ms,
     priority_badge,
     priority_row_bg,
-    row_bg,
     rule_badge,
     stale_badge,
     verdict_badge,
@@ -144,11 +142,6 @@ def runs_page():
     with ui.element("div").classes("al-content"):
         # ── Filter state ──────────────────────────────────────────────────────
         agents = ["All agents"] + state.get_unique_agents()
-        filter_agent = {"v": "All agents"}
-        filter_verdict = {"v": "All"}
-        filter_date_from = {"v": ""}
-        filter_date_to = {"v": ""}
-        filter_sort = {"v": "date"}
 
         SORT_OPTIONS = {
             "Newest first": "date",
@@ -169,48 +162,78 @@ def runs_page():
             f"background:{CARD};border:1px solid {BORDER};border-radius:10px;"
         ):
             with ui.element("div").style("display:flex;flex-direction:column;gap:4px;"):
-                ui.html(f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">Agent</span>')
-                agent_select = ui.select(
-                    agents,
-                    value="All agents",
-                ).style(
-                    f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
-                    f"padding:5px 10px;font-size:12px;color:{TEXT};min-width:140px;"
-                ).props("dense outlined")
+                ui.html(
+                    f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">Agent</span>'
+                )
+                agent_select = (
+                    ui.select(
+                        agents,
+                        value="All agents",
+                    )
+                    .style(
+                        f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
+                        f"padding:5px 10px;font-size:12px;color:{TEXT};min-width:140px;"
+                    )
+                    .props("dense outlined")
+                )
 
             with ui.element("div").style("display:flex;flex-direction:column;gap:4px;"):
-                ui.html(f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">Verdict</span>')
-                verdict_select = ui.select(
-                    ["All", "P1", "P2", "P3", "P4", "P5", "UNANALYZED"],
-                    value="All",
-                ).style(
-                    f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
-                    f"padding:5px 10px;font-size:12px;color:{TEXT};min-width:120px;"
-                ).props("dense outlined")
+                ui.html(
+                    f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">Verdict</span>'
+                )
+                verdict_select = (
+                    ui.select(
+                        ["All", "P1", "P2", "P3", "P4", "P5", "UNANALYZED"],
+                        value="All",
+                    )
+                    .style(
+                        f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
+                        f"padding:5px 10px;font-size:12px;color:{TEXT};min-width:120px;"
+                    )
+                    .props("dense outlined")
+                )
 
             with ui.element("div").style("display:flex;flex-direction:column;gap:4px;"):
-                ui.html(f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">From</span>')
-                date_from = ui.input(placeholder="YYYY-MM-DD").style(
-                    f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
-                    f"padding:5px 10px;font-size:12px;color:{TEXT};width:130px;"
-                ).props("dense outlined")
+                ui.html(
+                    f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">From</span>'
+                )
+                date_from = (
+                    ui.input(placeholder="YYYY-MM-DD")
+                    .style(
+                        f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
+                        f"padding:5px 10px;font-size:12px;color:{TEXT};width:130px;"
+                    )
+                    .props("dense outlined")
+                )
 
             with ui.element("div").style("display:flex;flex-direction:column;gap:4px;"):
-                ui.html(f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">To</span>')
-                date_to = ui.input(placeholder="YYYY-MM-DD").style(
-                    f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
-                    f"padding:5px 10px;font-size:12px;color:{TEXT};width:130px;"
-                ).props("dense outlined")
+                ui.html(
+                    f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">To</span>'
+                )
+                date_to = (
+                    ui.input(placeholder="YYYY-MM-DD")
+                    .style(
+                        f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
+                        f"padding:5px 10px;font-size:12px;color:{TEXT};width:130px;"
+                    )
+                    .props("dense outlined")
+                )
 
             with ui.element("div").style("display:flex;flex-direction:column;gap:4px;"):
-                ui.html(f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">Sort</span>')
-                sort_select = ui.select(
-                    list(SORT_OPTIONS.keys()),
-                    value="Newest first",
-                ).style(
-                    f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
-                    f"padding:5px 10px;font-size:12px;color:{TEXT};min-width:140px;"
-                ).props("dense outlined")
+                ui.html(
+                    f'<span style="font-size:10px;color:{TEXT_MUTED};font-weight:600;letter-spacing:1px;text-transform:uppercase;">Sort</span>'
+                )
+                sort_select = (
+                    ui.select(
+                        list(SORT_OPTIONS.keys()),
+                        value="Newest first",
+                    )
+                    .style(
+                        f"background:{CARD};border:1px solid {BORDER};border-radius:7px;"
+                        f"padding:5px 10px;font-size:12px;color:{TEXT};min-width:140px;"
+                    )
+                    .props("dense outlined")
+                )
 
             ui.element("div").style("flex:1;")  # spacer
 
@@ -240,7 +263,12 @@ def runs_page():
                     ("Total Runs", str(agg["total"]), PURPLE, f"{agg['analyzed']} analyzed"),
                     ("Avg Latency", fmt_ms(avg_lat), CYAN, "per pipeline run"),
                     ("Total Tokens", f"{total_tok:,}", AMBER, f"~${total_tok * 0.000005:.3f} est."),
-                    ("P1/P2 Issues", str(agg["p1_p2_count"]), RED if agg["p1_p2_count"] else GREEN, f"Top blamed: {top_agent}"),
+                    (
+                        "P1/P2 Issues",
+                        str(agg["p1_p2_count"]),
+                        RED if agg["p1_p2_count"] else GREEN,
+                        f"Top blamed: {top_agent}",
+                    ),
                 ]:
                     ui.html(f"""
                     <div class="al-stat">
@@ -379,7 +407,7 @@ def _run_row(
         with ui.element("div").classes("al-tcell"):
             ui.html(f'<span style="font-size:13px;">{fmt_ms(r.latency_ms)}</span>')
         with ui.element("div").classes("al-tcell"):
-            stale_el = ui.html(stale_disp)
+            ui.html(stale_disp)
 
     # Inline expansion panel (hidden by default)
     expansion = ui.element("div").classes("al-expansion")
@@ -390,7 +418,12 @@ def _run_row(
             _inline_verdict_panel(bundle, loss, r.run_id)
         else:
             _inline_analyze_panel(
-                r.run_id, expansion, row_el, cols, cause_el, verdict_el,
+                r.run_id,
+                expansion,
+                row_el,
+                cols,
+                cause_el,
+                verdict_el,
                 priority_el=priority_el,
                 stats_container=stats_container,
                 render_stat_cards_fn=render_stat_cards_fn,
@@ -1472,8 +1505,10 @@ if __name__ in {"__main__", "__mp_main__"}:
 
     # ── Mount REST API (Day 29) ───────────────────────────────────────────────
     try:
-        from api.router import health_router, router as api_router
         from fastapi import FastAPI as _FastAPI
+
+        from api.router import health_router
+        from api.router import router as api_router
 
         _api_app = _FastAPI(
             title="AgentLens API",
@@ -1500,4 +1535,3 @@ if __name__ in {"__main__", "__mp_main__"}:
         if os.path.exists(os.path.join(assets_dir, "logo.png"))
         else "🔬",
     )
-
