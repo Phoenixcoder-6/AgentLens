@@ -1,4 +1,4 @@
-﻿"""
+"""
 api/main.py — Standalone FastAPI application (Day 29)
 ======================================================
 Run with:  uvicorn api.main:app --reload

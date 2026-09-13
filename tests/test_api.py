@@ -1,4 +1,4 @@
-﻿"""
+"""
 tests/test_api.py — REST API tests (Day 29)
 
 Uses FastAPI's built-in TestClient (Starlette), which supports ASGI apps
@@ -26,6 +26,7 @@ def client():
     from fastapi.testclient import TestClient
 
     from api.main import fastapi_app
+
     with TestClient(fastapi_app, raise_server_exceptions=False) as c:
         yield c
 

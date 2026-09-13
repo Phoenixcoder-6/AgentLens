@@ -33,11 +33,11 @@ ROW_TINT = {
 
 # Day 29: Priority-level row tints (used when verdict_level is P1–P5)
 ROW_TINT_P = {
-    "P1": "rgba(180, 20,  20,  0.22)",   # bright crimson — critical
-    "P2": "rgba(160, 80,  0,   0.18)",   # dark amber — high
-    "P3": "rgba(0,   100, 150, 0.12)",   # deep cyan — medium
-    "P4": "rgba(100, 50,  200, 0.10)",   # muted purple — low
-    "P5": "rgba(20,  120, 40,  0.05)",   # faint green — pass
+    "P1": "rgba(180, 20,  20,  0.22)",  # bright crimson — critical
+    "P2": "rgba(160, 80,  0,   0.18)",  # dark amber — high
+    "P3": "rgba(0,   100, 150, 0.12)",  # deep cyan — medium
+    "P4": "rgba(100, 50,  200, 0.10)",  # muted purple — low
+    "P5": "rgba(20,  120, 40,  0.05)",  # faint green — pass
     "UNANALYZED": "transparent",
 }
 

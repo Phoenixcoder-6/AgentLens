@@ -43,10 +43,12 @@ import dashboard.state as _state  # noqa: E402
 
 # ── Optional auth ─────────────────────────────────────────────────────────────
 
+
 def _configured_api_key() -> str | None:
     """Return the API key from config.yaml, or None if not set."""
     try:
         from config.config_loader import get as cfg_get
+
         return cfg_get("api", "api_key") or None
     except Exception:
         return None
@@ -60,6 +62,7 @@ def verify_api_key(x_agentlens_key: str | None = Header(default=None)) -> None:
 
 
 # ── Response models ───────────────────────────────────────────────────────────
+
 
 class RunSummary(BaseModel):
     run_id: str
@@ -89,7 +92,7 @@ class VerdictResponse(BaseModel):
 
 class AnalysisJobResponse(BaseModel):
     run_id: str
-    status: str          # "complete" | "error"
+    status: str  # "complete" | "error"
     priority_level: str | None
     primary_agent: str | None
     error: str | None
@@ -110,9 +113,9 @@ class MetricsResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    status: str           # "ok" | "degraded"
+    status: str  # "ok" | "degraded"
     uptime_seconds: float
-    db_status: str        # "ok" | "error"
+    db_status: str  # "ok" | "error"
     version: str
 
 

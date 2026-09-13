@@ -1,4 +1,4 @@
-﻿"""
+"""
 scripts/verify_day29.py -- Day 29 automated verification (8 checks)
 
 Run from project root:
@@ -33,9 +33,16 @@ print("\nDay 29 verification -- Run Explorer Polish + REST API Layer\n")
 # -- Check 1: RunRow has verdict_level and stale_verdict ----------------------
 try:
     from dashboard.state import RunRow
+
     rr = RunRow(
-        run_id="x", workflow="w", topic="t", timestamp="ts",
-        status="ok", latency_ms=0, tokens_total=0, step_count=0
+        run_id="x",
+        workflow="w",
+        topic="t",
+        timestamp="ts",
+        status="ok",
+        latency_ms=0,
+        tokens_total=0,
+        step_count=0,
     )
     check("RunRow has verdict_level default UNANALYZED", rr.verdict_level == "UNANALYZED")
     check("RunRow has stale_verdict default False", rr.stale_verdict is False)
@@ -46,9 +53,12 @@ except Exception as e:
 # -- Check 2: list_runs filter params accepted --------------------------------
 try:
     from dashboard.state import list_runs
+
     sig = inspect.signature(list_runs)
     params = set(sig.parameters.keys())
-    has_filters = {"agent_filter", "verdict_filter", "date_from", "date_to", "sort_by"}.issubset(params)
+    has_filters = {"agent_filter", "verdict_filter", "date_from", "date_to", "sort_by"}.issubset(
+        params
+    )
     check("list_runs accepts filter/sort params", has_filters, str(params))
 except Exception as e:
     check("list_runs filter params", False, str(e))
@@ -56,6 +66,7 @@ except Exception as e:
 # -- Check 3: get_unique_agents returns list ----------------------------------
 try:
     from dashboard.state import get_unique_agents
+
     agents = get_unique_agents()
     check("get_unique_agents() returns list", isinstance(agents, list))
 except Exception as e:
@@ -64,6 +75,7 @@ except Exception as e:
 # -- Check 4: get_aggregate_stats works with empty list -----------------------
 try:
     from dashboard.state import RunRow, get_aggregate_stats  # noqa: F811
+
     stats = get_aggregate_stats([])
     keys = {"total", "analyzed", "p1_p2_count", "avg_latency", "total_tokens", "top_failing_agent"}
     check("get_aggregate_stats() returns expected keys", keys.issubset(stats.keys()))
@@ -73,6 +85,7 @@ except Exception as e:
 # -- Check 5: theme has ROW_TINT_P, priority_row_bg, stale_badge --------------
 try:
     from dashboard.theme import ROW_TINT_P, priority_row_bg, stale_badge
+
     check(
         "ROW_TINT_P has P1-P5 and UNANALYZED",
         set(ROW_TINT_P.keys()) >= {"P1", "P2", "P3", "P4", "P5", "UNANALYZED"},
@@ -88,6 +101,7 @@ except Exception as e:
 # -- Check 6: api.router imports cleanly --------------------------------------
 try:
     from api.router import health_router, router
+
     routes = [r.path for r in router.routes]
     check("api.router has /runs endpoint", any("/runs" in r for r in routes), str(routes))
     health_routes = [r.path for r in health_router.routes]
@@ -99,6 +113,7 @@ except Exception as e:
 # -- Check 7: FastAPI app creates successfully --------------------------------
 try:
     from api.main import fastapi_app
+
     check("api.main.fastapi_app is FastAPI", hasattr(fastapi_app, "routes"))
 except Exception as e:
     check("api.main fastapi_app", False, str(e))
@@ -108,6 +123,7 @@ try:
     from fastapi.testclient import TestClient
 
     from api.main import fastapi_app  # noqa: F811
+
     with TestClient(fastapi_app, raise_server_exceptions=False) as tc:
         resp = tc.get("/health")
         body = resp.json()

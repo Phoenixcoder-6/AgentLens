@@ -45,8 +45,8 @@ class RunRow:
     tokens_total: int
     step_count: int
     # Day 29: verdict-level for priority badge + stale detection
-    verdict_level: str = "UNANALYZED"   # "P1"…"P5" | "UNANALYZED"
-    stale_verdict: bool = False          # True when rule engine version changed
+    verdict_level: str = "UNANALYZED"  # "P1"…"P5" | "UNANALYZED"
+    stale_verdict: bool = False  # True when rule engine version changed
 
 
 @dataclass
@@ -150,7 +150,7 @@ def list_runs(
     verdict_filter: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
-    sort_by: str = "date",   # "date" | "priority" | "latency"
+    sort_by: str = "date",  # "date" | "priority" | "latency"
 ) -> list[RunRow]:
     db = get_db()
     rows = db.list_runs(limit=limit)
@@ -214,7 +214,6 @@ def list_runs(
     # "date" is already newest-first from DB query
 
     return result
-
 
 
 def get_steps(run_id: str) -> list[StepRow]:
