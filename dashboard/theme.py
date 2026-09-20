@@ -44,6 +44,20 @@ ROW_TINT_P = {
 # ── Badge colours ─────────────────────────────────────────────────────────────
 VERDICT_COLOR = {"PASS": GREEN, "WARNING": AMBER, "FAIL": RED, "UNKNOWN": GRAY}
 PRIORITY_COLOR = {"P1": RED, "P2": AMBER, "P3": CYAN, "P4": PURPLE, "P5": GRAY}
+
+# Day 30: Handoff diff category colours
+DIFF_COLORS = {
+    "added": GREEN,     # key appeared in output (agent contributed)
+    "modified": AMBER,  # key changed value (agent mutated)
+    "dropped": RED,     # key had content, now empty (information loss)
+    "unchanged": "#4b5563",  # TEXT_DIM — passed through untouched
+}
+DIFF_ICONS = {
+    "added": "+",
+    "modified": "~",
+    "dropped": "-",
+    "unchanged": "=",
+}
 CAUSE_COLOR = {
     "reasoning": AMBER,
     "workflow": RED,
@@ -300,6 +314,103 @@ body, .q-page, .nicegui-content {{
   border: 1px solid {BORDER};
   border-radius: 5px;
 }}
+
+/* ── Day 30: Timeline step cards (vertical layout) ── */
+.al-timeline-step {{
+  background: {CARD};
+  border: 1px solid {BORDER};
+  border-radius: 12px;
+  padding: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+}}
+.al-timeline-step:hover {{ box-shadow: 0 0 0 1px {BORDER}; }}
+.al-timeline-step.blamed {{
+  border-color: {AMBER}88;
+  box-shadow: 0 0 0 2px {AMBER}33;
+}}
+
+.al-step-header {{
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid {BORDER};
+}}
+.al-step-header:hover {{ background: {BG}22; }}
+
+.al-step-body {{
+  padding: 16px 20px;
+}}
+
+/* ── Day 30: State viewer (before / after grid) ── */
+.al-state-grid {{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0;
+}}
+@media (max-width: 700px) {{ .al-state-grid {{ grid-template-columns: 1fr; }} }}
+
+.al-state-card {{
+  background: {BG};
+  border: 1px solid {BORDER};
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  overflow: hidden;
+}}
+.al-state-card-label {{
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: {TEXT_MUTED};
+  margin-bottom: 8px;
+  font-family: 'Inter', sans-serif;
+}}
+.al-state-kv {{
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid {BORDER}44;
+  line-height: 1.4;
+  flex-wrap: wrap;
+}}
+.al-state-key {{
+  color: {CYAN};
+  flex-shrink: 0;
+  min-width: 80px;
+}}
+.al-state-val {{
+  color: {TEXT};
+  word-break: break-all;
+  flex: 1;
+}}
+.al-state-val.changed {{ color: {AMBER}; }}
+.al-state-val.dropped {{ color: {RED}; text-decoration: line-through; }}
+.al-state-val.added  {{ color: {GREEN}; }}
+
+/* ── Day 30: Diff badges ── */
+.al-diff-row {{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  align-items: center;
+}}
+.al-diff-badge {{
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid currentColor;
+  opacity: 0.85;
+}}
 </style>
 """
 
@@ -365,3 +476,46 @@ def bar_html(value: float, max_val: float, color: str, h: int = 5) -> str:
         f'<div class="al-bar-fill" style="width:{pct:.1f}%;background:{color};height:{h}px;"></div>'
         f"</div>"
     )
+
+
+# ── Day 30: Diff / state-viewer helpers ───────────────────────────────────────
+
+
+def diff_key_badge(key: str, category: str) -> str:
+    """
+    Render an inline colored badge for a single diffed state key.
+
+    category: "added" | "modified" | "dropped" | "unchanged"
+    """
+    color = DIFF_COLORS.get(category, "#4b5563")
+    icon = DIFF_ICONS.get(category, "·")
+    return (
+        f'<span class="al-diff-badge" style="color:{color};border-color:{color}44;">'
+        f'{icon} {key}</span>'
+    )
+
+
+def fmt_state_val(val: object, max_len: int = 80) -> str:
+    """
+    Convert a state value to a compact human-readable string.
+    - Lists  → "[N items]" or the single item if N==1
+    - Dicts  → "{N keys}"
+    - Strings → truncated at max_len chars
+    - None   → "—"
+    """
+    import html as _html  # avoid name clash
+
+    if val is None:
+        return "—"
+    if isinstance(val, list):
+        if len(val) == 0:
+            return "[]"
+        if len(val) == 1:
+            return _html.escape(str(val[0])[:max_len])
+        return f"[{len(val)} items]"
+    if isinstance(val, dict):
+        return f"{{{len(val)} keys}}"
+    s = str(val)
+    if len(s) > max_len:
+        s = s[:max_len] + "…"
+    return _html.escape(s)

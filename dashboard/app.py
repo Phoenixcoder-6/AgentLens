@@ -42,7 +42,9 @@ from dashboard.theme import (  # noqa: E402
     badge,
     bar_html,
     cause_badge,
+    diff_key_badge,
     fmt_ms,
+    fmt_state_val,
     priority_badge,
     priority_row_bg,
     rule_badge,
@@ -591,6 +593,7 @@ def trace_page(run_id: str):
     nav_bar("timeline", run_id)
 
     with ui.element("div").classes("al-content"):
+        # ── Breadcrumb ─────────────────────────────────────────────────────────
         ui.html(f"""
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
           <a href="/" style="color:{TEXT_MUTED};text-decoration:none;font-size:12px;">Runs</a>
@@ -601,109 +604,303 @@ def trace_page(run_id: str):
         </div>
         """)
 
+        # Load DB steps (for latency/token bars) and timeline detail (for state)
         steps_db = state.get_steps(run_id)
-        steps_trace = state.get_trace_steps(run_id)
-        trace_by_agent = {s.get("agent", ""): s for s in steps_trace}
+        timeline = state.get_timeline_data(run_id)
+
+        # Build a lookup from agent → DB step row
+        db_step_by_agent = {s.agent: s for s in steps_db}
 
         if not steps_db:
-            ui.html(f'<div style="color:{TEXT_MUTED};">No steps found.</div>')
+            ui.html(f'<div style="color:{TEXT_MUTED};">No steps found for this run.</div>')
             return
 
-        max_lat = max((s.latency_ms for s in steps_db), default=1)
-        _ = max((s.tokens_total for s in steps_db), default=1)  # reserved for token chart
+        max_lat = max((s.latency_ms for s in steps_db), default=1) or 1
 
+        # Blamed agent from analysis cache
+        cached = state.get_cached(run_id)
+        blamed_agent = cached.bundle.primary_agent if (cached and cached.bundle) else None
+
+        blamed_suffix = (
+            f'  <span style="font-size:11px;color:{AMBER};">&#9888; Blamed: {blamed_agent}</span>'
+            if blamed_agent else ""
+        )
         ui.html(
-            '<div class="al-section" style="margin-bottom:16px;">Step-by-step pipeline execution</div>'
+            f'<div class="al-section" style="margin-bottom:16px;">'
+            f'Step-by-step pipeline execution{blamed_suffix}'
+            f'</div>'
         )
 
-        # ── Node flow ─────────────────────────────────────────────────────────
-        with ui.element("div").style(
-            "display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding-bottom:8px;"
-        ):
-            for i, s in enumerate(steps_db):
-                color = STEP_COLOR.get(s.agent, GRAY)
-                t_data = trace_by_agent.get(s.agent, {})
+        # ── Helper: render one state card (input or output) ────────────────────
+        def _render_state_card(
+            label: str,
+            state_dict: dict,
+            diff: dict,
+            side: str,  # "input" or "output"
+        ) -> None:
+            """Render a before or after state card with diff-coloured key/values."""
+            added = set(diff.get("added", []))
+            modified = set(diff.get("modified", []))
+            dropped = set(diff.get("dropped", []))
 
-                node = ui.element("div").style(f"border-color:{color}44;").classes("al-node")
+            ui.html(f'<div class="al-state-card-label">{label}</div>')
+            if not state_dict:
+                ui.html(f'<div style="color:{TEXT_DIM};font-size:11px;font-family:monospace;">—  (no state captured)</div>')
+                return
 
-                json_panel = ui.element("div").style("display:none;margin-top:12px;")
+            for key, val in state_dict.items():
+                disp = fmt_state_val(val)
+                # Determine CSS modifier class
+                if side == "output":
+                    if key in dropped:
+                        css_cls = "dropped"
+                    elif key in added:
+                        css_cls = "added"
+                    elif key in modified:
+                        css_cls = "changed"
+                    else:
+                        css_cls = ""
+                else:
+                    css_cls = ""
 
-                with node:
-                    ui.html(f"""
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                      <span style="font-size:11px;font-weight:600;color:{color};text-transform:uppercase;
-                                   letter-spacing:1px;">{s.agent}</span>
-                      <span class="al-mono" style="font-size:10px;color:{TEXT_MUTED};">#{s.step}</span>
-                    </div>
-                    <div style="font-size:20px;font-weight:700;color:{TEXT};margin-bottom:4px;">
-                      {fmt_ms(s.latency_ms)}
-                    </div>
-                    <div style="font-size:11px;color:{TEXT_MUTED};margin-bottom:10px;">
-                      {s.tokens_total:,} tokens
-                    </div>
-                    """)
-                    ui.html(bar_html(s.latency_ms, max_lat, color))
-                    ui.html(f"""
-                    <div style="font-size:10px;color:{TEXT_MUTED};margin-top:6px;display:flex;gap:8px;">
-                      <span>↑ {s.tokens_prompt:,}</span>
-                      <span>↓ {s.tokens_completion:,}</span>
-                    </div>
-                    <div style="font-size:10px;color:{TEXT_DIM};margin-top:8px;text-align:center;">
-                      click to expand
-                    </div>
-                    """)
+                ui.html(f"""
+                <div class="al-state-kv">
+                  <span class="al-state-key">{key}</span>
+                  <span class="al-state-val {css_cls}">{disp}</span>
+                </div>
+                """)
 
-                    # JSON tabs
-                    with json_panel:
-                        tabs_data = {}
-                        handoff = t_data.get("handoff", {})
-                        if isinstance(handoff, str):
-                            try:
-                                handoff = json.loads(handoff)
-                            except Exception:
-                                handoff = {}
+        # ── Helper: render diff badge row ─────────────────────────────────────
+        def _render_diff_row(diff: dict) -> None:
+            parts = []
+            for category in ("added", "modified", "dropped"):
+                for key in diff.get(category, []):
+                    parts.append(diff_key_badge(key, category))
+            if not parts:
+                parts.append(
+                    f'<span style="font-size:11px;color:{TEXT_DIM};">no state changes detected</span>'
+                )
+            ui.html(f'<div class="al-diff-row">{"".join(parts)}</div>')
 
-                        tabs_data["Input"] = handoff.get("input_state", {})
-                        tabs_data["Filtered"] = handoff.get("filtered_state", {})
-                        tabs_data["Output"] = handoff.get("output_state", {})
+        # ── Helper: render one step card ──────────────────────────────────────
+        def _render_step_card(
+            detail: dict,
+            step_idx: int,
+            is_last: bool,
+        ) -> None:
+            agent = detail["agent"]
+            lat = detail["latency_ms"]
+            tok = detail["tokens_total"]
+            status = detail.get("status", "unknown")
+            blamed = detail.get("blamed", False)
+            diff = detail.get("diff", {})
+            input_state = detail.get("input_state", {})
+            output_state = detail.get("output_state", {})
 
-                        for tab_name, tab_data in tabs_data.items():
+            color = STEP_COLOR.get(agent, GRAY)
+            blamed_cls = " blamed" if blamed else ""
+
+            # Status badge
+            status_upper = status.upper()
+            if status_upper in ("SUCCESS", "PASS"):
+                status_color = GREEN
+                status_icon = "✓"
+            elif status_upper in ("ERROR", "FAILURE", "FAIL"):
+                status_color = RED
+                status_icon = "✗"
+            else:
+                status_color = TEXT_MUTED
+                status_icon = "·"
+
+            # Token bar (relative to max)
+            db_s = db_step_by_agent.get(agent)
+
+            # Blamed badge HTML
+            blamed_badge_html = (
+                f'<span style="font-size:10px;font-weight:700;color:{AMBER};">'
+                f'⚠ BLAMED</span>'
+            ) if blamed else ""
+
+            body = ui.element("div")
+            with body:
+                with ui.element("div").classes(f"al-timeline-step{blamed_cls}"):
+                    # ── Step header (clickable) ───────────────────────────────
+                    hdr = ui.element("div").classes("al-step-header")
+                    body_panel = ui.element("div").classes("al-step-body")
+                    body_panel.set_visibility(False)
+
+                    with hdr:
+                        # Colored left stripe
+                        ui.html(
+                            f'<div style="width:4px;height:36px;background:{color};'
+                            f'border-radius:2px;flex-shrink:0;"></div>'
+                        )
+                        # Agent name + step number
+                        ui.html(f"""
+                        <div style="flex:1;">
+                          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:13px;font-weight:600;color:{color};">
+                              {agent}
+                            </span>
+                            <span class="al-mono" style="font-size:10px;color:{TEXT_DIM};">
+                              #{step_idx + 1}
+                            </span>
+                            {blamed_badge_html}
+                          </div>
+                          <div style="font-size:11px;color:{TEXT_MUTED};margin-top:2px;">
+                            {fmt_ms(lat)} &nbsp;·&nbsp; {tok:,} tokens
+                          </div>
+                        </div>
+                        """)
+                        # Status badge
+                        ui.html(
+                            f'<span style="font-size:12px;color:{status_color};">'
+                            f'{status_icon} {status_upper}</span>'
+                        )
+                        # Diff summary (compact, just counts)
+                        n_added = len(diff.get("added", []))
+                        n_mod = len(diff.get("modified", []))
+                        n_drop = len(diff.get("dropped", []))
+                        if n_added + n_mod + n_drop > 0:
+                            diff_summary = " ".join([
+                                f'<span style="color:{GREEN};font-size:10px;">+{n_added}</span>' if n_added else "",
+                                f'<span style="color:{AMBER};font-size:10px;">~{n_mod}</span>' if n_mod else "",
+                                f'<span style="color:{RED};font-size:10px;">-{n_drop}</span>' if n_drop else "",
+                            ])
                             ui.html(
-                                f'<div style="font-size:10px;color:{TEXT_MUTED};margin:8px 0 4px;font-weight:600;">{tab_name}</div>'
+                                f'<div style="display:flex;gap:6px;align-items:center;">{diff_summary}</div>'
                             )
-                            content = json.dumps(tab_data, indent=2, default=str)[:800]
-                            ui.html(f'<div class="al-json">{content}</div>')
-
-                def make_toggle(n=node, jp=json_panel):
-                    def toggle():
-                        ui.run_javascript(
-                            f"var jp = document.getElementById('{jp.id}'); "
-                            f"jp.style.display = jp.style.display === 'none' ? 'block' : 'none';"
+                        # Expand indicator
+                        ui.html(
+                            f'<span style="color:{TEXT_DIM};font-size:14px;">▾</span>'
                         )
 
-                    n.on("click", toggle)
+                    # ── Expand body ───────────────────────────────────────────
+                    with body_panel:
+                        # Latency bar
+                        ui.html(
+                            f'<div style="font-size:10px;color:{TEXT_MUTED};margin-bottom:6px;">'
+                            f'Latency relative to slowest step</div>'
+                        )
+                        ui.html(bar_html(lat, max_lat, color, h=6))
 
-                make_toggle()
+                        if db_s:
+                            ui.html(f"""
+                            <div style="font-size:11px;color:{TEXT_MUTED};margin:6px 0 14px;
+                                        display:flex;gap:16px;font-family:monospace;">
+                              <span>↑ prompt: {db_s.tokens_prompt:,}</span>
+                              <span>↓ completion: {db_s.tokens_completion:,}</span>
+                            </div>
+                            """)
 
-                if i < len(steps_db) - 1:
-                    ui.html(
-                        f'<div style="font-size:22px;color:{TEXT_DIM};padding:20px 8px;flex-shrink:0;">→</div>'
+                        # ── Before/After state viewer ─────────────────────────
+                        if input_state or output_state:
+                            ui.html(
+                                f'<div style="font-size:11px;font-weight:600;color:{TEXT_MUTED};'
+                                f'text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">'
+                                f'Workflow State</div>'
+                            )
+                            with ui.element("div").classes("al-state-grid"):
+                                with ui.element("div").classes("al-state-card"):
+                                    _render_state_card(
+                                        "Input (before)", input_state, diff, "input"
+                                    )
+                                with ui.element("div").classes("al-state-card"):
+                                    _render_state_card(
+                                        "Output (after)", output_state, diff, "output"
+                                    )
+
+                            # Diff badges row
+                            ui.html(
+                                f'<div style="font-size:11px;font-weight:600;color:{TEXT_MUTED};'
+                                f'text-transform:uppercase;letter-spacing:1px;margin:12px 0 4px;">'
+                                f'State changes</div>'
+                            )
+                            _render_diff_row(diff)
+                        else:
+                            ui.html(
+                                f'<div style="color:{TEXT_DIM};font-size:12px;margin-top:8px;">'
+                                f'No handoff state captured for this step.</div>'
+                            )
+
+                        # ── Raw JSON toggle ───────────────────────────────────
+                        raw_panel = ui.element("div").style("display:none;margin-top:14px;")
+                        raw_btn = ui.button("Show raw JSON").style(
+                            f"font-size:11px;color:{TEXT_MUTED};"
+                            f"border:1px solid {BORDER};border-radius:5px;"
+                            f"padding:3px 10px;background:transparent;margin-top:14px;"
+                        )
+
+                        with raw_panel:
+                            raw_data = {
+                                "input_state": input_state,
+                                "output_state": output_state,
+                                "diff": diff,
+                            }
+                            content = json.dumps(raw_data, indent=2, default=str)[:2000]
+                            ui.html(f'<div class="al-json" style="margin-top:8px;">{content}</div>')
+
+                        def _toggle_raw(btn=raw_btn, panel=raw_panel):
+                            ui.run_javascript(
+                                f"var p=document.getElementById('{panel.id}');"
+                                f"p.style.display=p.style.display==='none'?'block':'none';"
+                            )
+
+                        raw_btn.on("click", lambda _: _toggle_raw())
+
+                    # Toggle on header click
+                    hdr.on(
+                        "click",
+                        lambda _, bp=body_panel: bp.set_visibility(not bp.visible),
                     )
 
-        # ── Summary card ──────────────────────────────────────────────────────
-        ui.html('<div class="al-section" style="margin:24px 0 12px;">Run Summary</div>')
+            # Connector arrow between steps
+            if not is_last:
+                ui.html(
+                    f'<div style="text-align:center;padding:8px 0;color:{TEXT_DIM};font-size:22px;">↓</div>'
+                )
+
+        # ── Render all step cards ─────────────────────────────────────────────
+        # Prefer timeline detail; fall back to DB steps with empty state
+        if timeline:
+            for i, detail in enumerate(timeline):
+                _render_step_card(detail, i, i == len(timeline) - 1)
+        else:
+            # Graceful degradation: no trace_json, show DB-only cards
+            for i, s in enumerate(steps_db):
+                fallback = {
+                    "agent": s.agent,
+                    "step": s.step,
+                    "latency_ms": s.latency_ms,
+                    "tokens_total": s.tokens_total,
+                    "status": s.status,
+                    "input_state": {},
+                    "filtered_state": {},
+                    "output_state": {},
+                    "diff": {"added": [], "modified": [], "dropped": [], "unchanged": []},
+                    "blamed": (s.agent == blamed_agent),
+                }
+                _render_step_card(fallback, i, i == len(steps_db) - 1)
+
+        # ── Run summary card ──────────────────────────────────────────────────
+        ui.html('<div class="al-section" style="margin:28px 0 12px;">Run Summary</div>')
         total_lat = sum(s.latency_ms for s in steps_db)
         total_tok = sum(s.tokens_total for s in steps_db)
+
+        info_cards = [
+            ("Total Latency", fmt_ms(total_lat), CYAN),
+            ("Total Tokens", f"{total_tok:,}", AMBER),
+            ("Step Count", str(len(steps_db)), PURPLE),
+            ("Est. Cost", f"${total_tok * 0.000005:.4f}", GREEN),
+        ]
+        if blamed_agent:
+            info_cards.append(("Blamed Agent", blamed_agent, RED))
+
         with ui.element("div").style(
             f"background:{CARD};border:1px solid {BORDER};border-radius:10px;"
             f"padding:16px 20px;display:flex;gap:32px;flex-wrap:wrap;"
         ):
-            for label, val, color in [
-                ("Total Latency", fmt_ms(total_lat), CYAN),
-                ("Total Tokens", f"{total_tok:,}", AMBER),
-                ("Step Count", str(len(steps_db)), PURPLE),
-                ("Est. Cost", f"${total_tok * 0.000005:.4f}", GREEN),
-            ]:
+            for label, val, color in info_cards:
                 ui.html(f"""
                 <div>
                   <div class="al-section" style="margin-bottom:5px;">{label}</div>
@@ -712,9 +909,11 @@ def trace_page(run_id: str):
                 """)
 
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Page 3 — Evidence View  /run/{run_id}/evidence
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 
 @ui.page("/run/{run_id}/evidence")

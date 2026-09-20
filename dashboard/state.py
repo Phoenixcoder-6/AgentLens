@@ -242,6 +242,117 @@ def get_trace_steps(run_id: str) -> list[dict]:
     return data.get("steps", [])
 
 
+def _parse_handoff(handoff_raw: dict | str | None) -> dict:
+    """Normalise the handoff field — may be a nested dict or a JSON string."""
+    if handoff_raw is None:
+        return {}
+    if isinstance(handoff_raw, str):
+        try:
+            handoff_raw = json.loads(handoff_raw)
+        except Exception:
+            return {}
+    return handoff_raw if isinstance(handoff_raw, dict) else {}
+
+
+def _extract_diff_from_states(
+    input_state: dict, output_state: dict
+) -> dict[str, list[str]]:
+    """
+    Re-run the HandoffCapture four-category diff logic on two state dicts.
+    Returns {"added": [...], "modified": [...], "dropped": [...], "unchanged": [...]}.
+    """
+    from capture.handoff import HandoffCapture  # lazy import to avoid circular dep
+
+    diff = HandoffCapture._compute_diff(input_state, output_state)
+    return {
+        "added": diff.added_keys,
+        "modified": diff.modified_keys,
+        "dropped": diff.dropped_keys,
+        "unchanged": diff.unchanged_keys,
+    }
+
+
+def get_step_handoff_detail(run_id: str, agent: str) -> dict:
+    """
+    Return a rich detail dict for a single agent step.
+
+    Includes structured input_state / filtered_state / output_state and the
+    four-category handoff diff.  Returns an empty dict if the run or agent
+    cannot be found.
+
+    Schema
+    ------
+    {
+        "agent": str,
+        "step": int,
+        "latency_ms": float,
+        "tokens_total": int,
+        "status": str,
+        "input_state": dict,
+        "filtered_state": dict,
+        "output_state": dict,
+        "diff": {"added": [...], "modified": [...], "dropped": [...], "unchanged": [...]},
+        "blamed": bool,
+    }
+    """
+    trace_steps = get_trace_steps(run_id)
+    step_dict = next((s for s in trace_steps if s.get("agent") == agent), None)
+    if not step_dict:
+        return {}
+
+    handoff = _parse_handoff(step_dict.get("handoff"))
+    input_state: dict = handoff.get("input_state") or {}
+    filtered_state: dict = handoff.get("filtered_state") or {}
+    output_state: dict = handoff.get("output_state") or {}
+
+    # If output_state is absent, reconstruct from input + filtered (LangGraph merge)
+    if not output_state and input_state and filtered_state:
+        output_state = {**input_state, **filtered_state}
+
+    diff = _extract_diff_from_states(input_state, output_state)
+
+    # Blamed agent from analysis cache
+    cached = _analysis_cache.get(run_id)
+    blamed_agent = cached.bundle.primary_agent if (cached and cached.bundle) else None
+
+    return {
+        "agent": agent,
+        "step": step_dict.get("step", 0),
+        "latency_ms": step_dict.get("latency_ms", 0.0) or 0.0,
+        "tokens_total": step_dict.get("tokens_total", 0) or 0,
+        "status": step_dict.get("status", "unknown"),
+        "input_state": input_state,
+        "filtered_state": filtered_state,
+        "output_state": output_state,
+        "diff": diff,
+        "blamed": (agent == blamed_agent),
+    }
+
+
+def get_timeline_data(run_id: str) -> list[dict]:
+    """
+    Return an ordered list of step detail dicts for every agent in the run.
+
+    Each element is the result of get_step_handoff_detail() for that agent.
+    Steps are ordered by the ``step`` field in trace_json.
+    """
+    trace_steps = get_trace_steps(run_id)
+    if not trace_steps:
+        return []
+
+    # Order by step index, dedupe on agent name (keep first occurrence)
+    seen: set[str] = set()
+    ordered: list[dict] = []
+    for s in sorted(trace_steps, key=lambda x: x.get("step", 0)):
+        agent = s.get("agent", "")
+        if agent and agent not in seen:
+            seen.add(agent)
+            detail = get_step_handoff_detail(run_id, agent)
+            if detail:
+                ordered.append(detail)
+    return ordered
+
+
 def get_unique_agents() -> list[str]:
     """Return sorted distinct agent names found in the steps table."""
     db = get_db()
@@ -289,6 +400,11 @@ def get_aggregate_stats(runs: list[RunRow]) -> dict:
         "total_tokens": total_tok,
         "top_failing_agent": top_agent,
     }
+
+
+def get_cached(run_id: str) -> AnalysisState | None:
+    """Return the cached AnalysisState for a run, or None if not yet analyzed."""
+    return _analysis_cache.get(run_id)
 
 
 def run_full_analysis(run_id: str, db: DatabaseManager | None = None) -> AnalysisState:
@@ -414,10 +530,6 @@ def explain_agent_evidence(agent, evidence, bundle):
         return str(resp.content)
     except Exception as exc:
         return f"LLM error: {exc}"
-
-
-def get_cached(run_id: str) -> AnalysisState | None:
-    return _analysis_cache.get(run_id)
 
 
 def get_metrics_data() -> dict:
