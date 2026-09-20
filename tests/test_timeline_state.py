@@ -1,4 +1,4 @@
-﻿"""
+"""
 tests/test_timeline_state.py  —  Day 30 unit tests
 
 Tests the two new state helpers:
@@ -22,6 +22,7 @@ if str(_ROOT) not in sys.path:
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 def _make_trace_json(steps: list[dict]) -> str:
     """Build a minimal trace_json string with given steps."""
     return json.dumps({"steps": steps, "workflow": "test", "run_id": "r1"})
@@ -39,6 +40,7 @@ def _make_step(agent: str, step: int, handoff: dict | None = None) -> dict:
 
 
 # ── Test 1: graceful empty return for unknown run ─────────────────────────────
+
 
 class TestGetStepHandoffDetailEmpty:
     def test_returns_empty_dict_for_missing_run(self):
@@ -63,6 +65,7 @@ class TestGetStepHandoffDetailEmpty:
 
 # ── Test 2: get_timeline_data returns [] for unknown run ──────────────────────
 
+
 class TestGetTimelineDataEmpty:
     def test_empty_for_no_trace(self):
         from dashboard.state import get_timeline_data
@@ -75,28 +78,37 @@ class TestGetTimelineDataEmpty:
 
 # ── Test 3: diff correctly identifies added keys ──────────────────────────────
 
+
 class TestDiffExtractionAdded:
     def test_added_keys_detected(self):
         from dashboard.state import get_step_handoff_detail
 
         handoff = {
             "input_state": {"topic": "AI safety", "sources": []},
-            "output_state": {"topic": "AI safety", "sources": ["arxiv:123", "nat:456"], "summary": "..."},
+            "output_state": {
+                "topic": "AI safety",
+                "sources": ["arxiv:123", "nat:456"],
+                "summary": "...",
+            },
         }
         steps = [_make_step("researcher", 1, handoff=handoff)]
 
-        with patch("dashboard.state.get_trace_steps", return_value=steps), \
-             patch("dashboard.state._analysis_cache", {}):
+        with (
+            patch("dashboard.state.get_trace_steps", return_value=steps),
+            patch("dashboard.state._analysis_cache", {}),
+        ):
             result = get_step_handoff_detail("run-1", "researcher")
 
         assert "summary" in result["diff"]["added"], "summary should be added"
-        assert result["diff"]["added"] or result["diff"]["modified"], \
+        assert result["diff"]["added"] or result["diff"]["modified"], (
             "sources went from [] to populated, should be in added or modified"
+        )
         assert result["agent"] == "researcher"
         assert result["step"] == 1
 
 
 # ── Test 4: diff correctly identifies dropped keys ────────────────────────────
+
 
 class TestDiffExtractionDropped:
     def test_dropped_keys_detected(self):
@@ -108,15 +120,19 @@ class TestDiffExtractionDropped:
         }
         steps = [_make_step("writer", 2, handoff=handoff)]
 
-        with patch("dashboard.state.get_trace_steps", return_value=steps), \
-             patch("dashboard.state._analysis_cache", {}):
+        with (
+            patch("dashboard.state.get_trace_steps", return_value=steps),
+            patch("dashboard.state._analysis_cache", {}),
+        ):
             result = get_step_handoff_detail("run-2", "writer")
 
-        assert "entities" in result["diff"]["dropped"], \
+        assert "entities" in result["diff"]["dropped"], (
             "entities went from populated to empty — should be dropped"
+        )
 
 
 # ── Test 5: blamed flag only on Arbiter primary_agent ─────────────────────────
+
 
 class TestBlamedFlag:
     def test_blamed_true_for_primary_agent(self):
@@ -130,8 +146,10 @@ class TestBlamedFlag:
         mock_state = MagicMock()
         mock_state.bundle = mock_bundle
 
-        with patch("dashboard.state.get_trace_steps", return_value=steps), \
-             patch("dashboard.state._analysis_cache", {"run-3": mock_state}):
+        with (
+            patch("dashboard.state.get_trace_steps", return_value=steps),
+            patch("dashboard.state._analysis_cache", {"run-3": mock_state}),
+        ):
             researcher_detail = get_step_handoff_detail("run-3", "researcher")
             writer_detail = get_step_handoff_detail("run-3", "writer")
 

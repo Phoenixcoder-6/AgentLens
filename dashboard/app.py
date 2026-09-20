@@ -623,12 +623,13 @@ def trace_page(run_id: str):
 
         blamed_suffix = (
             f'  <span style="font-size:11px;color:{AMBER};">&#9888; Blamed: {blamed_agent}</span>'
-            if blamed_agent else ""
+            if blamed_agent
+            else ""
         )
         ui.html(
             f'<div class="al-section" style="margin-bottom:16px;">'
-            f'Step-by-step pipeline execution{blamed_suffix}'
-            f'</div>'
+            f"Step-by-step pipeline execution{blamed_suffix}"
+            f"</div>"
         )
 
         # ── Helper: render one state card (input or output) ────────────────────
@@ -645,7 +646,9 @@ def trace_page(run_id: str):
 
             ui.html(f'<div class="al-state-card-label">{label}</div>')
             if not state_dict:
-                ui.html(f'<div style="color:{TEXT_DIM};font-size:11px;font-family:monospace;">—  (no state captured)</div>')
+                ui.html(
+                    f'<div style="color:{TEXT_DIM};font-size:11px;font-family:monospace;">—  (no state captured)</div>'
+                )
                 return
 
             for key, val in state_dict.items():
@@ -717,9 +720,10 @@ def trace_page(run_id: str):
 
             # Blamed badge HTML
             blamed_badge_html = (
-                f'<span style="font-size:10px;font-weight:700;color:{AMBER};">'
-                f'⚠ BLAMED</span>'
-            ) if blamed else ""
+                (f'<span style="font-size:10px;font-weight:700;color:{AMBER};">⚠ BLAMED</span>')
+                if blamed
+                else ""
+            )
 
             body = ui.element("div")
             with body:
@@ -755,32 +759,38 @@ def trace_page(run_id: str):
                         # Status badge
                         ui.html(
                             f'<span style="font-size:12px;color:{status_color};">'
-                            f'{status_icon} {status_upper}</span>'
+                            f"{status_icon} {status_upper}</span>"
                         )
                         # Diff summary (compact, just counts)
                         n_added = len(diff.get("added", []))
                         n_mod = len(diff.get("modified", []))
                         n_drop = len(diff.get("dropped", []))
                         if n_added + n_mod + n_drop > 0:
-                            diff_summary = " ".join([
-                                f'<span style="color:{GREEN};font-size:10px;">+{n_added}</span>' if n_added else "",
-                                f'<span style="color:{AMBER};font-size:10px;">~{n_mod}</span>' if n_mod else "",
-                                f'<span style="color:{RED};font-size:10px;">-{n_drop}</span>' if n_drop else "",
-                            ])
+                            diff_summary = " ".join(
+                                [
+                                    f'<span style="color:{GREEN};font-size:10px;">+{n_added}</span>'
+                                    if n_added
+                                    else "",
+                                    f'<span style="color:{AMBER};font-size:10px;">~{n_mod}</span>'
+                                    if n_mod
+                                    else "",
+                                    f'<span style="color:{RED};font-size:10px;">-{n_drop}</span>'
+                                    if n_drop
+                                    else "",
+                                ]
+                            )
                             ui.html(
                                 f'<div style="display:flex;gap:6px;align-items:center;">{diff_summary}</div>'
                             )
                         # Expand indicator
-                        ui.html(
-                            f'<span style="color:{TEXT_DIM};font-size:14px;">▾</span>'
-                        )
+                        ui.html(f'<span style="color:{TEXT_DIM};font-size:14px;">▾</span>')
 
                     # ── Expand body ───────────────────────────────────────────
                     with body_panel:
                         # Latency bar
                         ui.html(
                             f'<div style="font-size:10px;color:{TEXT_MUTED};margin-bottom:6px;">'
-                            f'Latency relative to slowest step</div>'
+                            f"Latency relative to slowest step</div>"
                         )
                         ui.html(bar_html(lat, max_lat, color, h=6))
 
@@ -798,13 +808,11 @@ def trace_page(run_id: str):
                             ui.html(
                                 f'<div style="font-size:11px;font-weight:600;color:{TEXT_MUTED};'
                                 f'text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">'
-                                f'Workflow State</div>'
+                                f"Workflow State</div>"
                             )
                             with ui.element("div").classes("al-state-grid"):
                                 with ui.element("div").classes("al-state-card"):
-                                    _render_state_card(
-                                        "Input (before)", input_state, diff, "input"
-                                    )
+                                    _render_state_card("Input (before)", input_state, diff, "input")
                                 with ui.element("div").classes("al-state-card"):
                                     _render_state_card(
                                         "Output (after)", output_state, diff, "output"
@@ -814,13 +822,13 @@ def trace_page(run_id: str):
                             ui.html(
                                 f'<div style="font-size:11px;font-weight:600;color:{TEXT_MUTED};'
                                 f'text-transform:uppercase;letter-spacing:1px;margin:12px 0 4px;">'
-                                f'State changes</div>'
+                                f"State changes</div>"
                             )
                             _render_diff_row(diff)
                         else:
                             ui.html(
                                 f'<div style="color:{TEXT_DIM};font-size:12px;margin-top:8px;">'
-                                f'No handoff state captured for this step.</div>'
+                                f"No handoff state captured for this step.</div>"
                             )
 
                         # ── Raw JSON toggle ───────────────────────────────────
@@ -909,11 +917,9 @@ def trace_page(run_id: str):
                 """)
 
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Page 3 — Evidence View  /run/{run_id}/evidence
 # ─────────────────────────────────────────────────────────────────────────────
-
 
 
 @ui.page("/run/{run_id}/evidence")

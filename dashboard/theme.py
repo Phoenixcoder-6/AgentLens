@@ -47,9 +47,9 @@ PRIORITY_COLOR = {"P1": RED, "P2": AMBER, "P3": CYAN, "P4": PURPLE, "P5": GRAY}
 
 # Day 30: Handoff diff category colours
 DIFF_COLORS = {
-    "added": GREEN,     # key appeared in output (agent contributed)
+    "added": GREEN,  # key appeared in output (agent contributed)
     "modified": AMBER,  # key changed value (agent mutated)
-    "dropped": RED,     # key had content, now empty (information loss)
+    "dropped": RED,  # key had content, now empty (information loss)
     "unchanged": "#4b5563",  # TEXT_DIM — passed through untouched
 }
 DIFF_ICONS = {
@@ -491,7 +491,7 @@ def diff_key_badge(key: str, category: str) -> str:
     icon = DIFF_ICONS.get(category, "·")
     return (
         f'<span class="al-diff-badge" style="color:{color};border-color:{color}44;">'
-        f'{icon} {key}</span>'
+        f"{icon} {key}</span>"
     )
 
 

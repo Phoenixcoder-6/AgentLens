@@ -254,9 +254,7 @@ def _parse_handoff(handoff_raw: dict | str | None) -> dict:
     return handoff_raw if isinstance(handoff_raw, dict) else {}
 
 
-def _extract_diff_from_states(
-    input_state: dict, output_state: dict
-) -> dict[str, list[str]]:
+def _extract_diff_from_states(input_state: dict, output_state: dict) -> dict[str, list[str]]:
     """
     Re-run the HandoffCapture four-category diff logic on two state dicts.
     Returns {"added": [...], "modified": [...], "dropped": [...], "unchanged": [...]}.

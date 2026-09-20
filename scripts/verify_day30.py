@@ -1,4 +1,4 @@
-﻿"""
+"""
 scripts/verify_day30.py  --  Day 30 automated verification (8 checks)
 
 Run from project root:
@@ -33,6 +33,7 @@ print("\nDay 30 verification -- Timeline & Workflow State Viewer\n")
 # -- Check 1: get_step_handoff_detail exists in dashboard.state ---------------
 try:
     from dashboard.state import get_step_handoff_detail
+
     sig = inspect.signature(get_step_handoff_detail)
     params = set(sig.parameters.keys())
     check("get_step_handoff_detail(run_id, agent) exists", {"run_id", "agent"}.issubset(params))
@@ -42,6 +43,7 @@ except Exception as e:
 # -- Check 2: get_timeline_data exists in dashboard.state ---------------------
 try:
     from dashboard.state import get_timeline_data
+
     sig2 = inspect.signature(get_timeline_data)
     check("get_timeline_data(run_id) exists", "run_id" in sig2.parameters)
 except Exception as e:
@@ -52,6 +54,7 @@ try:
     from unittest.mock import patch
 
     from dashboard.state import get_step_handoff_detail, get_timeline_data  # noqa: F811
+
     with patch("dashboard.state.get_trace_steps", return_value=[]):
         r1 = get_step_handoff_detail("fake-run", "agent-x")
         r2 = get_timeline_data("fake-run")
@@ -66,6 +69,7 @@ except Exception as e:
 # -- Check 4: diff_key_badge exists in dashboard.theme ------------------------
 try:
     from dashboard.theme import diff_key_badge
+
     html = diff_key_badge("sources", "added")
     check("diff_key_badge('sources', 'added') returns HTML", "sources" in html and "+" in html)
 except Exception as e:
@@ -74,6 +78,7 @@ except Exception as e:
 # -- Check 5: DIFF_COLORS has all four categories ----------------------------
 try:
     from dashboard.theme import DIFF_COLORS
+
     required = {"added", "modified", "dropped", "unchanged"}
     check(
         "DIFF_COLORS has added/modified/dropped/unchanged",
@@ -86,6 +91,7 @@ except Exception as e:
 # -- Check 6: .al-state-card CSS present in GLOBAL_CSS -----------------------
 try:
     from dashboard.theme import GLOBAL_CSS
+
     check(".al-state-card CSS defined", ".al-state-card" in GLOBAL_CSS)
 except Exception as e:
     check(".al-state-card CSS", False, str(e))
@@ -93,6 +99,7 @@ except Exception as e:
 # -- Check 7: .al-diff-badge CSS present in GLOBAL_CSS -----------------------
 try:
     from dashboard.theme import GLOBAL_CSS  # noqa: F811
+
     check(".al-diff-badge CSS defined", ".al-diff-badge" in GLOBAL_CSS)
 except Exception as e:
     check(".al-diff-badge CSS", False, str(e))
@@ -103,6 +110,7 @@ try:
     # Only check the function exists and accepts run_id
     import ast
     import pathlib
+
     src = pathlib.Path("dashboard/app.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
     found = False
