@@ -605,12 +605,14 @@ def get_failure_timeline(days: int = 14) -> list[dict]:
         if date_str == "unknown":
             continue
         b = buckets[date_str]
-        result.append({
-            "date": date_str,
-            "p1": b["p1"],
-            "p2": b["p2"],
-            "total": b["p1"] + b["p2"],
-        })
+        result.append(
+            {
+                "date": date_str,
+                "p1": b["p1"],
+                "p2": b["p2"],
+                "total": b["p1"] + b["p2"],
+            }
+        )
 
     return result[-days:]
 
@@ -630,7 +632,6 @@ def get_cause_breakdown() -> list[dict]:
             counts[cause] += 1
 
     return [{"cause": c, "count": n} for c, n in counts.most_common()]
-
 
 
 def _load_run_trace(run_id: str) -> RunTrace | None:

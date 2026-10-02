@@ -33,6 +33,7 @@ print("\nDay 31 verification -- Evidence Panel + Metrics + Alerting\n")
 # -- Check 1: Alerter class exists and importable ----------------------------
 try:
     from analyzers.alerter import Alerter
+
     check("analyzers.alerter.Alerter importable", True)
 except Exception as e:
     check("analyzers.alerter.Alerter importable", False, str(e))
@@ -40,6 +41,7 @@ except Exception as e:
 # -- Check 2: Alerter.fire() accepts run_id, bundle, dashboard_base_url ------
 try:
     from analyzers.alerter import Alerter  # noqa: F811
+
     sig = inspect.signature(Alerter.fire)
     params = set(sig.parameters.keys())
     check(
@@ -53,6 +55,7 @@ except Exception as e:
 # -- Check 3: Alerter.should_alert() works correctly -------------------------
 try:
     from analyzers.alerter import Alerter  # noqa: F811
+
     alerter = Alerter.__new__(Alerter)
     alerter._enabled = True
     alerter._on_verdict = ["P1", "P2"]
@@ -64,6 +67,7 @@ except Exception as e:
 # -- Check 4: alerting section exists in config.yaml -------------------------
 try:
     from config.config_loader import get
+
     enabled = get("alerting.enabled", None)
     on_verdict = get("alerting.on_verdict", None)
     channel = get("alerting.channel", None)
@@ -89,6 +93,7 @@ except Exception as e:
 # -- Check 6: get_failure_timeline exists in dashboard.state -----------------
 try:
     from dashboard.state import get_failure_timeline
+
     sig3 = inspect.signature(get_failure_timeline)
     check("get_failure_timeline(days) exists", "days" in sig3.parameters)
 except Exception as e:
@@ -97,6 +102,7 @@ except Exception as e:
 # -- Check 7: get_cause_breakdown exists in dashboard.state ------------------
 try:
     from dashboard.state import get_cause_breakdown
+
     result = get_cause_breakdown()
     check("get_cause_breakdown() returns list", isinstance(result, list))
 except Exception as e:
@@ -104,7 +110,6 @@ except Exception as e:
 
 # -- Check 8: metrics_page has failure timeline in app.py --------------------
 try:
-
     src = Path("dashboard/app.py").read_text(encoding="utf-8")
     check(
         "metrics_page has failure_timeline and cause_breakdown",

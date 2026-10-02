@@ -1382,7 +1382,9 @@ def metrics_page():
         cause_breakdown = state.get_cause_breakdown()
 
         if not data:
-            ui.html(f'<div style="color:{TEXT_MUTED};">No metrics yet — run some analyses first.</div>')
+            ui.html(
+                f'<div style="color:{TEXT_MUTED};">No metrics yet — run some analyses first.</div>'
+            )
             return
 
         agents = list(data.keys())
@@ -1499,7 +1501,9 @@ def metrics_page():
         )
 
         # ── Failure rate timeline (Day 31) ────────────────────────────────────
-        ui.html('<div class="al-section" style="margin-bottom:12px;">P1/P2 Failures — last 14 days</div>')
+        ui.html(
+            '<div class="al-section" style="margin-bottom:12px;">P1/P2 Failures — last 14 days</div>'
+        )
         if failure_timeline:
             dates = [d["date"] for d in failure_timeline]
             p1_vals = [d["p1"] for d in failure_timeline]
@@ -1553,16 +1557,20 @@ def metrics_page():
         else:
             ui.html(
                 f'<div style="color:{TEXT_MUTED};font-size:13px;margin-bottom:24px;">'
-                f'No cached analyses yet — run analyses to populate this chart.</div>'
+                f"No cached analyses yet — run analyses to populate this chart.</div>"
             )
 
         # ── Cause breakdown + Alert status (two columns) ──────────────────────
-        with ui.element("div").style("display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;"):
+        with ui.element("div").style(
+            "display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;"
+        ):
             # Left: Top failure causes
             with ui.element("div").style(
                 f"background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:16px;"
             ):
-                ui.html('<div class="al-section" style="margin-bottom:12px;">Top Failure Causes</div>')
+                ui.html(
+                    '<div class="al-section" style="margin-bottom:12px;">Top Failure Causes</div>'
+                )
                 if cause_breakdown:
                     max_count = cause_breakdown[0]["count"] if cause_breakdown else 1
                     for item in cause_breakdown[:6]:
@@ -1609,14 +1617,14 @@ def metrics_page():
                     </div>
                     """)
                 except Exception as e:
-                    ui.html(f'<div style="color:{TEXT_MUTED};font-size:12px;">Config unavailable: {e}</div>')
-
+                    ui.html(
+                        f'<div style="color:{TEXT_MUTED};font-size:12px;">Config unavailable: {e}</div>'
+                    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Page 6 — Explanation  /run/{run_id}/explain
 # ─────────────────────────────────────────────────────────────────────────────
-
 
 
 @ui.page("/run/{run_id}/explain")
