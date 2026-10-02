@@ -61,12 +61,12 @@ class Alerter:
         try:
             from config.config_loader import get
 
-            self._enabled: bool = bool(get("alerting.enabled", False))
-            self._on_verdict: list[str] = list(get("alerting.on_verdict", ["P1", "P2"]))
-            self._channel: str = str(get("alerting.channel", "log"))
-            self._webhook_url: str = str(get("alerting.slack_webhook_url", ""))
-            self._cooldown_minutes: int = int(get("alerting.cooldown_minutes", 60))
-            self._log_dir: str = str(get("logging.log_dir", "logs"))
+            self._enabled: bool = bool(get("alerting", "enabled", False))
+            self._on_verdict: list[str] = list(get("alerting", "on_verdict", ["P1", "P2"]))
+            self._channel: str = str(get("alerting", "channel", "log"))
+            self._webhook_url: str = str(get("alerting", "slack_webhook_url", ""))
+            self._cooldown_minutes: int = int(get("alerting", "cooldown_minutes", 60))
+            self._log_dir: str = str(get("logging", "log_dir", "logs"))
         except Exception:
             # Graceful fallback if config is missing
             self._enabled = False
@@ -138,7 +138,12 @@ class Alerter:
     ) -> str:
         agent = getattr(bundle, "primary_agent", "unknown") or "unknown"
         cause = getattr(bundle, "primary_cause", None)
-        cause_str = cause.value if hasattr(cause, "value") else str(cause or "unknown")
+        # cause_str = cause.value if hasattr(cause, "value") else str(cause or "unknown")
+        cause_str = (
+            str(cause.value)
+            if cause is not None and hasattr(cause, "value")
+            else str(cause or "unknown")
+        )
         confidence = getattr(bundle, "confidence", None)
         conf_str = f"{confidence:.2f}" if confidence is not None else "n/a"
         url = f"{base_url}/run/{run_id}"
