@@ -457,6 +457,16 @@ def run_full_analysis(run_id: str, db: DatabaseManager | None = None) -> Analysi
 
     state.done = True
     _analysis_cache[run_id] = state
+
+    # Day 31: Fire alert if verdict meets threshold
+    try:
+        from analyzers.alerter import Alerter
+
+        if state.bundle:
+            Alerter().fire(run_id, state.bundle)
+    except Exception:
+        pass  # alerting must never crash the analysis pipeline
+
     return state
 
 
@@ -559,6 +569,68 @@ def get_metrics_data() -> dict:
             "run_count": len(lats),
         }
     return result
+
+
+def get_failure_timeline(days: int = 14) -> list[dict]:
+    """
+    Return daily P1/P2 failure counts for the last ``days`` days.
+
+    Each element: {"date": "YYYY-MM-DD", "p1": int, "p2": int, "total": int}
+    Sorted ascending by date.
+    """
+    db = get_db()
+    runs = db.list_runs(limit=500)
+
+    # Group by date
+    from collections import defaultdict
+
+    buckets: dict[str, dict[str, int]] = defaultdict(lambda: {"p1": 0, "p2": 0})
+
+    for r in runs:
+        run_id = r["run_id"]
+        ts = r.get("timestamp", "") or ""
+        date_str = ts[:10] if len(ts) >= 10 else "unknown"
+
+        cached = _analysis_cache.get(run_id)
+        if cached and cached.bundle:
+            level = str(cached.bundle.priority_level.value)
+            if level == "P1":
+                buckets[date_str]["p1"] += 1
+            elif level == "P2":
+                buckets[date_str]["p2"] += 1
+
+    # Build sorted list (last N days only)
+    result = []
+    for date_str in sorted(buckets.keys()):
+        if date_str == "unknown":
+            continue
+        b = buckets[date_str]
+        result.append({
+            "date": date_str,
+            "p1": b["p1"],
+            "p2": b["p2"],
+            "total": b["p1"] + b["p2"],
+        })
+
+    return result[-days:]
+
+
+def get_cause_breakdown() -> list[dict]:
+    """
+    Return top failure causes across all cached analyses.
+
+    Each element: {"cause": str, "count": int}  sorted by count descending.
+    """
+    from collections import Counter
+
+    counts: Counter[str] = Counter()
+    for cached in _analysis_cache.values():
+        if cached and cached.bundle and cached.bundle.primary_cause:
+            cause = str(cached.bundle.primary_cause.value)
+            counts[cause] += 1
+
+    return [{"cause": c, "count": n} for c, n in counts.most_common()]
+
 
 
 def _load_run_trace(run_id: str) -> RunTrace | None:

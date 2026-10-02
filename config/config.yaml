@@ -130,3 +130,13 @@ pipeline:
 logging:
   level: "INFO"                            # DEBUG | INFO | WARNING | ERROR
   log_dir: "logs"
+
+# ─────────────────────────────────────────────
+# Alerting (Day 31)
+# ─────────────────────────────────────────────
+alerting:
+  enabled: true
+  on_verdict: [P1, P2]                    # alert when Arbiter verdict is P1 or P2
+  channel: log                            # log | slack
+  slack_webhook_url: ""                   # set env var SLACK_WEBHOOK_URL or paste here
+  cooldown_minutes: 60                    # suppress re-alerts for the same run within this window

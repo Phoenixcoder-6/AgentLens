@@ -1378,12 +1378,14 @@ def metrics_page():
         )
 
         data = state.get_metrics_data()
+        failure_timeline = state.get_failure_timeline(days=14)
+        cause_breakdown = state.get_cause_breakdown()
+
         if not data:
-            ui.html(f'<div style="color:{TEXT_MUTED};">No metrics yet.</div>')
+            ui.html(f'<div style="color:{TEXT_MUTED};">No metrics yet — run some analyses first.</div>')
             return
 
         agents = list(data.keys())
-        # colors reserved for future chart coloring: [STEP_COLOR.get(ag, GRAY) for ag in agents]
 
         # ── Stat cards ────────────────────────────────────────────────────────
         with ui.element("div").style("display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;"):
@@ -1493,13 +1495,128 @@ def metrics_page():
                 ],
             }
         ).style(
-            f"height:260px;background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:12px;"
+            f"height:260px;background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:12px;margin-bottom:24px;"
         )
+
+        # ── Failure rate timeline (Day 31) ────────────────────────────────────
+        ui.html('<div class="al-section" style="margin-bottom:12px;">P1/P2 Failures — last 14 days</div>')
+        if failure_timeline:
+            dates = [d["date"] for d in failure_timeline]
+            p1_vals = [d["p1"] for d in failure_timeline]
+            p2_vals = [d["p2"] for d in failure_timeline]
+            ui.echart(
+                {
+                    "backgroundColor": "transparent",
+                    "tooltip": {
+                        "trigger": "axis",
+                        "backgroundColor": CARD,
+                        "borderColor": BORDER,
+                        "textStyle": {"color": TEXT},
+                    },
+                    "legend": {
+                        "data": ["P1", "P2"],
+                        "textStyle": {"color": TEXT_MUTED},
+                        "right": 10,
+                    },
+                    "xAxis": {
+                        "type": "category",
+                        "data": dates,
+                        "axisLabel": {"color": TEXT_MUTED, "fontSize": 10},
+                        "axisLine": {"lineStyle": {"color": BORDER}},
+                    },
+                    "yAxis": {
+                        "type": "value",
+                        "minInterval": 1,
+                        "axisLabel": {"color": TEXT_MUTED},
+                        "splitLine": {"lineStyle": {"color": BORDER}},
+                    },
+                    "series": [
+                        {
+                            "name": "P1",
+                            "type": "bar",
+                            "stack": "failures",
+                            "data": p1_vals,
+                            "itemStyle": {"color": RED},
+                        },
+                        {
+                            "name": "P2",
+                            "type": "bar",
+                            "stack": "failures",
+                            "data": p2_vals,
+                            "itemStyle": {"color": AMBER},
+                        },
+                    ],
+                }
+            ).style(
+                f"height:220px;background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:12px;margin-bottom:24px;"
+            )
+        else:
+            ui.html(
+                f'<div style="color:{TEXT_MUTED};font-size:13px;margin-bottom:24px;">'
+                f'No cached analyses yet — run analyses to populate this chart.</div>'
+            )
+
+        # ── Cause breakdown + Alert status (two columns) ──────────────────────
+        with ui.element("div").style("display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;"):
+            # Left: Top failure causes
+            with ui.element("div").style(
+                f"background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:16px;"
+            ):
+                ui.html('<div class="al-section" style="margin-bottom:12px;">Top Failure Causes</div>')
+                if cause_breakdown:
+                    max_count = cause_breakdown[0]["count"] if cause_breakdown else 1
+                    for item in cause_breakdown[:6]:
+                        col = CAUSE_COLOR.get(item["cause"], GRAY)
+                        pct = (item["count"] / max_count * 100) if max_count else 0
+                        ui.html(f"""
+                        <div style="margin-bottom:10px;">
+                          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                            <span style="font-size:12px;color:{col};">{item["cause"]}</span>
+                            <span style="font-size:11px;color:{TEXT_MUTED};">{item["count"]}</span>
+                          </div>
+                          <div style="background:{BG};border-radius:3px;height:5px;">
+                            <div style="width:{pct:.1f}%;background:{col};height:5px;border-radius:3px;"></div>
+                          </div>
+                        </div>
+                        """)
+                else:
+                    ui.html(f'<div style="color:{TEXT_MUTED};font-size:12px;">No data yet</div>')
+
+            # Right: Alert status card
+            with ui.element("div").style(
+                f"background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:16px;"
+            ):
+                ui.html('<div class="al-section" style="margin-bottom:12px;">Alerting Status</div>')
+                try:
+                    from config.config_loader import get
+
+                    enabled = bool(get("alerting.enabled", False))
+                    on_verdict = list(get("alerting.on_verdict", ["P1", "P2"]))
+                    channel = str(get("alerting.channel", "log"))
+                    cooldown = int(get("alerting.cooldown_minutes", 60))
+
+                    status_col = GREEN if enabled else GRAY
+                    status_txt = "ENABLED" if enabled else "DISABLED"
+
+                    ui.html(f"""
+                    <div style="margin-bottom:10px;">
+                      <span style="font-size:12px;font-weight:700;color:{status_col};">{status_txt}</span>
+                    </div>
+                    <div style="font-size:12px;color:{TEXT_MUTED};line-height:2;">
+                      <div>Triggers on: <span style="color:{RED};">{", ".join(on_verdict)}</span></div>
+                      <div>Channel: <span style="color:{CYAN};">{channel}</span></div>
+                      <div>Cooldown: <span style="color:{TEXT};">{cooldown}min</span></div>
+                    </div>
+                    """)
+                except Exception as e:
+                    ui.html(f'<div style="color:{TEXT_MUTED};font-size:12px;">Config unavailable: {e}</div>')
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Page 6 — Explanation  /run/{run_id}/explain
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 
 @ui.page("/run/{run_id}/explain")
