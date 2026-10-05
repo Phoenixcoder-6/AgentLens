@@ -104,6 +104,7 @@ def nav_bar(active: str, run_id: str = ""):
         ("🔍", "Runs", "runs", "/"),
         ("📈", "Metrics", "metrics", "/metrics"),
         ("⚖️", "Diff", "diff", "/diff"),
+        ("📖", "Rules", "rules", "/rules"),
     ]
     run_tabs = (
         [
@@ -1197,8 +1198,28 @@ def diff_page():
                     ui.spinner(size="sm").style(f"color:{PURPLE};")
                     ui.label("Aligning runs and computing similarity…")
 
+            if sel_a.value == sel_b.value:
+                result_area.clear()
+                with result_area:
+                    ui.html(
+                        f'<div style="color:{AMBER};font-size:13px;">'
+                        f"Run A and Run B are the same run — pick two different runs to compare.</div>"
+                    )
+                return
+
             diff = await run.io_bound(state.compute_diff, sel_a.value, sel_b.value)
             result_area.clear()
+
+            if diff.first_divergence == "(trace not found)":
+                with result_area:
+                    ui.html(
+                        f'<div style="color:{RED};font-size:13px;">'
+                        f"Could not load the trace for one of the runs "
+                        f"(<span class='al-mono'>{sel_a.value[:14]}…</span> / "
+                        f"<span class='al-mono'>{sel_b.value[:14]}…</span>). "
+                        f"Its trace_json may be missing.</div>"
+                    )
+                return
 
             with result_area:
                 # ── Summary stat cards ─────────────────────────────────────
@@ -1236,6 +1257,17 @@ def diff_page():
                   </div>
                 </div>
                 """)
+
+                if (
+                    diff.steps
+                    and not diff.missing_in_a_count
+                    and not diff.missing_in_b_count
+                    and not any(s.get("diverged") for s in diff.steps)
+                ):
+                    ui.html(
+                        f'<div style="color:{GREEN};font-size:13px;margin-bottom:14px;">'
+                        f"✓ Runs are semantically identical — no divergence detected.</div>"
+                    )
 
                 if not diff.steps:
                     ui.html(f'<div style="color:{TEXT_MUTED};">No steps to compare.</div>')
@@ -1329,6 +1361,21 @@ def diff_page():
 
                         method = row.get("method", "—")
 
+                        # Missing side → dash; deltas against nothing are meaningless
+                        cell_a = (
+                            "—"
+                            if status == "MISSING_IN_A"
+                            else f"{fmt_ms(row['lat_a'])} / {int(row['tok_a']):,}"
+                        )
+                        cell_b = (
+                            "—"
+                            if status == "MISSING_IN_B"
+                            else f"{fmt_ms(row['lat_b'])} / {int(row['tok_b']):,}"
+                        )
+                        if status != "MATCHED":
+                            lat_d_str = tok_d_str = "—"
+                            lat_d_col = tok_d_col = TEXT_MUTED
+
                         ui.html(f"""
                         <div style="display:grid;grid-template-columns:{DCOLS};
                                     padding:12px 20px;border-bottom:1px solid {BORDER};{row_style}">
@@ -1336,10 +1383,10 @@ def diff_page():
                             {ag}{status_badge}
                           </span>
                           <span style="font-size:12px;color:{TEXT_MUTED};">
-                            {fmt_ms(row["lat_a"])} / {int(row["tok_a"]):,}
+                            {cell_a}
                           </span>
                           <span style="font-size:12px;color:{TEXT_MUTED};">
-                            {fmt_ms(row["lat_b"])} / {int(row["tok_b"]):,}
+                            {cell_b}
                           </span>
                           <span style="font-size:12px;color:{lat_d_col};">{lat_d_str}</span>
                           <span style="font-size:12px;color:{tok_d_col};">{tok_d_str}</span>
@@ -1359,6 +1406,97 @@ def diff_page():
                   <span><span style="background:{RED}18;padding:0 4px;border-radius:3px;">↑ div</span> first divergence</span>
                 </div>
                 """)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Page 4b — Rule Explorer  /rules   (Day 32)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _fmt_ts(iso: str | None) -> str:
+    """ISO timestamp -> 'YYYY-MM-DD HH:MM' (or a dash)."""
+    if not iso:
+        return "—"
+    return iso[:16].replace("T", " ")
+
+
+@ui.page("/rules")
+def rules_page():
+    inject_css()
+    header()
+    nav_bar("rules")
+
+    from analyzers.rule_catalog import CATEGORIES
+
+    with ui.element("div").classes("al-content"):
+        ui.html(
+            f'<div class="al-section" style="margin-bottom:6px;">Rule Explorer'
+            f'<span style="font-size:11px;color:{TEXT_MUTED};font-weight:400;margin-left:10px;">'
+            f"Deterministic rules · fire counts from stored analyses · no LLM</span></div>"
+        )
+
+        category_sel = ui.select(["all", *CATEGORIES], value="all", label="Category").style(
+            f"background:{CARD};color:{TEXT};min-width:200px;margin-bottom:16px;"
+        )
+
+        RCOLS = "210px 1fr 110px 80px 90px 150px 150px"
+
+        @ui.refreshable
+        def rules_table() -> None:
+            rows = state.get_rule_stats(category=category_sel.value)
+            total_fired = sum(r["times_fired"] for r in rows)
+            active = sum(1 for r in rows if r["times_fired"] > 0)
+
+            ui.html(
+                f'<div style="font-size:12px;color:{TEXT_MUTED};margin-bottom:10px;">'
+                f"{len(rows)} rules · {active} have fired · {total_fired} total matches</div>"
+            )
+            if total_fired == 0:
+                ui.html(
+                    f'<div style="color:{AMBER};font-size:12px;margin-bottom:12px;">'
+                    f"No rule matches stored yet — analyze runs from the Runs page to populate counts. "
+                    f"(Runs analyzed before Day 32 have no stored matches until re-analyzed.)</div>"
+                )
+
+            with ui.element("div").style(
+                f"background:{CARD};border:1px solid {BORDER};border-radius:10px;overflow:hidden;"
+            ):
+                ui.html(f"""
+                <div style="display:grid;grid-template-columns:{RCOLS};padding:9px 20px;
+                            border-bottom:1px solid {BORDER};font-size:10px;font-weight:600;
+                            letter-spacing:1px;text-transform:uppercase;color:{TEXT_MUTED};">
+                  <span>Rule ID</span><span>Name</span><span>Category</span><span>Version</span>
+                  <span>Fired</span><span>Last Triggered</span><span>Example Run</span>
+                </div>
+                """)
+                for r in rows:
+                    fired = r["times_fired"]
+                    fired_col = RED if fired >= 5 else AMBER if fired > 0 else TEXT_DIM
+                    if r["example_run"]:
+                        rid = r["example_run"]
+                        example = (
+                            f'<a href="/run/{rid}/evidence" class="al-mono" '
+                            f'style="color:{CYAN};text-decoration:none;font-size:11px;">'
+                            f"{rid[:14]}…</a>"
+                        )
+                    else:
+                        example = f'<span style="color:{TEXT_DIM};">—</span>'
+                    ui.html(f"""
+                    <div style="display:grid;grid-template-columns:{RCOLS};padding:12px 20px;
+                                border-bottom:1px solid {BORDER};align-items:center;"
+                         title="{r["description"]}">
+                      <span class="al-mono" style="font-size:11px;color:{TEXT};">{r["rule_id"]}</span>
+                      <span style="font-size:12px;color:{TEXT};">{r["name"]}</span>
+                      <span>{cause_badge(r["category"])}</span>
+                      <span class="al-mono" style="font-size:11px;color:{TEXT_MUTED};">{r["version"]}</span>
+                      <span style="font-size:13px;font-weight:700;color:{fired_col};">{fired}</span>
+                      <span style="font-size:11px;color:{TEXT_MUTED};">{_fmt_ts(r["last_triggered"])}</span>
+                      {example}
+                    </div>
+                    """)
+
+        rules_table()
+        category_sel.on_value_change(lambda _: rules_table.refresh())
 
 
 # ─────────────────────────────────────────────────────────────────────────────

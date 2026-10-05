@@ -400,6 +400,84 @@ def get_aggregate_stats(runs: list[RunRow]) -> dict:
     }
 
 
+def persist_rule_matches(run_id: str, bundle: object, db: DatabaseManager | None = None) -> int:
+    """
+    Store a bundle's rule matches in the rule_matches table (Day 32).
+
+    Rule IDs are normalized (STAT-LAT-* -> STAT-LAT). Never raises: a persistence
+    failure must not break analysis. Returns rows written (0 on failure).
+    """
+    try:
+        from analyzers.rule_catalog import normalize_rule_id
+
+        matches = []
+        for m in getattr(bundle, "rule_matches", None) or []:
+            matches.append(
+                {
+                    "rule_id": normalize_rule_id(str(m.rule_id)),
+                    "rule_version": m.rule_version,
+                    "category": m.category,
+                    "severity": m.severity,
+                    "agent": m.agent,
+                    "step": m.step,
+                    "description": m.description,
+                }
+            )
+        return (db or get_db()).insert_rule_matches(run_id, matches)
+    except Exception:
+        return 0
+
+
+def get_rule_stats(category: str | None = None, db: DatabaseManager | None = None) -> list[dict]:
+    """
+    Rule Explorer rows: catalog merged with DB fire stats (Day 32).
+
+    Every catalog rule appears (never-fired = 0). Rules seen in the DB but missing
+    from the catalog are appended as category 'unknown'. Sorted by times_fired desc,
+    then rule_id. ``category`` filters rows (None / 'all' = no filter).
+    """
+    from analyzers.rule_catalog import RULE_CATALOG
+
+    try:
+        stats = {s["rule_id"]: s for s in (db or get_db()).get_rule_stats()}
+    except Exception:
+        stats = {}
+
+    rows: list[dict] = []
+    for rid, info in RULE_CATALOG.items():
+        s = stats.pop(rid, None)
+        rows.append(
+            {
+                "rule_id": rid,
+                "name": info["name"],
+                "category": info["category"],
+                "version": (s or {}).get("rule_version") or info["version"],
+                "description": info["description"],
+                "times_fired": (s or {}).get("times_fired", 0),
+                "last_triggered": (s or {}).get("last_triggered"),
+                "example_run": (s or {}).get("example_run"),
+            }
+        )
+    for rid, s in stats.items():  # uncatalogued rules still shown
+        rows.append(
+            {
+                "rule_id": rid,
+                "name": rid,
+                "category": s.get("category") or "unknown",
+                "version": s.get("rule_version") or "?",
+                "description": "(not in catalog)",
+                "times_fired": s["times_fired"],
+                "last_triggered": s["last_triggered"],
+                "example_run": s["example_run"],
+            }
+        )
+
+    if category and category != "all":
+        rows = [r for r in rows if r["category"] == category]
+    rows.sort(key=lambda r: (-r["times_fired"], r["rule_id"]))
+    return rows
+
+
 def get_cached(run_id: str) -> AnalysisState | None:
     """Return the cached AnalysisState for a run, or None if not yet analyzed."""
     return _analysis_cache.get(run_id)
@@ -457,6 +535,10 @@ def run_full_analysis(run_id: str, db: DatabaseManager | None = None) -> Analysi
 
     state.done = True
     _analysis_cache[run_id] = state
+
+    # Day 32: Persist rule matches for the Rule Explorer
+    if state.bundle:
+        persist_rule_matches(run_id, state.bundle)
 
     # Day 31: Fire alert if verdict meets threshold
     try:

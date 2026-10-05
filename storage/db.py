@@ -113,7 +113,36 @@ CREATE TABLE IF NOT EXISTS llm_cache (
 );
 """
 
-_ALL_DDL = [_CREATE_RUNS, _CREATE_STEPS, _CREATE_ANALYSIS, _CREATE_METRICS, _CREATE_LLM_CACHE]
+_CREATE_RULE_MATCHES = """
+CREATE TABLE IF NOT EXISTS rule_matches (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id       TEXT NOT NULL,
+    rule_id      TEXT NOT NULL,
+    rule_version TEXT NOT NULL DEFAULT '1.0.0',
+    category     TEXT,
+    severity     TEXT,
+    agent        TEXT,
+    step         INTEGER,
+    description  TEXT,
+    matched_at   TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+);
+"""
+
+_CREATE_RULE_MATCHES_IDX = [
+    "CREATE INDEX IF NOT EXISTS idx_rule_matches_rule_id ON rule_matches(rule_id);",
+    "CREATE INDEX IF NOT EXISTS idx_rule_matches_run_id ON rule_matches(run_id);",
+]
+
+_ALL_DDL = [
+    _CREATE_RUNS,
+    _CREATE_STEPS,
+    _CREATE_ANALYSIS,
+    _CREATE_METRICS,
+    _CREATE_LLM_CACHE,
+    _CREATE_RULE_MATCHES,
+    *_CREATE_RULE_MATCHES_IDX,
+]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -416,6 +445,77 @@ class DatabaseManager:
         with self.connection() as conn:
             cursor = conn.execute("DELETE FROM llm_cache WHERE expires_at <= ?", (now_iso,))
             return cursor.rowcount
+
+    # -- Rule matches (Day 32) -------------------------------------------------
+
+    def insert_rule_matches(self, run_id: str, matches: list[Any]) -> int:
+        """
+        Replace all stored rule matches for a run (idempotent on re-analysis).
+
+        ``matches`` may be RuleMatch objects or dicts. Returns rows inserted.
+        """
+        import datetime
+
+        now = datetime.datetime.now(datetime.UTC).isoformat()
+
+        def _val(m: Any, key: str, default: Any = None) -> Any:
+            v = m.get(key, default) if isinstance(m, dict) else getattr(m, key, default)
+            return getattr(v, "value", v)  # unwrap enums
+
+        with self.connection() as conn:
+            conn.execute("DELETE FROM rule_matches WHERE run_id = ?", (run_id,))
+            for m in matches:
+                conn.execute(
+                    """
+                    INSERT INTO rule_matches
+                        (run_id, rule_id, rule_version, category, severity,
+                         agent, step, description, matched_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        run_id,
+                        str(_val(m, "rule_id", "unknown")),
+                        str(_val(m, "rule_version", "1.0.0")),
+                        _val(m, "category"),
+                        _val(m, "severity"),
+                        _val(m, "agent"),
+                        _val(m, "step"),
+                        _val(m, "description"),
+                        now,
+                    ),
+                )
+        return len(matches)
+
+    def get_rule_stats(self) -> list[dict[str, Any]]:
+        """
+        Per-rule aggregate: times_fired, last_triggered, example_run (latest match).
+        """
+        with self.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT rm.rule_id                       AS rule_id,
+                       COUNT(*)                         AS times_fired,
+                       MAX(rm.matched_at)               AS last_triggered,
+                       (SELECT r2.run_id FROM rule_matches r2
+                         WHERE r2.rule_id = rm.rule_id
+                         ORDER BY r2.matched_at DESC, r2.id DESC LIMIT 1) AS example_run,
+                       (SELECT r3.rule_version FROM rule_matches r3
+                         WHERE r3.rule_id = rm.rule_id
+                         ORDER BY r3.matched_at DESC, r3.id DESC LIMIT 1) AS rule_version,
+                       (SELECT r4.category FROM rule_matches r4
+                         WHERE r4.rule_id = rm.rule_id
+                         ORDER BY r4.matched_at DESC, r4.id DESC LIMIT 1) AS category
+                FROM rule_matches rm
+                GROUP BY rm.rule_id
+                ORDER BY times_fired DESC, rm.rule_id ASC
+                """
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def rule_match_count(self) -> int:
+        """Total stored rule match rows."""
+        with self.connection() as conn:
+            return int(conn.execute("SELECT COUNT(*) FROM rule_matches").fetchone()[0])
 
     # -- Utility ---------------------------------------------------------------
 
