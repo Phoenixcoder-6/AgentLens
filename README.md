@@ -1,4 +1,4 @@
-# AgentLens
+# AgentLens_demo
 
 **Multi-Agent Failure Attribution, Trace Diffing & Explainability Platform**
 
