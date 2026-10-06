@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import os
 
+from analyzers.detection.rule_engine import _prestructured_evidence
 from analyzers.evidence_extraction.extractor import EvidenceExtractor
 from app.interfaces import AnalysisResult, Analyzer
 from config import config_loader
@@ -81,16 +82,16 @@ class ConsistencyValidator(Analyzer):
         wr_step = writer_steps[-1] if writer_steps else None
         ver_step = verifier_steps[-1] if verifier_steps else None
 
-        res_ev = None
-        wr_ev = None
-        ver_ev = None
+        res_ev = _prestructured_evidence(res_step)
+        wr_ev = _prestructured_evidence(wr_step)
+        ver_ev = _prestructured_evidence(ver_step)
 
         if extractor:
-            if res_step:
+            if res_ev is None and res_step:
                 res_ev = extractor.extract(res_step.output, agent="researcher")
-            if wr_step:
+            if wr_ev is None and wr_step:
                 wr_ev = extractor.extract(wr_step.output, agent="writer")
-            if ver_step:
+            if ver_ev is None and ver_step:
                 ver_ev = extractor.extract(ver_step.output, agent="verifier")
 
         # ── Rule: verifier_passthrough_v1 ─────────────────────────────────────

@@ -32,7 +32,7 @@ flowchart TD
     end
 
     subgraph P4["4. Deterministic Detection Layer (analyzers/detection/)"]
-        GT["GroundTruthEvaluator (P1)"]
+        GT["GroundTruthValidator (P1)"]
         RE["RuleEngine (P2)"]
         IL["InformationLossRule (P2/P3)"]
         WV["WorkflowValidator (P3)"]
@@ -77,7 +77,7 @@ Every layer communicates exclusively through typed Pydantic v2 models (`schema/m
 | **2. Storage** | `storage/writer.py` (`StorageWriter`), `storage/db.py` (`DatabaseManager`) | `RunTrace` | SQLite rows (`runs`, `steps`, `metrics`) + `data/traces/{run_id}.json` | Writes the full trace JSON blob to disk and indexes metadata and step metrics in SQLite. |
 | **3. Normalizer** | `normalizer/normalizer.py` (`Normalizer`) | `RunTrace` | `NormalizedRun` (`list[NormalizedStep]`) | Deserializes JSON strings safely (`safe_loads`), enforces UTC-aware timestamps, stamps `schema_version = "1.0"`, and guarantees JSON-serializable state dicts. |
 | **4. Evidence Extractor** | `analyzers/evidence_extraction/extractor.py` (`EvidenceExtractor`) | `raw_output: str`, `agent: str` | `ExtractedEvidence` | Calls Groq LLM (with SQLite `LLMCache`, fallback model, and 1x stricter-prompt retry) to extract structured counts and lists: `source_count`, `entity_count`, `tool_calls`, `claims`, `references`, `numbers`, `dates`. Sets `extraction_failed=True` on double failure so downstream rules skip gracefully. |
-| **5a. Ground Truth** | `analyzers/detection/ground_truth.py` (`GroundTruthEvaluator`) | `RunTrace` (with `expected_output`) | `AnalysisResult` (`list[EvidenceRecord]` at **P1**) | Compares final output against `expected_output`. Fires `gt_mismatch_v1` (`grounded=True`) when similarity falls below `p1_similarity_threshold`. |
+| **5a. Ground Truth** | `analyzers/detection/ground_truth.py` (`GroundTruthValidator`) | `RunTrace` (with `expected_output`) | `AnalysisResult` (`list[EvidenceRecord]` at **P1**) | Compares final output against `expected_output`. Fires `gt_mismatch_v1` (`grounded=True`) when similarity falls below `p1_similarity_threshold`. |
 | **5b. Rule Engine** | `analyzers/detection/rule_engine.py` (`RuleEngine`) | `RunTrace` + `ExtractedEvidence` | `AnalysisResult` (`list[EvidenceRecord]` at **P2**) | Evaluates deterministic execution and reasoning rules (`missing_tool_output_v1`, `tool_failure_v1`, `researcher_quality_v1`, `hallucination_v1`). |
 | **5c. Information Loss** | `analyzers/detection/information_loss.py` (`InformationLossRule`) | `researcher: ExtractedEvidence`, `writer: ExtractedEvidence` | `InformationLossResult` $\rightarrow$ `EvidenceRecord` (**P2**) | Detects dropped sources/entities between Researcher and Writer (`information_loss_v1`). |
 | **5d. Workflow Validator** | `analyzers/detection/workflow_validator.py` (`WorkflowValidator`) | `RunTrace` | `AnalysisResult` (`list[EvidenceRecord]` at **P3**) | Validates agent execution topology against `arbiter.workflow.required_agents` (`skipped_step_v1`, `wrong_order_v1`). |
