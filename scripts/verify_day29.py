@@ -11,6 +11,8 @@ import inspect
 import sys
 from pathlib import Path
 
+from starlette.routing import Route
+
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
@@ -99,12 +101,13 @@ except Exception as e:
     check("stale_badge", False, "skipped")
 
 # -- Check 6: api.router imports cleanly --------------------------------------
+# -- Check 6: api.router imports cleanly --------------------------------------
 try:
     from api.router import health_router, router
 
-    routes = [r.path for r in router.routes]
+    routes = [r.path for r in router.routes if isinstance(r, Route)]
     check("api.router has /runs endpoint", any("/runs" in r for r in routes), str(routes))
-    health_routes = [r.path for r in health_router.routes]
+    health_routes = [r.path for r in health_router.routes if isinstance(r, Route)]
     check("health_router has /health endpoint", any("/health" in r for r in health_routes))
 except Exception as e:
     check("api.router imports", False, str(e))

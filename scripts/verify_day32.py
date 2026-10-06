@@ -40,7 +40,7 @@ try:
     check("rule_matches table created (idempotent init)", db.rule_match_count() == 0)
 except Exception as e:
     check("rule_matches table created", False, str(e))
-    db = None
+    sys.exit(1)
 
 # 2: insert / aggregate round trip
 try:
@@ -88,7 +88,10 @@ except Exception as e:
 # 6: category filter
 try:
     rows = state.get_rule_stats(category="workflow", db=db)
-    check("category filter works", rows and all(r["category"] == "workflow" for r in rows))
+    check(
+        "category filter works",
+        bool(rows) and all(r["category"] == "workflow" for r in rows),
+    )
 except Exception as e:
     check("category filter", False, str(e))
 
