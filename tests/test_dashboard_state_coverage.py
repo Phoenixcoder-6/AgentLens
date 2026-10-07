@@ -1161,3 +1161,72 @@ class TestComputeDiffCoverage:
         assert result.missing_in_a_count == 1
         assert result.missing_in_b_count == 1
         assert result.first_divergence == "researcher"
+
+class TestRunFullAnalysisCoverage:
+    def test_cached_result_is_returned(self):
+        import dashboard.state as state
+
+        cached = _state(bundle=_bundle(run_id="cached"))
+
+        with patch.object(
+            state,
+            "_analysis_cache",
+            {"cached": cached},
+        ):
+            result = state.run_full_analysis("cached")
+
+        assert result is cached
+
+    def test_missing_trace_json_returns_error_state(self):
+        import dashboard.state as state
+
+        db = _db()
+        db.get_run.return_value = {
+            "run_id": "missing-trace",
+            "trace_json": "",
+        }
+
+        with (
+            patch.object(state, "_analysis_cache", {}),
+            patch.object(state, "get_db", return_value=db),
+        ):
+            result = state.run_full_analysis("missing-trace")
+
+        assert result.done is True
+        assert result.error == "trace_json not found"
+        assert result.bundle is None
+
+    def test_missing_run_returns_error_state(self):
+        import dashboard.state as state
+
+        db = _db()
+        db.get_run.return_value = None
+
+        with (
+            patch.object(state, "_analysis_cache", {}),
+            patch.object(state, "get_db", return_value=db),
+        ):
+            result = state.run_full_analysis("unknown-run")
+
+        assert result.done is True
+        assert result.error == "trace_json not found"
+        assert result.bundle is None
+
+    def test_analysis_exception_is_captured(self):
+        import dashboard.state as state
+
+        db = _db()
+        db.get_run.return_value = {
+            "run_id": "bad-run",
+            "trace_json": "{invalid json",
+        }
+
+        with (
+            patch.object(state, "_analysis_cache", {}),
+            patch.object(state, "get_db", return_value=db),
+        ):
+            result = state.run_full_analysis("bad-run")
+
+        assert result.done is True
+        assert result.error
+        assert result.bundle is None
