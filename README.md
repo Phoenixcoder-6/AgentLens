@@ -1,5 +1,7 @@
 # AgentLens_demo
 
+[![AgentLens CI](https://github.com/Phoenixcoder-6/AgentLens/actions/workflows/ci.yml/badge.svg)](https://github.com/Phoenixcoder-6/AgentLens/actions/workflows/ci.yml)
+
 **Multi-Agent Failure Attribution, Trace Diffing & Explainability Platform**
 
 AgentLens answers a single question precisely: *why did a multi-agent workflow fail, and which agent was responsible?*
@@ -98,6 +100,22 @@ streamlit run dashboard/app.py
 | Diff Engine | sentence-transformers (local) |
 | Dashboard | Streamlit |
 
+## CI/CD & Branch Protection
+
+Every push to `main` / `dev` and every pull request targeting `main` runs the GitHub Actions workflow in `.github/workflows/ci.yml`:
+
+1. **Lint & Type Check (`lint`)**: `ruff check .`, `ruff format --check .`, and `mypy . --ignore-missing-imports`.
+2. **Unit & Error Injection Tests (`test`)**: `pytest tests/ --cov=. --cov-fail-under=70`.
+3. **Validation Accuracy Gate (`validation-gate`)**: Runs the 20-trace frozen labeled dataset (`scripts/run_day34_validation.py` + `scripts/evaluate_day35_accuracy.py`) and fails the build if exact root-cause attribution accuracy drops below **75% (15/20)**.
+
+### Branch Protection Setup (`main`)
+Pull requests targeting `main` require all three CI status checks to pass before merging:
+- Enable **Require a pull request before merging** in GitHub `Settings -> Branches -> Branch protection rules (main)`.
+- Enable **Require status checks to pass before merging** and select:
+  - `Lint & Type Check`
+  - `Unit & Error Injection Tests (Coverage >= 70%)`
+  - `Validation Accuracy Gate (>= 75%)`
+
 ## Status
 
 🚧 **Active development — v1.0 build in progress (45-day plan)**
@@ -107,3 +125,4 @@ See `docs/` for the full Architecture & Requirements Document.
 ## Limitations
 
 See `LIMITATIONS.md` (generated after validation in Week 7).
+

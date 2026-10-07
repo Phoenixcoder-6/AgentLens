@@ -107,7 +107,8 @@ def evaluate_day35() -> dict[str, Any]:
     """Compare Day 34 pipeline results against Day 15 manual labels."""
     if not RESULTS_DAY34_PATH.exists():
         from scripts.run_day34_validation import run_validation
-    run_validation()
+
+        run_validation()
 
     labels_doc = json.loads(LABELS_PATH.read_text(encoding="utf-8"))
     results_doc = json.loads(RESULTS_DAY34_PATH.read_text(encoding="utf-8"))
