@@ -139,7 +139,9 @@ class TestShouldAlert:
 
         assert alerter.should_alert("P1") is False
 
+
 # ── Additional coverage tests ────────────────────────────────────────────────
+
 
 class TestAlerterEdgeCases:
     def test_does_not_fire_when_bundle_is_none(self):
@@ -209,6 +211,7 @@ class TestAlerterEdgeCases:
         assert alerter.should_alert("p1") is False
         assert alerter.should_alert("") is False
 
+
 class TestAlerterDispatch:
     def _make_alerter(self, tmp_path):
         from analyzers.alerter import Alerter
@@ -275,9 +278,7 @@ class TestAlerterDispatch:
 
         assert (log_dir / "alerts.log").exists()
 
-        content = (log_dir / "alerts.log").read_text(
-            encoding="utf-8"
-        )
+        content = (log_dir / "alerts.log").read_text(encoding="utf-8")
 
         assert "hello alert" in content
         assert "-" * 60 in content

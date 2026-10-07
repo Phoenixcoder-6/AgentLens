@@ -123,17 +123,7 @@ class TestExtractTopicCoverage:
         from dashboard.state import _extract_topic
 
         trace = {
-            "steps": [
-                {
-                    "handoff": json.dumps(
-                        {
-                            "input_state": json.dumps(
-                                {"topic": "Agentic AI"}
-                            )
-                        }
-                    )
-                }
-            ]
+            "steps": [{"handoff": json.dumps({"input_state": json.dumps({"topic": "Agentic AI"})})}]
         }
 
         assert _extract_topic(json.dumps(trace)) == "Agentic AI"
@@ -155,9 +145,7 @@ class TestExtractTopicCoverage:
 
         trace = {
             "steps": [],
-            "initial_state": json.dumps(
-                {"topic": "Large Language Models"}
-            ),
+            "initial_state": json.dumps({"topic": "Large Language Models"}),
         }
 
         assert _extract_topic(json.dumps(trace)) == "Large Language Models"
@@ -220,9 +208,12 @@ class TestGetDb:
 
         fake_db = MagicMock()
 
-        with patch.object(state, "_db", None), patch(
-            "dashboard.state.DatabaseManager",
-            return_value=fake_db,
+        with (
+            patch.object(state, "_db", None),
+            patch(
+                "dashboard.state.DatabaseManager",
+                return_value=fake_db,
+            ),
         ):
             result = state.get_db()
 
@@ -299,9 +290,7 @@ class TestTraceHelpers:
 
         steps = [{"agent": "researcher", "step": 1}]
         db = _db()
-        db.get_run.return_value = {
-            "trace_json": json.dumps({"steps": steps})
-        }
+        db.get_run.return_value = {"trace_json": json.dumps({"steps": steps})}
 
         with patch.object(state, "get_db", return_value=db):
             assert state.get_trace_steps("r1") == steps
@@ -314,9 +303,7 @@ class TestTraceHelpers:
     def test_parse_handoff_valid_json(self):
         from dashboard.state import _parse_handoff
 
-        assert _parse_handoff('{"input_state": {"x": 1}}') == {
-            "input_state": {"x": 1}
-        }
+        assert _parse_handoff('{"input_state": {"x": 1}}') == {"input_state": {"x": 1}}
 
     def test_parse_handoff_invalid_json(self):
         from dashboard.state import _parse_handoff
@@ -378,17 +365,7 @@ class TestListRunsCoverage:
         db.get_run.side_effect = lambda run_id: {
             "r1": {
                 "trace_json": json.dumps(
-                    {
-                        "steps": [
-                            {
-                                "handoff": {
-                                    "input_state": {
-                                        "topic": "AI research"
-                                    }
-                                }
-                            }
-                        ]
-                    }
+                    {"steps": [{"handoff": {"input_state": {"topic": "AI research"}}}]}
                 )
             },
             "r2": {"trace_json": ""},
@@ -480,13 +457,16 @@ class TestListRunsCoverage:
 
         db = self._make_db()
 
-        with patch.object(state, "get_db", return_value=db), patch.object(
-            state,
-            "_analysis_cache",
-            {
-                "r1": _state(_bundle("r1", "P2")),
-                "r2": _state(_bundle("r2", "P4")),
-            },
+        with (
+            patch.object(state, "get_db", return_value=db),
+            patch.object(
+                state,
+                "_analysis_cache",
+                {
+                    "r1": _state(_bundle("r1", "P2")),
+                    "r2": _state(_bundle("r2", "P4")),
+                },
+            ),
         ):
             result = state.list_runs(verdict_filter="P2")
 
@@ -886,15 +866,9 @@ class TestFailureAndCauseHelpers:
         import dashboard.state as state
 
         cache = {
-            "r1": _state(
-                _bundle(cause="information_loss")
-            ),
-            "r2": _state(
-                _bundle(cause="information_loss")
-            ),
-            "r3": _state(
-                _bundle(cause="hallucination")
-            ),
+            "r1": _state(_bundle(cause="information_loss")),
+            "r2": _state(_bundle(cause="information_loss")),
+            "r3": _state(_bundle(cause="hallucination")),
             "r4": _state(None),
         }
 
@@ -957,9 +931,7 @@ class TestVerdictForBundle:
     def test_p5_is_pass(self):
         from dashboard.state import verdict_for_bundle
 
-        assert verdict_for_bundle(
-            _bundle(priority="P5")
-        ) == "PASS"
+        assert verdict_for_bundle(_bundle(priority="P5")) == "PASS"
 
     def test_cached_loss_verdict_is_returned(self):
         import dashboard.state as state
@@ -998,6 +970,7 @@ class TestVerdictForBundle:
 
         with patch.object(state, "_analysis_cache", {}):
             assert state.verdict_for_bundle(bundle) == "WARNING"
+
 
 class TestComputeDiffCoverage:
     def test_compute_diff_missing_trace(self):

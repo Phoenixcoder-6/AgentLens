@@ -125,6 +125,7 @@ def test_run_pipeline_integration():
     if not state["verified"]:
         assert state["revision_notes"], "revision_notes should be populated when not verified"
 
+
 # ── Unit tests for pipeline nodes ─────────────────────────────────────────────
 
 
