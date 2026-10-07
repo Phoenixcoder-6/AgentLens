@@ -122,10 +122,10 @@ def check_4_fail_safe_capture() -> str:
             raise RuntimeError("Forced capture failure")
 
         HandoffCapture.finalize = _boom  # type: ignore[method-assign]
-        CaptureSession._save_trace_to_disk = classmethod(  # type: ignore[method-assign]
+        CaptureSession._save_trace_to_disk = classmethod(  # type: ignore[assignment]
             lambda cls, tr: (_ for _ in ()).throw(OSError("Disk error"))
         )
-        CaptureSession._save_trace_to_db = classmethod(  # type: ignore[method-assign]
+        CaptureSession._save_trace_to_db = classmethod(  # type: ignore[assignment]
             lambda cls, tr: (_ for _ in ()).throw(RuntimeError("DB error"))
         )
 
