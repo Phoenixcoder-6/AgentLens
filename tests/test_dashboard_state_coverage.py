@@ -999,3 +999,193 @@ class TestVerdictForBundle:
 
         with patch.object(state, "_analysis_cache", {}):
             assert state.verdict_for_bundle(bundle) == "WARNING"
+
+class TestComputeDiffCoverage:
+    def test_compute_diff_missing_trace(self):
+        import dashboard.state as state
+
+        with patch.object(state, "_load_run_trace", return_value=None):
+            result = state.compute_diff("run-a", "run-b")
+
+        assert result.run_a == "run-a"
+        assert result.run_b == "run-b"
+        assert result.steps == []
+        assert result.rows == []
+        assert result.first_divergence == "(trace not found)"
+        assert result.overall_similarity == 0.0
+
+    def test_compute_diff_full_path(self):
+        import dashboard.state as state
+
+        trace_a = object()
+        trace_b = object()
+
+        step_a = SimpleNamespace(agent="researcher")
+        step_b = SimpleNamespace(agent="researcher")
+
+        pair = SimpleNamespace(
+            agent="researcher",
+            status=SimpleNamespace(value="MATCHED"),
+            step_a=step_a,
+            step_b=step_b,
+        )
+
+        alignment = SimpleNamespace(
+            pairs=[pair],
+            matched_count=1,
+            missing_in_a_count=0,
+            missing_in_b_count=0,
+        )
+
+        score = SimpleNamespace(
+            agent="researcher",
+            similarity=0.92,
+            diverged=False,
+            method="semantic",
+        )
+
+        sim_report = SimpleNamespace(
+            scores=[score],
+            first_divergence_agent=None,
+            average_similarity=0.92,
+        )
+
+        db = MagicMock()
+        db.get_steps_for_run.side_effect = lambda run_id: [
+            {
+                "agent": "researcher",
+                "latency_ms": 100,
+                "tokens_total": 50,
+            }
+        ]
+
+        with (
+            patch.object(state, "_load_run_trace", side_effect=[trace_a, trace_b]),
+            patch(
+                "diff_engine.align_traces",
+                return_value=alignment,
+            ),
+            patch(
+                "diff_engine.score_similarity",
+                return_value=sim_report,
+            ),
+            patch.object(state, "get_db", return_value=db),
+        ):
+            result = state.compute_diff("run-a", "run-b")
+
+        assert result.run_a == "run-a"
+        assert result.run_b == "run-b"
+        assert result.overall_similarity == 0.92
+        assert result.first_divergence == "(none)"
+        assert result.matched_count == 1
+        assert result.missing_in_a_count == 0
+        assert result.missing_in_b_count == 0
+
+        assert len(result.rows) == 1
+        row = result.rows[0]
+
+        assert row.agent == "researcher"
+        assert row.match_status == "MATCHED"
+        assert row.lat_a == 100.0
+        assert row.lat_b == 100.0
+        assert row.lat_delta == 0.0
+        assert row.tok_a == 50
+        assert row.tok_b == 50
+        assert row.tok_delta == 0
+        assert row.sim == 0.92
+        assert row.diverged is False
+        assert row.method == "semantic"
+
+        assert len(result.steps) == 1
+        assert result.steps[0]["agent"] == "researcher"
+
+    def test_compute_diff_missing_in_a_and_missing_in_b(self):
+        import dashboard.state as state
+
+        trace_a = object()
+        trace_b = object()
+
+        pair_a = SimpleNamespace(
+            agent="researcher",
+            status=SimpleNamespace(value="MISSING_IN_B"),
+            step_a=SimpleNamespace(agent="researcher"),
+            step_b=None,
+        )
+
+        pair_b = SimpleNamespace(
+            agent="writer",
+            status=SimpleNamespace(value="MISSING_IN_A"),
+            step_a=None,
+            step_b=SimpleNamespace(agent="writer"),
+        )
+
+        alignment = SimpleNamespace(
+            pairs=[pair_a, pair_b],
+            matched_count=0,
+            missing_in_a_count=1,
+            missing_in_b_count=1,
+        )
+
+        sim_report = SimpleNamespace(
+            scores=[],
+            first_divergence_agent="researcher",
+            average_similarity=0.0,
+        )
+
+        db = MagicMock()
+        db.get_steps_for_run.side_effect = lambda run_id: {
+            "run-a": [
+                {
+                    "agent": "researcher",
+                    "latency_ms": 150,
+                    "tokens_total": 80,
+                }
+            ],
+            "run-b": [
+                {
+                    "agent": "writer",
+                    "latency_ms": 300,
+                    "tokens_total": 120,
+                }
+            ],
+        }[run_id]
+
+        with (
+            patch.object(state, "_load_run_trace", side_effect=[trace_a, trace_b]),
+            patch(
+                "diff_engine.align_traces",
+                return_value=alignment,
+            ),
+            patch(
+                "diff_engine.score_similarity",
+                return_value=sim_report,
+            ),
+            patch.object(state, "get_db", return_value=db),
+        ):
+            result = state.compute_diff("run-a", "run-b")
+
+        assert len(result.rows) == 2
+
+        researcher = result.rows[0]
+        assert researcher.match_status == "MISSING_IN_B"
+        assert researcher.lat_a == 150.0
+        assert researcher.lat_b == 0.0
+        assert researcher.lat_delta == -150.0
+        assert researcher.tok_a == 80
+        assert researcher.tok_b == 0
+        assert researcher.diverged is True
+        assert researcher.method == "n/a"
+
+        writer = result.rows[1]
+        assert writer.match_status == "MISSING_IN_A"
+        assert writer.lat_a == 0.0
+        assert writer.lat_b == 300.0
+        assert writer.lat_delta == 300.0
+        assert writer.tok_a == 0
+        assert writer.tok_b == 120
+        assert writer.diverged is True
+        assert writer.method == "n/a"
+
+        assert result.missing_in_a_count == 1
+        assert result.missing_in_b_count == 1
+        assert result.first_divergence == "researcher"
