@@ -100,6 +100,40 @@ streamlit run dashboard/app.py
 | Diff Engine | sentence-transformers (local) |
 | Dashboard | Streamlit |
 
+## Replay CLI (`replay.py`)
+
+> **Note:** `replay.py` is a deliberate addition beyond the original MVP, included because it directly supports cross-run diff validation and CI/CD pipeline gating.
+
+Re-run or deterministically evaluate a captured workflow run by `run_id`:
+
+```bash
+# Re-run or evaluate a run by ID
+python replay.py run_lbl_pass_01
+
+# Dry-run mode (evaluate deterministically without calling LLMs)
+python replay.py run_lbl_pass_01 --dry-run
+
+# Machine-readable JSON output for CI scripting
+python replay.py run_lbl_execution_01 --dry-run --json
+
+# Replay with a different topic to test attribution stability and diff validation
+python replay.py run_lbl_reasoning_01 --dry-run --override-topic "Quantum error correction"
+```
+
+### Exit Codes for CI Gating
+
+| Exit Code | Verdict | Meaning |
+|---|---|---|
+| `0` | `PASS` | `P5` — No failures or anomalies detected |
+| `1` | `WARNING` | `P3` / `P4` — Workflow violation or statistical outlier |
+| `2` | `FAIL` | `P1` / `P2` — Ground-truth mismatch or critical rule failure |
+| `3` | `ERROR` | Run ID not found, malformed trace, or runtime error |
+
+```bash
+python replay.py <run_id> --dry-run --json
+if [ $? -ge 2 ]; then exit 1; fi
+```
+
 ## CI/CD & Branch Protection
 
 Every push to `main` / `dev` and every pull request targeting `main` runs the GitHub Actions workflow in `.github/workflows/ci.yml`:
