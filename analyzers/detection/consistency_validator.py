@@ -21,6 +21,7 @@ RuleEngine and WorkflowValidator.
 
 from __future__ import annotations
 
+import json
 import os
 
 from analyzers.detection.rule_engine import _prestructured_evidence
@@ -28,6 +29,7 @@ from analyzers.evidence_extraction.extractor import EvidenceExtractor
 from app.interfaces import AnalysisResult, Analyzer
 from config import config_loader
 from schema.models import (
+    AgentStep,
     EvidenceRecord,
     EvidenceSource,
     FailureCategory,
@@ -35,6 +37,33 @@ from schema.models import (
     RuleSeverity,
     RunTrace,
 )
+
+
+def _is_rubber_stamp_verifier(step: AgentStep | None) -> bool:
+    """Return True when a verifier step explicitly rubber-stamps flagged/unverified content."""
+    if step is None or not step.output:
+        return False
+    raw = step.output.strip()
+    if not raw.startswith("{"):
+        return False
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return False
+    if not isinstance(data, dict):
+        return False
+    approved = (
+        data.get("verified") is True
+        or data.get("approved") is True
+        or str(data.get("verification_result", "")).upper() == "APPROVED"
+    )
+    if not approved:
+        return False
+    return bool(
+        data.get("always_approve") is True
+        or int(data.get("unverified_claims", 0) or 0) > 0
+        or int(data.get("flagged_claims", 0) or 0) > 0
+    )
 
 
 class ConsistencyValidator(Analyzer):
@@ -98,6 +127,7 @@ class ConsistencyValidator(Analyzer):
         # Fires when the verifier's entity count equals the writer's entity count
         # AND the writer had hallucinated new entities (gain > threshold).
         # This means the verifier "passed through" hallucinated content unchanged.
+        passthrough_fired = False
         if (
             res_step
             and wr_step
@@ -111,6 +141,7 @@ class ConsistencyValidator(Analyzer):
         ):
             entity_gain = wr_ev.entity_count - res_ev.entity_count
             if wr_ev.entity_count == ver_ev.entity_count and entity_gain > entity_gain_threshold:
+                passthrough_fired = True
                 evidence.append(
                     self._make_record(
                         rule_id="verifier_passthrough_v1",
@@ -123,6 +154,20 @@ class ConsistencyValidator(Analyzer):
                         step_idx=ver_step.step,
                     )
                 )
+
+        if not passthrough_fired and ver_step and _is_rubber_stamp_verifier(ver_step):
+            evidence.append(
+                self._make_record(
+                    rule_id="verifier_passthrough_v1",
+                    category=FailureCategory.VERIFICATION,
+                    description=(
+                        "Always-approve verifier rubber-stamped output without "
+                        "rejecting flagged or unverified claims."
+                    ),
+                    agent="verifier",
+                    step_idx=ver_step.step,
+                )
+            )
 
         # ── Rule: claim_drift_v1 ──────────────────────────────────────────────
         # Fires when the writer introduces claims that were NOT in the researcher
