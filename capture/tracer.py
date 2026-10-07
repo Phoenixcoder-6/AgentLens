@@ -38,86 +38,91 @@ def trace_step(func: Callable) -> Callable:
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        # ── No active session → run the function unchanged ─────────────────
-        trace = CaptureSession.get_current_trace()
+        # ── Pre-execution capture setup (fail-safe) ─────────────────────────
+        trace = None
+        capture = None
+        step = None
+        try:
+            trace = CaptureSession.get_current_trace()
+            if not trace:
+                return func(*args, **kwargs)
+
+            agent_name = func.__name__.replace("_node", "")
+            step_idx = len(trace.steps) + 1
+
+            state_in = args[0] if args else kwargs.get("state", {})
+            capture = HandoffCapture(input_state=state_in if isinstance(state_in, dict) else {})
+
+            step = AgentStep(
+                run_id=trace.run_id,
+                step=step_idx,
+                agent=agent_name,
+                input=json.dumps(state_in, default=str),
+                timestamp=datetime.now(UTC),
+            )
+        except Exception as cap_exc:
+            print(f"[trace_step] Warning: pre-execution capture failed: {cap_exc}")
+            trace = None
+
         if not trace:
             return func(*args, **kwargs)
-
-        # ── Metadata ────────────────────────────────────────────────────────
-        agent_name = func.__name__.replace("_node", "")
-        step_idx = len(trace.steps) + 1
-
-        # ── Snapshot full state BEFORE agent runs ────────────────────────
-        state_in = args[0] if args else kwargs.get("state", {})
-        capture = HandoffCapture(input_state=state_in if isinstance(state_in, dict) else {})
-
-        # ── Build the AgentStep (filled in below) ────────────────────────
-        step = AgentStep(
-            run_id=trace.run_id,
-            step=step_idx,
-            agent=agent_name,
-            input=json.dumps(state_in, default=str),
-            timestamp=datetime.now(UTC),
-        )
 
         start_time = time.perf_counter()
 
         try:
-            # ── Run the actual agent ────────────────────────────────────
+            # ── Run the actual agent ────────────────────────────────────────
             result = func(*args, **kwargs)
-
-            latency = (time.perf_counter() - start_time) * 1000.0
-
-            # ── Record what the agent returned ──────────────────────────
-            agent_return = result if isinstance(result, dict) else {}
-            capture.record_agent_return(agent_return)
-
-            # ── Finalize the three-state snapshot + diff ─────────────────
-            input_s, filtered_s, output_s, diff = capture.finalize()
-
-            # ── Populate the step ────────────────────────────────────────
-            step.output = json.dumps(result, default=str)
-            step.latency_ms = latency
-            step.status = StepStatus.SUCCESS
-            step.handoff.input_state = input_s
-            step.handoff.filtered_state = filtered_s  # agent's own return dict
-            step.handoff.output_state = output_s  # full merged state
-
-            # Apply token counts staged by the node via set_step_tokens()
-            # Consumed here (after node returns) so the correct step gets them
-            pending = CaptureSession.consume_pending_tokens()
-            if pending:
-                from schema.models import TokenUsage
-
-                step.tokens = TokenUsage(
-                    prompt=pending[0],
-                    completion=pending[1],
-                    total=pending[0] + pending[1],
-                )
-
-            # Store the diff summary in metadata for quick querying
-            # (full diff object is recoverable by re-running the diff engine)
-            step.prompt = diff.summary()  # re-using prompt field for diff log
-
-            CaptureSession.add_step(step)
-            return result
-
         except Exception as exc:
             latency = (time.perf_counter() - start_time) * 1000.0
+            try:
+                if capture is not None and step is not None:
+                    capture.record_agent_return({})
+                    input_s, filtered_s, output_s, diff = capture.finalize()
 
-            # Record partial capture even on error
-            capture.record_agent_return({})
-            input_s, filtered_s, output_s, diff = capture.finalize()
+                    step.latency_ms = latency
+                    step.status = StepStatus.ERROR
+                    step.error = f"{type(exc).__name__}: {exc}"
+                    step.handoff.input_state = input_s
+                    step.handoff.filtered_state = filtered_s
+                    step.handoff.output_state = output_s
+                    step.prompt = diff.summary()
 
-            step.latency_ms = latency
-            step.status = StepStatus.ERROR
-            step.error = f"{type(exc).__name__}: {exc}"
-            step.handoff.input_state = input_s
-            step.handoff.filtered_state = filtered_s
-            step.handoff.output_state = output_s
-            step.prompt = diff.summary()
-
-            CaptureSession.add_step(step)
+                    CaptureSession.add_step(step)
+            except Exception as cap_exc:
+                print(f"[trace_step] Warning: error-path capture failed: {cap_exc}")
             raise
+
+        # ── Post-execution capture recording (fail-safe) ────────────────────
+        latency = (time.perf_counter() - start_time) * 1000.0
+        try:
+            if capture is not None and step is not None:
+                agent_return = result if isinstance(result, dict) else {}
+                capture.record_agent_return(agent_return)
+
+                input_s, filtered_s, output_s, diff = capture.finalize()
+
+                step.output = json.dumps(result, default=str)
+                step.latency_ms = latency
+                step.status = StepStatus.SUCCESS
+                step.handoff.input_state = input_s
+                step.handoff.filtered_state = filtered_s
+                step.handoff.output_state = output_s
+
+                pending = CaptureSession.consume_pending_tokens()
+                if pending:
+                    from schema.models import TokenUsage
+
+                    step.tokens = TokenUsage(
+                        prompt=pending[0],
+                        completion=pending[1],
+                        total=pending[0] + pending[1],
+                    )
+
+                step.prompt = diff.summary()
+                CaptureSession.add_step(step)
+        except Exception as cap_exc:
+            print(f"[trace_step] Warning: post-execution capture failed: {cap_exc}")
+
+        return result
 
     return wrapper

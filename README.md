@@ -150,6 +150,22 @@ Pull requests targeting `main` require all three CI status checks to pass before
   - `Unit & Error Injection Tests (Coverage >= 70%)`
   - `Validation Accuracy Gate (>= 75%)`
 
+## Data Privacy, PII Scrubbing & Trace Retention
+
+> **Warning:** Traces contain full LLM I/O. Enable `pii_scrubbing` before using on user data.
+
+- **Fail-Safe Capture (`capture.fail_safe: true`)**: Exceptions inside `CaptureSession`, `HandoffCapture`, `@trace_step`, or `StorageWriter` are caught and logged as warnings; they never crash or alter the underlying agent workflow execution.
+- **Config-Driven PII Scrubbing (`capture/pii_scrubber.py`)**: Set `capture.pii_scrubbing.enabled: true` in `config/config.yaml` to redact emails (`[REDACTED_EMAIL]`), phone numbers (`[REDACTED_PHONE]`), SSNs (`[REDACTED_SSN]`), API keys (`[REDACTED_API_KEY]`), and credit cards (`[REDACTED_CREDIT_CARD]`) via configurable regex patterns, plus optional `spaCy` (`en_core_web_sm`) NER entity redaction when installed.
+- **Trace Retention Policy (`capture.retention_days: 90`)**: Run the cleanup utility to delete traces older than `retention_days` from `data/traces/*.json` and `data/agentlens.db`:
+
+```bash
+# Preview traces older than 90 days (dry-run)
+python scripts/cleanup_old_traces.py --dry-run
+
+# Delete traces older than 30 days
+python scripts/cleanup_old_traces.py --days 30
+```
+
 ## Status
 
 🚧 **Active development — v1.0 build in progress (45-day plan)**
@@ -159,4 +175,5 @@ See `docs/` for the full Architecture & Requirements Document.
 ## Limitations
 
 See `LIMITATIONS.md` (generated after validation in Week 7).
+
 

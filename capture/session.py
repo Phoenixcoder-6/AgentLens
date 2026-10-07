@@ -45,13 +45,17 @@ class CaptureSession:
 
     @classmethod
     def start_trace(cls, workflow: str, run_id: str | None = None) -> RunTrace:
-        cls._current_trace = RunTrace(
-            run_id=run_id or f"run_{uuid.uuid4().hex[:8]}",
-            workflow=workflow,
-            timestamp=datetime.now(UTC),
-            status=StepStatus.SUCCESS,
-        )
-        return cls._current_trace
+        try:
+            cls._current_trace = RunTrace(
+                run_id=run_id or f"run_{uuid.uuid4().hex[:8]}",
+                workflow=workflow,
+                timestamp=datetime.now(UTC),
+                status=StepStatus.SUCCESS,
+            )
+        except Exception as exc:
+            print(f"[CaptureSession] Warning: start_trace failed: {exc}")
+            cls._current_trace = None
+        return cls._current_trace  # type: ignore[return-value]
 
     @classmethod
     def get_current_trace(cls) -> RunTrace | None:
@@ -59,8 +63,14 @@ class CaptureSession:
 
     @classmethod
     def add_step(cls, step: AgentStep):
-        if cls._current_trace:
-            cls._current_trace.steps.append(step)
+        try:
+            if cls._current_trace:
+                from capture.pii_scrubber import PIIScrubber
+
+                PIIScrubber().scrub_step(step)
+                cls._current_trace.steps.append(step)
+        except Exception as exc:
+            print(f"[CaptureSession] Warning: add_step failed: {exc}")
 
     @classmethod
     def end_trace(
@@ -70,41 +80,59 @@ class CaptureSession:
             return None
 
         trace = cls._current_trace
-        if status != StepStatus.SUCCESS:
-            trace.status = status
+        try:
+            if status != StepStatus.SUCCESS:
+                trace.status = status
 
-        # Calculate aggregate metrics
-        total_latency = 0.0
-        total_tokens = 0
-        for step in trace.steps:
-            total_latency += step.latency_ms
-            total_tokens += step.tokens.total
-            if step.status in (StepStatus.FAILURE, StepStatus.ERROR):
-                trace.status = step.status
-                if step.error and not error:
-                    error = step.error
+            # Calculate aggregate metrics
+            total_latency = 0.0
+            total_tokens = 0
+            for step in trace.steps:
+                total_latency += step.latency_ms
+                total_tokens += step.tokens.total
+                if step.status in (StepStatus.FAILURE, StepStatus.ERROR):
+                    trace.status = step.status
+                    if step.error and not error:
+                        error = step.error
 
-        trace.total_latency_ms = total_latency
-        trace.total_tokens = total_tokens
+            trace.total_latency_ms = total_latency
+            trace.total_tokens = total_tokens
 
-        # 1. Save full JSON trace to disk
-        cls._save_trace_to_disk(trace)
+            # 0. Scrub PII if enabled in config
+            try:
+                from capture.pii_scrubber import PIIScrubber
 
-        # 2. Normalize and persist to SQLite
-        cls._save_trace_to_db(trace)
+                PIIScrubber().scrub_trace(trace)
+            except Exception as scrub_exc:
+                print(f"[CaptureSession] Warning: PII scrubbing failed: {scrub_exc}")
 
-        cls._current_trace = None
+            # 1. Save full JSON trace to disk (fail-safe)
+            cls._save_trace_to_disk(trace)
+
+            # 2. Normalize and persist to SQLite (fail-safe)
+            cls._save_trace_to_db(trace)
+        except Exception as exc:
+            print(f"[CaptureSession] Warning: end_trace failed: {exc}")
+        finally:
+            cls._current_trace = None
+
         return trace
 
     @classmethod
     def _save_trace_to_disk(cls, trace: RunTrace):
-        traces_dir = "data/traces"
-        os.makedirs(traces_dir, exist_ok=True)
+        try:
+            from config.config_loader import get
 
-        trace.trace_path = f"{traces_dir}/{trace.run_id}.json"
+            traces_dir = get("storage", "traces_dir", "data/traces") or "data/traces"
+            os.makedirs(traces_dir, exist_ok=True)
 
-        with open(trace.trace_path, "w", encoding="utf-8") as f:
-            f.write(trace.model_dump_json(indent=2))
+            trace.trace_path = f"{traces_dir}/{trace.run_id}.json"
+
+            with open(trace.trace_path, "w", encoding="utf-8") as f:
+                f.write(trace.model_dump_json(indent=2))
+        except Exception as exc:
+            # Disk failure must never crash the pipeline
+            print(f"[CaptureSession] Warning: disk trace save failed: {exc}")
 
     @classmethod
     def _save_trace_to_db(cls, trace: RunTrace) -> None:
@@ -119,11 +147,13 @@ class CaptureSession:
 
             normalized = Normalizer().normalize_run(trace)
 
-            # Read the JSON blob we just saved to disk
+            # Read the JSON blob we just saved to disk, or serialize directly on fallback
             trace_json: str | None = None
             if trace.trace_path and os.path.exists(trace.trace_path):
                 with open(trace.trace_path, encoding="utf-8") as f:
                     trace_json = f.read()
+            else:
+                trace_json = trace.model_dump_json(indent=2)
 
             writer = StorageWriter(db)
             writer.write_run(

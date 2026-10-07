@@ -517,6 +517,37 @@ class DatabaseManager:
         with self.connection() as conn:
             return int(conn.execute("SELECT COUNT(*) FROM rule_matches").fetchone()[0])
 
+    # -- Retention Policy (Day 39) ---------------------------------------------
+
+    def delete_runs_older_than(self, cutoff_iso: str, dry_run: bool = False) -> list[str]:
+        """
+        Find (and optionally delete) all runs with timestamp < cutoff_iso.
+        Deletes child rows from rule_matches, metrics, analysis, and steps first
+        to respect foreign-key constraints, then deletes from runs.
+
+        Returns the list of affected run_ids.
+        """
+        with self.connection() as conn:
+            rows = conn.execute(
+                "SELECT run_id FROM runs WHERE timestamp < ? ORDER BY timestamp ASC",
+                (cutoff_iso,),
+            ).fetchall()
+            run_ids = [str(r["run_id"]) for r in rows]
+
+            if not dry_run and run_ids:
+                placeholders = ",".join("?" for _ in run_ids)
+                for child_table in ("rule_matches", "metrics", "analysis", "steps"):
+                    conn.execute(
+                        f"DELETE FROM {child_table} WHERE run_id IN ({placeholders})",
+                        run_ids,
+                    )
+                conn.execute(
+                    f"DELETE FROM runs WHERE run_id IN ({placeholders})",
+                    run_ids,
+                )
+
+        return run_ids
+
     # -- Utility ---------------------------------------------------------------
 
     def table_counts(self) -> dict[str, int]:
