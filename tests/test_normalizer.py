@@ -407,3 +407,103 @@ class TestNormalizerRun:
         result = self.normalizer.normalize_run(run)
         assert isinstance(result.timestamp, datetime)
         assert result.timestamp.tzinfo is not None
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Normalizer — edge-case helper coverage
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestNormalizerHelpers:
+    def test_parse_state_dict_passthrough(self):
+        value = {"topic": "AI", "count": 5}
+
+        result = Normalizer._parse_state(value)
+
+        assert result is value
+
+    def test_parse_state_empty_values(self):
+        assert Normalizer._parse_state(None) == {}
+        assert Normalizer._parse_state("") == {}
+        assert Normalizer._parse_state(0) == {}
+
+    def test_parse_state_valid_json_dict(self):
+        result = Normalizer._parse_state('{"topic": "AI", "count": 5}')
+
+        assert result == {"topic": "AI", "count": 5}
+
+    def test_parse_state_non_dict_json(self):
+        assert Normalizer._parse_state("[1, 2, 3]") == {}
+
+    def test_parse_state_json_scalar(self):
+        assert Normalizer._parse_state('"hello"') == {}
+
+    def test_normalize_timestamp_naive_datetime(self):
+        value = datetime(2026, 7, 17, 12, 0, 0)
+
+        result = Normalizer._normalize_timestamp(value)
+
+        assert result == value.replace(tzinfo=UTC)
+        assert result.tzinfo == UTC
+
+    def test_normalize_timestamp_aware_datetime(self):
+        value = datetime(2026, 7, 17, 12, 0, 0, tzinfo=UTC)
+
+        result = Normalizer._normalize_timestamp(value)
+
+        assert result is value
+
+    def test_normalize_timestamp_valid_string(self):
+        result = Normalizer._normalize_timestamp(
+            "2026-07-17T12:00:00+00:00"
+        )
+
+        assert result == datetime(
+            2026, 7, 17, 12, 0, 0, tzinfo=UTC
+        )
+
+    def test_normalize_timestamp_naive_string_gets_utc(self):
+        result = Normalizer._normalize_timestamp(
+            "2026-07-17T12:00:00"
+        )
+
+        assert result.tzinfo == UTC
+
+    def test_normalize_timestamp_invalid_string_falls_back(self):
+        before = datetime.now(UTC)
+
+        result = Normalizer._normalize_timestamp("not-a-valid-timestamp")
+
+        after = datetime.now(UTC)
+
+        assert result.tzinfo == UTC
+        assert before <= result <= after
+
+    def test_normalize_timestamp_none_falls_back(self):
+        result = Normalizer._normalize_timestamp(None)
+
+        assert result.tzinfo == UTC
+
+    def test_normalize_status_enum_passthrough(self):
+        result = Normalizer._normalize_status(StepStatus.SUCCESS)
+
+        assert result is StepStatus.SUCCESS
+
+    def test_normalize_status_valid_string(self):
+        result = Normalizer._normalize_status("SUCCESS")
+
+        assert result is StepStatus.SUCCESS
+
+    def test_normalize_status_lowercase_string(self):
+        result = Normalizer._normalize_status("success")
+
+        assert result is StepStatus.SUCCESS
+
+    def test_normalize_status_invalid_string_falls_back(self):
+        result = Normalizer._normalize_status("NOT_A_REAL_STATUS")
+
+        assert result is StepStatus.SUCCESS
+
+    def test_normalize_status_none_falls_back(self):
+        result = Normalizer._normalize_status(None)
+
+        assert result is StepStatus.SUCCESS
