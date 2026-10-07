@@ -138,3 +138,231 @@ class TestShouldAlert:
         alerter._on_verdict = ["P1", "P2"]
 
         assert alerter.should_alert("P1") is False
+
+# ── Additional coverage tests ────────────────────────────────────────────────
+
+class TestAlerterEdgeCases:
+    def test_does_not_fire_when_bundle_is_none(self):
+        """No bundle means there is nothing to alert on."""
+        from analyzers.alerter import Alerter
+
+        Alerter.reset_cooldowns()
+
+        alerter = Alerter.__new__(Alerter)
+        alerter._enabled = True
+        alerter._on_verdict = ["P1", "P2"]
+        alerter._cooldown_minutes = 60
+
+        assert alerter.fire("run-none", None) is False
+
+    def test_does_not_fire_when_priority_is_missing(self):
+        """Bundle without a priority should not trigger an alert."""
+        from analyzers.alerter import Alerter
+
+        Alerter.reset_cooldowns()
+
+        alerter = Alerter.__new__(Alerter)
+        alerter._enabled = True
+        alerter._on_verdict = ["P1", "P2"]
+        alerter._cooldown_minutes = 60
+
+        bundle = MagicMock()
+        bundle.priority_level = None
+
+        assert alerter.fire("run-no-priority", bundle) is False
+
+    def test_reset_cooldowns_clears_registry(self):
+        """reset_cooldowns should remove all cooldown entries."""
+        from analyzers.alerter import Alerter
+
+        Alerter.reset_cooldowns()
+
+        alerter = Alerter.__new__(Alerter)
+        alerter._enabled = True
+        alerter._on_verdict = ["P1"]
+        alerter._channel = "log"
+        alerter._webhook_url = ""
+        alerter._cooldown_minutes = 60
+        alerter._log_dir = "logs"
+
+        with patch.object(alerter, "_dispatch"):
+            alerter.fire("run-reset", _make_bundle("P1"))
+
+        # Cooldown should exist.
+        from analyzers.alerter import _COOLDOWN_REGISTRY
+
+        assert "run-reset" in _COOLDOWN_REGISTRY
+
+        Alerter.reset_cooldowns()
+
+        assert "run-reset" not in _COOLDOWN_REGISTRY
+
+    def test_should_alert_handles_case_exactly(self):
+        """Only configured verdict strings should trigger."""
+        from analyzers.alerter import Alerter
+
+        alerter = Alerter.__new__(Alerter)
+        alerter._enabled = True
+        alerter._on_verdict = ["P1", "P2"]
+
+        assert alerter.should_alert("P1") is True
+        assert alerter.should_alert("p1") is False
+        assert alerter.should_alert("") is False
+
+class TestAlerterDispatch:
+    def _make_alerter(self, tmp_path):
+        from analyzers.alerter import Alerter
+
+        alerter = Alerter.__new__(Alerter)
+        alerter._enabled = True
+        alerter._on_verdict = ["P1", "P2"]
+        alerter._channel = "log"
+        alerter._webhook_url = ""
+        alerter._cooldown_minutes = 60
+        alerter._log_dir = str(tmp_path)
+        return alerter
+
+    def test_build_message_contains_key_information(self, tmp_path):
+        """Alert message should contain the important alert information."""
+        alerter = self._make_alerter(tmp_path)
+
+        message = alerter._build_message(
+            "run-message",
+            _make_bundle("P1", "reasoning"),
+            "P1",
+            "http://localhost:8501",
+        )
+
+        assert "run-message" in message
+        assert "P1" in message
+        assert "researcher" in message
+        assert "reasoning" in message
+        assert "0.85" in message
+        assert "http://localhost:8501/run/run-message" in message
+
+    def test_log_channel_dispatches_to_log(self, tmp_path):
+        """Log channel should call _write_log."""
+        alerter = self._make_alerter(tmp_path)
+
+        with patch.object(alerter, "_write_log") as write_log:
+            alerter._dispatch("test alert", "run-dispatch")
+
+        write_log.assert_called_once_with(
+            "test alert",
+            "run-dispatch",
+        )
+
+    def test_slack_channel_dispatches_to_slack(self, tmp_path):
+        """Slack channel should call _send_slack."""
+        alerter = self._make_alerter(tmp_path)
+        alerter._channel = "slack"
+
+        with patch.object(alerter, "_send_slack") as send_slack:
+            alerter._dispatch("test alert", "run-dispatch")
+
+        send_slack.assert_called_once_with("test alert")
+
+    def test_write_log_creates_directory(self, tmp_path):
+        """_write_log should create a missing log directory."""
+        from analyzers.alerter import Alerter
+
+        log_dir = tmp_path / "nested" / "alerts"
+
+        alerter = Alerter.__new__(Alerter)
+        alerter._log_dir = str(log_dir)
+
+        alerter._write_log("hello alert", "run-log")
+
+        assert (log_dir / "alerts.log").exists()
+
+        content = (log_dir / "alerts.log").read_text(
+            encoding="utf-8"
+        )
+
+        assert "hello alert" in content
+        assert "-" * 60 in content
+
+    def test_slack_without_webhook_falls_back_to_log(self, tmp_path):
+        """Slack without a webhook should fall back to local logging."""
+        from analyzers.alerter import Alerter
+
+        alerter = Alerter.__new__(Alerter)
+        alerter._webhook_url = ""
+        alerter._log_dir = str(tmp_path)
+
+        with patch.object(alerter, "_write_log") as write_log:
+            alerter._send_slack("fallback message")
+
+        write_log.assert_called_once_with(
+            "fallback message",
+            run_id="slack-fallback",
+        )
+
+    def test_slack_success(self, tmp_path):
+        """Successful Slack request should be handled without error."""
+        from analyzers.alerter import Alerter
+
+        alerter = Alerter.__new__(Alerter)
+        alerter._webhook_url = "https://example.com/webhook"
+        alerter._log_dir = str(tmp_path)
+
+        fake_response = MagicMock()
+        fake_response.status = 200
+        fake_response.__enter__.return_value = fake_response
+        fake_response.__exit__.return_value = None
+
+        with patch(
+            "urllib.request.urlopen",
+            return_value=fake_response,
+        ) as urlopen:
+            alerter._send_slack("Slack alert")
+
+        urlopen.assert_called_once()
+
+        request = urlopen.call_args.args[0]
+
+        assert request.full_url == "https://example.com/webhook"
+        assert request.data is not None
+        assert b"Slack alert" in request.data
+
+    def test_slack_non_200_response(self, tmp_path):
+        """Non-200 Slack response should log a warning."""
+        from analyzers.alerter import Alerter
+
+        alerter = Alerter.__new__(Alerter)
+        alerter._webhook_url = "https://example.com/webhook"
+        alerter._log_dir = str(tmp_path)
+
+        fake_response = MagicMock()
+        fake_response.status = 500
+        fake_response.__enter__.return_value = fake_response
+        fake_response.__exit__.return_value = None
+
+        with patch(
+            "urllib.request.urlopen",
+            return_value=fake_response,
+        ):
+            with patch("analyzers.alerter.logger.warning") as warning:
+                alerter._send_slack("Slack alert")
+
+        warning.assert_called_once()
+
+    def test_slack_exception_falls_back_to_log(self, tmp_path):
+        """Slack request failures should fall back to local logging."""
+        from analyzers.alerter import Alerter
+
+        alerter = Alerter.__new__(Alerter)
+        alerter._webhook_url = "https://example.com/webhook"
+        alerter._log_dir = str(tmp_path)
+
+        with patch(
+            "urllib.request.urlopen",
+            side_effect=Exception("network failure"),
+        ):
+            with patch.object(alerter, "_write_log") as write_log:
+                alerter._send_slack("Slack alert")
+
+        write_log.assert_called_once_with(
+            "Slack alert",
+            run_id="slack-fallback",
+        )
