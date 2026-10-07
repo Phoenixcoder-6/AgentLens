@@ -22,9 +22,9 @@ from app.pipeline import (
     PipelineState,
     build_pipeline,
     researcher_node,
-    writer_node,
-    verifier_node,
     run_pipeline,
+    verifier_node,
+    writer_node,
 )
 
 # ── Pipeline structure tests (no API call needed) ─────────────────────────────
