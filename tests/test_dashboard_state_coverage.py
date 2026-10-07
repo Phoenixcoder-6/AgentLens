@@ -1162,6 +1162,7 @@ class TestComputeDiffCoverage:
         assert result.missing_in_b_count == 1
         assert result.first_divergence == "researcher"
 
+
 class TestRunFullAnalysisCoverage:
     def test_cached_result_is_returned(self):
         import dashboard.state as state

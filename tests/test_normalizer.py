@@ -408,6 +408,7 @@ class TestNormalizerRun:
         assert isinstance(result.timestamp, datetime)
         assert result.timestamp.tzinfo is not None
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Normalizer — edge-case helper coverage
 # ─────────────────────────────────────────────────────────────────────────────
@@ -453,18 +454,12 @@ class TestNormalizerHelpers:
         assert result is value
 
     def test_normalize_timestamp_valid_string(self):
-        result = Normalizer._normalize_timestamp(
-            "2026-07-17T12:00:00+00:00"
-        )
+        result = Normalizer._normalize_timestamp("2026-07-17T12:00:00+00:00")
 
-        assert result == datetime(
-            2026, 7, 17, 12, 0, 0, tzinfo=UTC
-        )
+        assert result == datetime(2026, 7, 17, 12, 0, 0, tzinfo=UTC)
 
     def test_normalize_timestamp_naive_string_gets_utc(self):
-        result = Normalizer._normalize_timestamp(
-            "2026-07-17T12:00:00"
-        )
+        result = Normalizer._normalize_timestamp("2026-07-17T12:00:00")
 
         assert result.tzinfo == UTC
 
