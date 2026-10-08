@@ -8,13 +8,16 @@
 llm:
   provider: "groq"                          # groq | openai | local
   model: "openai/gpt-oss-120b"              # Groq primary model ID
+  primary_model: "openai/gpt-oss-120b"      # Alias for primary model ID (Day 40)
   fallback_model: "openai/gpt-oss-20b"      # Groq fallback model ID if primary fails
   temperature: 0.0                          # Deterministic output for extraction
   extraction_max_tokens: 4096               # Token budget for evidence extraction calls
-  explanation_max_tokens: 4096             # Token budget for LLM explainer calls
+  explanation_max_tokens: 4096              # Token budget for LLM explainer calls
   retry_attempts: 1                         # Retry once on malformed extraction output
   cache_enabled: true                       # Store/retrieve LLM calls in SQLite cache
   cache_ttl_hours: 24                       # Cache lifetime in hours
+  budget_alert_usd: 1.00                    # Warn in logs + dashboard if session cost exceeds this
+  cost_per_token_usd: 0.000005              # Estimated USD cost per token ($0.005 / 1K tokens)
 
 # ─────────────────────────────────────────────
 # Storage
@@ -55,6 +58,9 @@ metrics:
   latency_stddev_multiplier: 2.5           # Flag if latency > mean + (N * stddev)
   min_runs_for_baseline: 5                 # Min runs needed before statistical detection activates
 
+stats:
+  outlier_stddev: 2.5                      # Unified outlier stddev multiplier (Day 40 config sweep)
+
 # ─────────────────────────────────────────────
 # Arbiter Priority Levels
 # ─────────────────────────────────────────────
@@ -64,6 +70,9 @@ arbiter:
   reasoning:
     researcher_min_sources: 1              # Minimum required sources for researcher_quality_v1
     hallucination_entity_gain_threshold: 0 # Allowed entity count increase from researcher to writer
+  information_loss:
+    severe_threshold: 3                    # |delta| >= 3 → HIGH severity (FAIL on drops)
+    moderate_threshold: 1                  # |delta| >= 1 → MEDIUM severity (WARNING)
   workflow:
     required_agents: ["researcher", "writer", "verifier"]
   priorities:

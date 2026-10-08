@@ -102,8 +102,24 @@ class StatisticalDetector:
 
     def __init__(self, db: DatabaseManager) -> None:
         self.db = db
-        self._latency_mult = float(get("metrics", "latency_stddev_multiplier", 2.5))
-        self._token_mult = float(get("metrics", "token_stddev_multiplier", 2.5))
+        stats_outlier = get("stats", "outlier_stddev", None)
+        lat_cfg = get("metrics", "latency_stddev_multiplier", None)
+        tok_cfg = get("metrics", "token_stddev_multiplier", None)
+
+        default_mult = float(stats_outlier) if stats_outlier is not None else 2.5
+        if stats_outlier is not None and float(stats_outlier) != 2.5:
+            # If stats.outlier_stddev is explicitly customized, allow it to drive multipliers
+            # unless metrics.*_stddev_multiplier was also customized away from 2.5
+            self._latency_mult = (
+                float(lat_cfg) if (lat_cfg is not None and float(lat_cfg) != 2.5) else default_mult
+            )
+            self._token_mult = (
+                float(tok_cfg) if (tok_cfg is not None and float(tok_cfg) != 2.5) else default_mult
+            )
+        else:
+            self._latency_mult = float(lat_cfg) if lat_cfg is not None else default_mult
+            self._token_mult = float(tok_cfg) if tok_cfg is not None else default_mult
+
         self._min_runs = int(get("metrics", "min_runs_for_baseline", 5))
 
     # ── Public API ─────────────────────────────────────────────────────────────

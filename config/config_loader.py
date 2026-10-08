@@ -37,4 +37,9 @@ def get(section: str, key: str | None = None, default: Any = None) -> Any:
     section_data = cfg.get(section, {})
     if key is None:
         return section_data
+    if section == "llm" and key in ("model", "primary_model"):
+        if key in section_data:
+            return section_data[key]
+        alt = "primary_model" if key == "model" else "model"
+        return section_data.get(alt, default)
     return section_data.get(key, default)

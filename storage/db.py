@@ -164,7 +164,17 @@ class DatabaseManager:
         db.initialize()                  # create tables if not exist
     """
 
-    def __init__(self, db_path: str = DEFAULT_DB_PATH) -> None:
+    def __init__(self, db_path: str | None = None) -> None:
+        if db_path is None:
+            if DEFAULT_DB_PATH != "data/agentlens.db":
+                db_path = DEFAULT_DB_PATH
+            else:
+                try:
+                    from config.config_loader import get
+
+                    db_path = str(get("storage", "db_path", DEFAULT_DB_PATH) or DEFAULT_DB_PATH)
+                except Exception:
+                    db_path = DEFAULT_DB_PATH
         self.db_path = db_path
         os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else ".", exist_ok=True)
 

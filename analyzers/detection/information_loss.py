@@ -96,9 +96,28 @@ class InformationLossRule:
         print(result.summary)
     """
 
-    # How much delta triggers each severity level
+    # Default thresholds (overridden by arbiter.information_loss in config.yaml)
     _SEVERE_THRESHOLD = 3  # |delta| >= 3 → HIGH severity
     _MODERATE_THRESHOLD = 1  # |delta| >= 1 → MEDIUM severity
+
+    def __init__(
+        self,
+        severe_threshold: int | None = None,
+        moderate_threshold: int | None = None,
+    ) -> None:
+        from config.config_loader import get
+
+        cfg = get("arbiter", "information_loss", {}) or {}
+        self.severe_threshold = (
+            int(severe_threshold)
+            if severe_threshold is not None
+            else int(cfg.get("severe_threshold", self._SEVERE_THRESHOLD))
+        )
+        self.moderate_threshold = (
+            int(moderate_threshold)
+            if moderate_threshold is not None
+            else int(cfg.get("moderate_threshold", self._MODERATE_THRESHOLD))
+        )
 
     def evaluate(
         self,
@@ -205,9 +224,9 @@ class InformationLossRule:
         """Map absolute delta to severity level."""
         if abs_delta == 0:
             return "NONE"
-        if abs_delta >= self._SEVERE_THRESHOLD:
+        if abs_delta >= self.severe_threshold:
             return "HIGH"
-        if abs_delta >= self._MODERATE_THRESHOLD:
+        if abs_delta >= self.moderate_threshold:
             return "MEDIUM"
         return "LOW"
 

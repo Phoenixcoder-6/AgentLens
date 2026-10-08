@@ -842,14 +842,58 @@ def compute_diff(run_id_a: str, run_id_b: str) -> DiffResult:
     )
 
 
+def get_cost_per_token() -> float:
+    """Return configured USD cost per token from config.yaml (llm.cost_per_token_usd)."""
+    try:
+        from config.config_loader import get
+
+        val = get("llm", "cost_per_token_usd", COST_PER_TOKEN)
+        return float(val) if val is not None else COST_PER_TOKEN
+    except Exception:
+        return COST_PER_TOKEN
+
+
+def get_budget_alert_usd() -> float:
+    """Return configured session cost budget alert threshold in USD (llm.budget_alert_usd)."""
+    try:
+        from config.config_loader import get
+
+        val = get("llm", "budget_alert_usd", 1.00)
+        return float(val) if val is not None else 1.00
+    except Exception:
+        return 1.00
+
+
 def total_cost_estimate() -> float:
-    """Estimate total LLM cost across all runs (display in header)."""
+    """
+    Estimate total LLM cost across all runs (display in header).
+    Logs a WARNING if total estimated cost exceeds llm.budget_alert_usd.
+    """
     db = get_db()
     runs = db.list_runs(limit=500)
     total = 0
     for r in runs:
         total += _total_tokens(r["run_id"])
-    return total * COST_PER_TOKEN
+    cost = total * get_cost_per_token()
+    budget = get_budget_alert_usd()
+    if cost > budget:
+        from config.logging_config import get_logger
+
+        get_logger("cost_control").warning(
+            f"Session LLM cost (${cost:.4f}) exceeded budget_alert_usd (${budget:.2f})"
+        )
+    return cost
+
+
+def get_budget_status() -> dict[str, float | bool]:
+    """Return current session cost, budget threshold, and whether budget is exceeded."""
+    cost = total_cost_estimate()
+    budget = get_budget_alert_usd()
+    return {
+        "cost_usd": cost,
+        "budget_usd": budget,
+        "exceeded": cost > budget,
+    }
 
 
 def verdict_for_bundle(bundle: AnalysisBundle | None) -> str:

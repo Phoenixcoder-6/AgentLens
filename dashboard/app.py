@@ -78,13 +78,39 @@ def _logo_html() -> str:
 
 def _cost_ticker() -> str:
     try:
-        cost = state.total_cost_estimate()
+        status = state.get_budget_status()
+        cost = float(status["cost_usd"])
+        budget = float(status["budget_usd"])
+        if status["exceeded"]:
+            return (
+                f'<span class="al-cost-alert" style="background:{RED}22;color:{RED};'
+                f"border:1px solid {RED}55;border-radius:6px;padding:3px 10px;"
+                f'font-size:11px;font-weight:700;margin-right:8px;">'
+                f"BUDGET ALERT: ~${cost:.4f} &gt; ${budget:.2f} limit</span>"
+                f'<span class="al-cost">~${cost:.4f} est.</span>'
+            )
         return f'<span class="al-cost">~${cost:.4f} est.</span>'
     except Exception:
         return ""
 
 
 def header(pipeline_name: str = "research_report_pipeline"):
+    banner_html = ""
+    try:
+        status = state.get_budget_status()
+        if status["exceeded"]:
+            cost = float(status["cost_usd"])
+            budget = float(status["budget_usd"])
+            banner_html = f"""
+            <div class="al-budget-banner" style="background:{AMBER}18;border-bottom:1px solid {AMBER}55;
+                        color:{AMBER};padding:6px 24px;font-size:12px;font-weight:600;
+                        display:flex;align-items:center;gap:8px;">
+              <span>&#9888; Cost Budget Alert: Total estimated session cost (~${cost:.4f}) exceeds configured budget_alert_usd (${budget:.2f}).</span>
+            </div>
+            """
+    except Exception:
+        pass
+
     ui.html(f"""
     <div class="al-header">
       {_logo_html()}
@@ -95,6 +121,7 @@ def header(pipeline_name: str = "research_report_pipeline"):
       <div style="flex:1;"></div>
       {_cost_ticker()}
     </div>
+    {banner_html}
     """)
 
 
@@ -265,7 +292,12 @@ def runs_page():
                 for label, val, color, sub in [
                     ("Total Runs", str(agg["total"]), PURPLE, f"{agg['analyzed']} analyzed"),
                     ("Avg Latency", fmt_ms(avg_lat), CYAN, "per pipeline run"),
-                    ("Total Tokens", f"{total_tok:,}", AMBER, f"~${total_tok * 0.000005:.3f} est."),
+                    (
+                        "Total Tokens",
+                        f"{total_tok:,}",
+                        AMBER,
+                        f"~${total_tok * state.get_cost_per_token():.3f} est.",
+                    ),
                     (
                         "P1/P2 Issues",
                         str(agg["p1_p2_count"]),
