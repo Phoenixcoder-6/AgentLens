@@ -140,11 +140,19 @@ def check_4_custom_3_agent_pipeline() -> str:
         )
         re_ev = RuleEngine().analyze(trace).evidence
         cv_ev = ConsistencyValidator().analyze(trace).evidence
-        assert any(e.agent == "coder" and e.rule_match.rule_id == "hallucination_v1" for e in re_ev)
         assert any(
-            e.agent == "reviewer" and e.rule_match.rule_id == "verifier_passthrough_v1"
+            e.agent == "coder"
+            and e.rule_match is not None
+            and e.rule_match.rule_id == "hallucination_v1"
+            for e in re_ev
+        )
+        assert any(
+            e.agent == "reviewer"
+            and e.rule_match is not None
+            and e.rule_match.rule_id == "verifier_passthrough_v1"
             for e in cv_ev
         )
+       
     finally:
         config_loader.get = orig_get  # type: ignore[assignment]
 
