@@ -232,9 +232,7 @@ def main() -> int:
             assert len(il_res.evidence) == 1
             assert il_res.evidence[0].rule_match is not None
             assert il_res.evidence[0].rule_match.rule_id == "information_loss_v1"
-            print(
-                "[PASS] Check 5: All 5 Detection sub-modules implement Analyzer (.analyze)"
-            )
+            print("[PASS] Check 5: All 5 Detection sub-modules implement Analyzer (.analyze)")
             passed += 1
         except Exception as exc:
             print(f"[FAIL] Check 5: {exc}")
