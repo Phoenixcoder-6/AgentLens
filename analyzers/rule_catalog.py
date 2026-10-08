@@ -126,3 +126,29 @@ def normalize_rule_id(rule_id: str) -> str:
 def get_rule_info(rule_id: str) -> RuleInfo | None:
     """Catalog entry for a (possibly parametrized) rule ID, or None if unknown."""
     return RULE_CATALOG.get(normalize_rule_id(rule_id))
+
+
+def get_current_rule_version(
+    rule_id: str, catalog: dict[str, RuleInfo] | None = None
+) -> str | None:
+    """Return the current catalog version string for a rule_id, or None if unknown."""
+    active_catalog = catalog if catalog is not None else RULE_CATALOG
+    info = active_catalog.get(normalize_rule_id(rule_id))
+    return info["version"] if info is not None else None
+
+
+def is_rule_version_stale(
+    rule_id: str,
+    recorded_version: str | None,
+    catalog: dict[str, RuleInfo] | None = None,
+) -> bool:
+    """
+    Return True if a stored rule match's version differs from the current
+    RULE_CATALOG version (indicating the run should be re-analyzed).
+    """
+    current = get_current_rule_version(rule_id, catalog=catalog)
+    if current is None:
+        return False
+    if not recorded_version:
+        return True
+    return str(recorded_version) != str(current)

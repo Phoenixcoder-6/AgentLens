@@ -527,6 +527,43 @@ class DatabaseManager:
         with self.connection() as conn:
             return int(conn.execute("SELECT COUNT(*) FROM rule_matches").fetchone()[0])
 
+    def get_rule_matches_for_run(self, run_id: str) -> list[dict[str, Any]]:
+        """Return all stored rule_matches rows for a specific run_id."""
+        with self.connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM rule_matches WHERE run_id = ? ORDER BY step ASC, id ASC",
+                (run_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_stale_rule_matches(self, catalog: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        """
+        Return all stored rule_matches whose rule_version differs from the
+        current RULE_CATALOG version (Day 42 stale rule detection).
+        """
+        from analyzers.rule_catalog import (
+            RULE_CATALOG,
+            get_current_rule_version,
+            is_rule_version_stale,
+        )
+
+        active_catalog = catalog if catalog is not None else RULE_CATALOG
+        with self.connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM rule_matches ORDER BY matched_at DESC, id DESC"
+            ).fetchall()
+
+        stale: list[dict[str, Any]] = []
+        for r in rows:
+            row_dict = dict(r)
+            rid = str(row_dict.get("rule_id", ""))
+            rec_ver = str(row_dict.get("rule_version", ""))
+            if is_rule_version_stale(rid, rec_ver, catalog=active_catalog):
+                row_dict["current_version"] = get_current_rule_version(rid, catalog=active_catalog)
+                row_dict["is_stale"] = True
+                stale.append(row_dict)
+        return stale
+
     # -- Retention Policy (Day 39) ---------------------------------------------
 
     def delete_runs_older_than(self, cutoff_iso: str, dry_run: bool = False) -> list[str]:

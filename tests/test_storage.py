@@ -328,8 +328,67 @@ class TestCheckpoint:
         parsed = json.loads(stored_json)
         assert parsed["run_id"] == "run_test999"
 
-        print("\n✅ CHECKPOINT PASSED")
+        print("\n[OK] CHECKPOINT PASSED")
         print(f"   runs     : {counts['runs']}")
         print(f"   steps    : {counts['steps']}")
         print(f"   metrics  : {counts['metrics']}")
-        print(f"   analysis : {counts['analysis']} (empty — awaiting analyzers)")
+        print(f"   analysis : {counts['analysis']} (empty -- awaiting analyzers)")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Day 42: Alembic Migration Upgrade / Downgrade Tests
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestAlembicMigrations:
+    """Verify Alembic migration ec1ab42def9b upgrades to head and downgrades to base cleanly."""
+
+    EXPECTED_INDEXES = {
+        "ix_runs_timestamp",
+        "ix_analysis_run_id",
+        "ix_llm_cache_key",
+        "ix_llm_cache_expires_at",
+        "ix_steps_run_id",
+    }
+
+    @staticmethod
+    def _list_indexes(db: DatabaseManager) -> set[str]:
+        with db.connection() as conn:
+            rows = conn.execute("SELECT name FROM sqlite_master WHERE type = 'index'").fetchall()
+        return {str(r[0]) for r in rows if r[0]}
+
+    def test_alembic_upgrade_head_and_downgrade_base(self, tmp_path):
+        from pathlib import Path
+
+        from alembic.config import Config
+
+        from alembic import command
+
+        db_file = tmp_path / "alembic_migration_test.db"
+        db = DatabaseManager(db_path=str(db_file))
+        db.initialize()
+
+        root_dir = Path(__file__).resolve().parent.parent
+        alembic_cfg = Config(str(root_dir / "alembic.ini"))
+        alembic_cfg.set_main_option("script_location", str(root_dir / "alembic"))
+        alembic_cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_file.as_posix()}")
+
+        # 1. Downgrade to base first so we test upgrade from clean base
+        command.downgrade(alembic_cfg, "base")
+        indexes_after_base = self._list_indexes(db)
+        assert not (self.EXPECTED_INDEXES & indexes_after_base), (
+            f"Expected performance indexes to be dropped on downgrade(base), found: "
+            f"{self.EXPECTED_INDEXES & indexes_after_base}"
+        )
+
+        # 2. Upgrade to head -> all 5 performance indexes must exist
+        command.upgrade(alembic_cfg, "head")
+        indexes_after_head = self._list_indexes(db)
+        assert self.EXPECTED_INDEXES.issubset(indexes_after_head), (
+            f"Missing indexes after upgrade(head): {self.EXPECTED_INDEXES - indexes_after_head}"
+        )
+
+        # 3. Downgrade back to base -> all 5 performance indexes must be removed
+        command.downgrade(alembic_cfg, "base")
+        indexes_after_second_down = self._list_indexes(db)
+        assert not (self.EXPECTED_INDEXES & indexes_after_second_down)
