@@ -26,9 +26,9 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import alembic.command as command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 
-import alembic.command as command  # noqa: E402
 from analyzers.alerter import Alerter  # noqa: E402
 from analyzers.arbiter import Arbiter  # noqa: E402
 from analyzers.detection.workflow_validator import WorkflowValidator  # noqa: E402
