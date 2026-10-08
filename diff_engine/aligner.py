@@ -18,6 +18,7 @@ Features:
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -281,3 +282,74 @@ class GraphAligner:
 
         pairs_reversed.reverse()
         return pairs_reversed
+
+    @property
+    def analyzer_id(self) -> str:
+        return "diff_engine"
+
+    def __init__(self, baseline_trace: RunTrace | None = None) -> None:
+        self.baseline_trace = baseline_trace
+
+    def analyze(self, trace: RunTrace, baseline_trace: RunTrace | None = None) -> Any:
+        """
+        Run Analyzer-compatible graph alignment analysis on a RunTrace.
+        """
+        from app.interfaces import AnalysisResult
+        from schema.models import (
+            EvidenceRecord,
+            EvidenceSource,
+            FailureCategory,
+            RuleMatch,
+            RuleSeverity,
+        )
+
+        try:
+            if not trace or not getattr(trace, "steps", None):
+                return AnalysisResult(
+                    skipped=True,
+                    skip_reason="No steps in trace",
+                    analyzer_id=self.analyzer_id,
+                )
+
+            ref_trace = baseline_trace or self.baseline_trace or trace
+            alignment = self.align_traces(ref_trace, trace)
+            evidence: list[EvidenceRecord] = []
+
+            for pair in alignment.get_missing_steps():
+                desc = f"Agent '{pair.agent}' alignment status: {pair.status.value}"
+                rule = RuleMatch(
+                    rule_id=f"DIFF-ALIGN-{pair.agent.upper()}",
+                    rule_version="1.0.0",
+                    category=FailureCategory.WORKFLOW,
+                    description=desc,
+                    severity=RuleSeverity.MEDIUM,
+                    agent=pair.agent,
+                    step=pair.step_index_b or pair.step_index_a,
+                )
+                evidence.append(
+                    EvidenceRecord(
+                        source=EvidenceSource.DIFF_ENGINE,
+                        description=desc,
+                        value=pair.status.value,
+                        rule_match=rule,
+                        agent=pair.agent,
+                        step=pair.step_index_b or pair.step_index_a,
+                        confidence=1.0,
+                    )
+                )
+
+            return AnalysisResult(
+                evidence=evidence,
+                analyzer_id=self.analyzer_id,
+                skipped=False,
+            )
+        except Exception as exc:
+            return AnalysisResult(
+                skipped=True,
+                skip_reason=f"GraphAligner error: {exc}",
+                analyzer_id=self.analyzer_id,
+            )
+
+    def run(self, trace: RunTrace, baseline_trace: RunTrace | None = None) -> Any:
+        """Standard Analyzer execution alias."""
+        return self.analyze(trace, baseline_trace=baseline_trace)

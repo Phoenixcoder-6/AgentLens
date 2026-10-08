@@ -462,7 +462,11 @@ class EvidenceExtractor:
         result.schema_version = SCHEMA_VERSION
         return result
 
-    def extract_run(self, steps: list[dict]) -> dict[int, ExtractedEvidence]:
+    @property
+    def analyzer_id(self) -> str:
+        return "evidence_extraction"
+
+    def extract_run(self, steps: list[Any]) -> dict[int, ExtractedEvidence]:
         """
         Extract evidence for all steps in a run.
 
@@ -475,9 +479,89 @@ class EvidenceExtractor:
         results = {}
         for step in steps:
             step_num = step["step"] if isinstance(step, dict) else step.step
-            raw_output = step.get("raw_output", "") if isinstance(step, dict) else step.raw_output
+            raw_output = (
+                step.get("raw_output", "")
+                if isinstance(step, dict)
+                else getattr(step, "raw_output", getattr(step, "output", ""))
+            )
             agent = step.get("agent", "") if isinstance(step, dict) else step.agent
 
             results[step_num] = self.extract(raw_output=raw_output, agent=agent)
 
         return results
+
+    def analyze(self, trace: Any) -> Any:
+        """
+        Run Analyzer-compatible evidence extraction on a RunTrace.
+
+        Uses pre-structured metadata['extracted_evidence'] when present (zero LLM cost),
+        or falls back to live LLM extraction when GROQ_API_KEY is configured.
+        Never raises — returns AnalysisResult(skipped=True) when unable to extract.
+        """
+        from app.interfaces import AnalysisResult
+        from schema.models import EvidenceRecord, EvidenceSource
+
+        try:
+            if not trace or not getattr(trace, "steps", None):
+                return AnalysisResult(
+                    skipped=True,
+                    skip_reason="No steps in trace",
+                    analyzer_id=self.analyzer_id,
+                )
+
+            evidence_records: list[EvidenceRecord] = []
+            has_api_key = bool(os.getenv("GROQ_API_KEY"))
+
+            from analyzers.detection.rule_engine import _prestructured_evidence
+
+            for step in trace.steps:
+                ev: ExtractedEvidence | None = _prestructured_evidence(step)
+                if ev is None:
+                    handoff_ev = (
+                        getattr(getattr(step, "handoff", None), "output_state", {}) or {}
+                    ).get("extracted_evidence")
+                    meta_ev = handoff_ev or (getattr(step, "metadata", {}) or {}).get(
+                        "extracted_evidence"
+                    )
+                    if isinstance(meta_ev, dict):
+                        try:
+                            ev = ExtractedEvidence(**meta_ev)
+                        except Exception:
+                            ev = None
+                if ev is None and has_api_key:
+                    ev = self.extract(raw_output=step.output, agent=step.agent)
+
+                if ev is not None and not ev.extraction_failed:
+                    evidence_records.append(
+                        EvidenceRecord(
+                            source=EvidenceSource.EVIDENCE_EXTRACTION,
+                            description=(
+                                f"Extracted {ev.source_count} source(s) and "
+                                f"{ev.entity_count} entity(s) from '{step.agent}'."
+                            ),
+                            value={
+                                "source_count": ev.source_count,
+                                "entity_count": ev.entity_count,
+                                "claims": ev.claims,
+                            },
+                            agent=step.agent,
+                            step=step.step,
+                            confidence=1.0,
+                        )
+                    )
+
+            return AnalysisResult(
+                evidence=evidence_records,
+                analyzer_id=self.analyzer_id,
+                skipped=False,
+            )
+        except Exception as exc:
+            return AnalysisResult(
+                skipped=True,
+                skip_reason=f"EvidenceExtractor error: {exc}",
+                analyzer_id=self.analyzer_id,
+            )
+
+    def run(self, trace: Any) -> Any:
+        """Standard Analyzer execution alias."""
+        return self.analyze(trace)

@@ -90,3 +90,7 @@ class GroundTruthValidator(Analyzer):
             analyzer_id="ground_truth_validator",
             skipped=False,
         )
+
+    def run(self, trace: RunTrace) -> AnalysisResult:
+        """Standard Analyzer execution alias."""
+        return self.analyze(trace)

@@ -34,6 +34,9 @@ dev = [
 [project.scripts]
 agentlens = "app.main:main"
 
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Ruff — linting & formatting
 # ─────────────────────────────────────────────────────────────────────────────
@@ -73,6 +76,10 @@ ignore_missing_imports = true
 explicit_package_bases = true
 exclude = [
     "\\.venv",
+    "\\.git",
+    "\\.pytest_cache",
+    "\\.mypy_cache",
+    "\\.ruff_cache",
     "_patch_.*\\.py",
     "_diag_.*\\.py",
     "check_.*\\.py",

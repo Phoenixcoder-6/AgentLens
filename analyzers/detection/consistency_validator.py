@@ -205,6 +205,10 @@ class ConsistencyValidator(Analyzer):
 
         return AnalysisResult(evidence=evidence, analyzer_id=self.analyzer_id)
 
+    def run(self, trace: RunTrace) -> AnalysisResult:
+        """Standard Analyzer execution alias."""
+        return self.analyze(trace)
+
     def _make_record(
         self,
         rule_id: str,

@@ -32,8 +32,18 @@ from schema.models import (
 
 
 def _prestructured_evidence(step: AgentStep | None) -> ExtractedEvidence | None:
-    """Hydrate ExtractedEvidence directly when step.output is pre-structured JSON."""
-    if step is None or not step.output:
+    """Hydrate ExtractedEvidence directly when step.output is pre-structured JSON or in handoff."""
+    if step is None:
+        return None
+    handoff_ev = (getattr(getattr(step, "handoff", None), "output_state", {}) or {}).get(
+        "extracted_evidence"
+    )
+    if isinstance(handoff_ev, dict):
+        try:
+            return ExtractedEvidence(**handoff_ev)
+        except Exception:
+            pass
+    if not step.output:
         return None
     raw = step.output.strip()
     if not raw.startswith("{"):
@@ -181,6 +191,10 @@ class RuleEngine(Analyzer):
                 )
 
         return AnalysisResult(evidence=evidence, analyzer_id=self.analyzer_id)
+
+    def run(self, trace: RunTrace) -> AnalysisResult:
+        """Standard Analyzer execution alias."""
+        return self.analyze(trace)
 
     def _make_record(
         self, rule_id: str, category: FailureCategory, description: str, agent: str, step_idx: int

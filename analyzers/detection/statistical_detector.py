@@ -100,8 +100,12 @@ class StatisticalDetector:
         evidence: list[EvidenceRecord] = report.anomalies
     """
 
-    def __init__(self, db: DatabaseManager) -> None:
-        self.db = db
+    @property
+    def analyzer_id(self) -> str:
+        return "statistical_detector"
+
+    def __init__(self, db: DatabaseManager | None = None) -> None:
+        self.db = db if db is not None else DatabaseManager()
         stats_outlier = get("stats", "outlier_stddev", None)
         lat_cfg = get("metrics", "latency_stddev_multiplier", None)
         tok_cfg = get("metrics", "token_stddev_multiplier", None)
@@ -123,6 +127,50 @@ class StatisticalDetector:
         self._min_runs = int(get("metrics", "min_runs_for_baseline", 5))
 
     # ── Public API ─────────────────────────────────────────────────────────────
+
+    def analyze(self, trace: Any) -> Any:
+        """
+        Run Analyzer-compatible statistical anomaly detection on a RunTrace.
+        """
+        from app.interfaces import AnalysisResult
+
+        try:
+            if not trace or not getattr(trace, "steps", None):
+                return AnalysisResult(
+                    skipped=True,
+                    skip_reason="No steps in trace",
+                    analyzer_id=self.analyzer_id,
+                )
+
+            baselines = self._build_baselines(exclude_run_id=trace.run_id)
+            anomalies: list[EvidenceRecord] = []
+            for s in trace.steps:
+                baseline = baselines.get(s.agent)
+                if baseline is None:
+                    continue
+                step_dict = {
+                    "agent": s.agent,
+                    "step": s.step,
+                    "latency_ms": s.latency_ms,
+                    "tokens_total": getattr(s.tokens, "total", 0) if s.tokens else 0,
+                }
+                anomalies.extend(self._check_step(step_dict, baseline))
+
+            return AnalysisResult(
+                evidence=anomalies,
+                analyzer_id=self.analyzer_id,
+                skipped=False,
+            )
+        except Exception as exc:
+            return AnalysisResult(
+                skipped=True,
+                skip_reason=f"StatisticalDetector error: {exc}",
+                analyzer_id=self.analyzer_id,
+            )
+
+    def run(self, trace: Any) -> Any:
+        """Standard Analyzer execution alias."""
+        return self.analyze(trace)
 
     def analyze_run(self, run_id: str) -> StatisticalAnomalyReport:
         """
@@ -180,7 +228,10 @@ class StatisticalDetector:
         Returns a dict of agent_name → AgentBaseline.
         Only agents with >= min_runs_for_baseline data points are included.
         """
-        all_runs = self.db.list_runs(limit=10_000)
+        try:
+            all_runs = self.db.list_runs(limit=10_000)
+        except Exception:
+            return {}
 
         # group steps by agent
         agent_latencies: dict[str, list[float]] = defaultdict(list)

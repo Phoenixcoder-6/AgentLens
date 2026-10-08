@@ -23,6 +23,7 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from config.config_loader import get
 from schema.models import SCHEMA_VERSION
@@ -106,12 +107,95 @@ class MetricsAnalyzer:
         report = analyzer.analyze_run("run_abc123")
     """
 
-    def __init__(self, db: DatabaseManager) -> None:
-        self.db = db
+    @property
+    def analyzer_id(self) -> str:
+        return "metrics_analyzer"
+
+    def __init__(self, db: DatabaseManager | None = None) -> None:
+        self.db = db if db is not None else DatabaseManager()
         self._latency_threshold = float(get("metrics", "latency_threshold_ms", 5000))
         self._min_runs_baseline = int(get("metrics", "min_runs_for_baseline", 5))
         self._token_stddev_mult = float(get("metrics", "token_stddev_multiplier", 2.5))
         self._latency_stddev_mult = float(get("metrics", "latency_stddev_multiplier", 2.5))
+
+    def analyze(self, trace: Any) -> Any:
+        """
+        Run Analyzer-compatible metrics analysis on a RunTrace.
+
+        Computes step metrics from the trace (or stored DB rows if available)
+        and returns an AnalysisResult containing EvidenceRecords for any anomalies.
+        """
+        from app.interfaces import AnalysisResult
+        from schema.models import (
+            EvidenceRecord,
+            EvidenceSource,
+            FailureCategory,
+            RuleMatch,
+            RuleSeverity,
+        )
+
+        try:
+            if not trace or not getattr(trace, "steps", None):
+                return AnalysisResult(
+                    skipped=True,
+                    skip_reason="No steps in trace",
+                    analyzer_id=self.analyzer_id,
+                )
+
+            baseline = self._get_baseline()
+            step_metrics: list[StepMetrics] = []
+            for s in trace.steps:
+                row = {
+                    "run_id": trace.run_id,
+                    "step": s.step,
+                    "agent": s.agent,
+                    "latency_ms": s.latency_ms,
+                    "tokens_prompt": getattr(s.tokens, "prompt", 0) if s.tokens else 0,
+                    "tokens_completion": getattr(s.tokens, "completion", 0) if s.tokens else 0,
+                    "tokens_total": getattr(s.tokens, "total", 0) if s.tokens else 0,
+                }
+                step_metrics.append(self._analyze_step(row, baseline))
+
+            evidence: list[EvidenceRecord] = []
+            for sm in step_metrics:
+                if sm.is_anomalous:
+                    desc = "; ".join(sm.anomaly_reasons)
+                    rule = RuleMatch(
+                        rule_id=f"METRIC-{sm.agent.upper()}-{sm.step:03d}",
+                        rule_version="1.0.0",
+                        category=FailureCategory.PERFORMANCE,
+                        description=desc,
+                        severity=RuleSeverity.MEDIUM,
+                        agent=sm.agent,
+                        step=sm.step,
+                    )
+                    evidence.append(
+                        EvidenceRecord(
+                            source=EvidenceSource.METRICS_ANALYZER,
+                            description=desc,
+                            value=sm.latency_ms,
+                            rule_match=rule,
+                            agent=sm.agent,
+                            step=sm.step,
+                            confidence=0.8,
+                        )
+                    )
+
+            return AnalysisResult(
+                evidence=evidence,
+                analyzer_id=self.analyzer_id,
+                skipped=False,
+            )
+        except Exception as exc:
+            return AnalysisResult(
+                skipped=True,
+                skip_reason=f"MetricsAnalyzer error: {exc}",
+                analyzer_id=self.analyzer_id,
+            )
+
+    def run(self, trace: Any) -> Any:
+        """Standard Analyzer execution alias."""
+        return self.analyze(trace)
 
     def analyze_run(self, run_id: str) -> RunMetrics | None:
         """
@@ -239,7 +323,10 @@ class MetricsAnalyzer:
         Compute statistical baseline from all stored runs.
         Returns empty baseline if fewer than min_runs_for_baseline runs exist.
         """
-        runs = self.db.list_runs(limit=1000)
+        try:
+            runs = self.db.list_runs(limit=1000)
+        except Exception:
+            return {"active": False}
         if len(runs) < self._min_runs_baseline:
             return {"active": False}
 

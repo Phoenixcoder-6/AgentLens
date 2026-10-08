@@ -97,3 +97,7 @@ class WorkflowValidator(Analyzer):
             step=step_idx if step_idx != -1 else None,
             confidence=1.0,
         )
+
+    def run(self, trace: RunTrace) -> AnalysisResult:
+        """Standard Analyzer execution alias."""
+        return self.analyze(trace)

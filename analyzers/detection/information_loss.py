@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from analyzers.evidence_extraction.extractor import ExtractedEvidence
+from app.interfaces import AnalysisResult, Analyzer
 from schema.models import SCHEMA_VERSION, RunTrace
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -82,7 +83,7 @@ class InformationLossResult:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-class InformationLossRule:
+class InformationLossRule(Analyzer):
     """
     Compares ExtractedEvidence from an upstream gatherer agent and a downstream
     synthesizer agent (resolved via `pipeline.agents` topology) to detect
@@ -92,6 +93,10 @@ class InformationLossRule:
     # Default thresholds (overridden by arbiter.information_loss in config.yaml)
     _SEVERE_THRESHOLD = 3  # |delta| >= 3 → HIGH severity
     _MODERATE_THRESHOLD = 1  # |delta| >= 1 → MEDIUM severity
+
+    @property
+    def analyzer_id(self) -> str:
+        return "information_loss"
 
     def __init__(
         self,
@@ -222,6 +227,40 @@ class InformationLossRule:
             source_agent=upstream_step.agent,
             target_agent=synth_step.agent,
         )
+
+    def analyze(self, trace: RunTrace) -> AnalysisResult:
+        """Run Analyzer-compatible information loss analysis on a RunTrace."""
+        try:
+            if not trace.steps:
+                return AnalysisResult(
+                    skipped=True,
+                    skip_reason="No steps in trace",
+                    analyzer_id=self.analyzer_id,
+                )
+            loss_result = self.evaluate_trace(trace)
+            if loss_result is None:
+                return AnalysisResult(
+                    skipped=True,
+                    skip_reason="Insufficient gatherer/synthesizer evidence in trace",
+                    analyzer_id=self.analyzer_id,
+                )
+            from analyzers.arbiter import evidence_from_information_loss
+
+            ev = evidence_from_information_loss(loss_result)
+            return AnalysisResult(
+                evidence=[ev] if ev is not None else [],
+                analyzer_id=self.analyzer_id,
+            )
+        except Exception as exc:
+            return AnalysisResult(
+                skipped=True,
+                skip_reason=f"InformationLossRule error: {exc}",
+                analyzer_id=self.analyzer_id,
+            )
+
+    def run(self, trace: RunTrace) -> AnalysisResult:
+        """Standard Analyzer execution alias."""
+        return self.analyze(trace)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

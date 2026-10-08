@@ -239,3 +239,82 @@ class SemanticSimilarityEngine:
             embedding_model=self._model_name if self._use_transformers else "jaccard-fallback",
             threshold_used=self._threshold,
         )
+
+    @property
+    def analyzer_id(self) -> str:
+        return "diff_engine"
+
+    def analyze(self, trace: Any, baseline_trace: Any = None) -> Any:
+        """
+        Run Analyzer-compatible semantic similarity analysis on a RunTrace.
+        """
+        from app.interfaces import AnalysisResult
+        from diff_engine.aligner import GraphAligner
+        from schema.models import (
+            EvidenceRecord,
+            EvidenceSource,
+            FailureCategory,
+            RuleMatch,
+            RuleSeverity,
+        )
+
+        try:
+            if not trace or not getattr(trace, "steps", None):
+                return AnalysisResult(
+                    skipped=True,
+                    skip_reason="No steps in trace",
+                    analyzer_id=self.analyzer_id,
+                )
+
+            ref_trace = baseline_trace or trace
+            alignment = GraphAligner.align_traces(ref_trace, trace)
+            # Use lightweight Jaccard scoring when self-comparing or during fast Analyzer checks
+            # unless sentence-transformers is already warm or explicitly requested
+            orig_use_tf = self._use_transformers
+            if ref_trace is trace:
+                self._use_transformers = False
+            try:
+                report = self.score(alignment)
+            finally:
+                self._use_transformers = orig_use_tf
+
+            evidence: list[EvidenceRecord] = []
+            for s in report.get_diverged_steps():
+                desc = (
+                    f"Semantic divergence in '{s.agent}': "
+                    f"similarity={s.similarity:.2f} < threshold={s.threshold:.2f}"
+                )
+                rule = RuleMatch(
+                    rule_id=f"DIFF-SIM-{s.agent.upper()}",
+                    rule_version="1.0.0",
+                    category=FailureCategory.REASONING,
+                    description=desc,
+                    severity=RuleSeverity.MEDIUM,
+                    agent=s.agent,
+                )
+                evidence.append(
+                    EvidenceRecord(
+                        source=EvidenceSource.DIFF_ENGINE,
+                        description=desc,
+                        value=s.similarity,
+                        rule_match=rule,
+                        agent=s.agent,
+                        confidence=round(max(0.5, 1.0 - s.similarity), 4),
+                    )
+                )
+
+            return AnalysisResult(
+                evidence=evidence,
+                analyzer_id=self.analyzer_id,
+                skipped=False,
+            )
+        except Exception as exc:
+            return AnalysisResult(
+                skipped=True,
+                skip_reason=f"SemanticSimilarityEngine error: {exc}",
+                analyzer_id=self.analyzer_id,
+            )
+
+    def run(self, trace: Any, baseline_trace: Any = None) -> Any:
+        """Standard Analyzer execution alias."""
+        return self.analyze(trace, baseline_trace=baseline_trace)
