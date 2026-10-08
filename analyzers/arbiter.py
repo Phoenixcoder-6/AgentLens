@@ -118,6 +118,9 @@ def evidence_from_information_loss(result: InformationLossResult) -> EvidenceRec
         return None
 
     # Map verdict → failure category + severity
+    src_agent = getattr(result, "source_agent", None) or "researcher"
+    tgt_agent = getattr(result, "target_agent", None) or "writer"
+
     if result.verdict == "FAIL":
         category = FailureCategory.WORKFLOW
         severity = RuleSeverity.HIGH
@@ -127,7 +130,7 @@ def evidence_from_information_loss(result: InformationLossResult) -> EvidenceRec
         ent_w = result.entity_diff.writer_value if result.entity_diff else "N/A"
         description = (
             f"Information loss detected: sources or entities were dropped "
-            f"in the Researcher → Writer handoff. "
+            f"in the {src_agent} → {tgt_agent} handoff. "
             f"source: {src_r}→{src_w}, "
             f"entity: {ent_r}→{ent_w}"
         )
@@ -139,8 +142,8 @@ def evidence_from_information_loss(result: InformationLossResult) -> EvidenceRec
         ent_r = result.entity_diff.researcher_value if result.entity_diff else "N/A"
         ent_w = result.entity_diff.writer_value if result.entity_diff else "N/A"
         description = (
-            f"Information gain detected: Writer introduced sources or entities "
-            f"not present in research findings (hallucination risk). "
+            f"Information gain detected: {tgt_agent} introduced sources or entities "
+            f"not present in {src_agent} findings (hallucination risk). "
             f"source: {src_r}→{src_w}, "
             f"entity: {ent_r}→{ent_w}"
         )
@@ -150,7 +153,7 @@ def evidence_from_information_loss(result: InformationLossResult) -> EvidenceRec
         category=category,
         description=description,
         severity=severity,
-        agent="writer",
+        agent=tgt_agent,
         evidence_detail=result.summary,
     )
 
@@ -159,7 +162,7 @@ def evidence_from_information_loss(result: InformationLossResult) -> EvidenceRec
         description=description,
         value=result.verdict,
         rule_match=rule,
-        agent="writer",
+        agent=tgt_agent,
         confidence=result.confidence,
     )
 

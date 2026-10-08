@@ -230,16 +230,23 @@ def analyze_trace(trace: RunTrace, *, dry_run: bool = False) -> AnalysisBundle:
         if not re_res.skipped:
             evidence.extend(re_res.evidence)
 
-        res_steps = [s for s in trace.steps if s.agent == "researcher"]
-        wr_steps = [s for s in trace.steps if s.agent == "writer"]
-        if res_steps and wr_steps:
-            res_ev = _prestructured_evidence(res_steps[-1])
-            wr_ev = _prestructured_evidence(wr_steps[-1])
+        from config.topology import ROLE_GATHERER, ROLE_SYNTHESIZER, get_topology
+
+        topo = get_topology()
+        wr_step = topo.find_step_for_role(trace.steps, ROLE_SYNTHESIZER)
+        res_step = topo.find_upstream_step(trace.steps, wr_step) or topo.find_step_for_role(
+            trace.steps, ROLE_GATHERER
+        )
+        if res_step and wr_step:
+            res_ev = _prestructured_evidence(res_step)
+            wr_ev = _prestructured_evidence(wr_step)
             if res_ev is not None and wr_ev is not None:
                 loss_res = info_loss_rule.evaluate(
                     run_id=trace.run_id,
                     researcher_evidence=res_ev,
                     writer_evidence=wr_ev,
+                    source_agent=res_step.agent,
+                    target_agent=wr_step.agent,
                 )
                 loss_ev = evidence_from_information_loss(loss_res)
                 if loss_ev is not None:

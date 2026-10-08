@@ -7,7 +7,6 @@ Implements Workflow rules (skipped steps, wrong order).
 from __future__ import annotations
 
 from app.interfaces import AnalysisResult, Analyzer
-from config import config_loader
 from schema.models import (
     EvidenceRecord,
     EvidenceSource,
@@ -35,11 +34,12 @@ class WorkflowValidator(Analyzer):
 
         evidence: list[EvidenceRecord] = []
 
-        # Load config
-        workflow_config = config_loader.get("arbiter", "workflow", {})
-        required_agents = workflow_config.get(
-            "required_agents", ["researcher", "writer", "verifier"]
-        )
+        # Load topology from config (Day 40a: supports pipeline.agents + arbiter.workflow)
+        from config.topology import get_topology
+
+        topo = get_topology()
+        required_agents = topo.required_agent_order()
+        handoff_edges = topo.handoff_edges()
 
         executed_agents = [step.agent for step in trace.steps]
 
@@ -57,27 +57,22 @@ class WorkflowValidator(Analyzer):
                 )
 
         # Workflow: wrong_order_v1
-        # Expect the order to be exactly the required_agents order, ignoring duplicates/loops for MVP
-        # Just check if the first occurrence of each required agent is in the right relative order
-        if len(required_agents) >= 2:
-            for i in range(len(required_agents) - 1):
-                agent_a = required_agents[i]
-                agent_b = required_agents[i + 1]
+        # Check each (upstream -> downstream) handoff edge from topology
+        for agent_a, agent_b in handoff_edges:
+            if agent_a in executed_agents and agent_b in executed_agents:
+                idx_a = executed_agents.index(agent_a)
+                idx_b = executed_agents.index(agent_b)
 
-                if agent_a in executed_agents and agent_b in executed_agents:
-                    idx_a = executed_agents.index(agent_a)
-                    idx_b = executed_agents.index(agent_b)
-
-                    if idx_b < idx_a:
-                        evidence.append(
-                            self._make_record(
-                                rule_id="wrong_order_v1",
-                                category=FailureCategory.WORKFLOW,
-                                description=f"Agent '{agent_b}' executed before '{agent_a}'.",
-                                agent=agent_b,
-                                step_idx=idx_b + 1,
-                            )
+                if idx_b < idx_a:
+                    evidence.append(
+                        self._make_record(
+                            rule_id="wrong_order_v1",
+                            category=FailureCategory.WORKFLOW,
+                            description=f"Agent '{agent_b}' executed before '{agent_a}'.",
+                            agent=agent_b,
+                            step_idx=idx_b + 1,
                         )
+                    )
 
         return AnalysisResult(evidence=evidence, analyzer_id=self.analyzer_id)
 

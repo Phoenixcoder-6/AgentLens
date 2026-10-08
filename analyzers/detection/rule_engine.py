@@ -114,61 +114,71 @@ class RuleEngine(Analyzer):
                         )
                     )
 
-        # 2. Reasoning Rules
-        researcher_steps = [s for s in trace.steps if s.agent == "researcher"]
-        writer_steps = [s for s in trace.steps if s.agent == "writer"]
-        # Note: verifier step collection moved to consistency_validator.py (Day 22)
+        # 2. Reasoning Rules (Day 40a: role-based topology resolution)
+        from config.topology import ROLE_GATHERER, ROLE_SYNTHESIZER, get_topology
 
-        res_step = researcher_steps[-1] if researcher_steps else None
-        wr_step = writer_steps[-1] if writer_steps else None
+        topo = get_topology()
+        res_step = topo.find_step_for_role(trace.steps, ROLE_GATHERER)
+        wr_step = topo.find_step_for_role(trace.steps, ROLE_SYNTHESIZER)
+        upstream_step = topo.find_upstream_step(trace.steps, wr_step) or res_step
 
         res_ev = _prestructured_evidence(res_step)
         wr_ev = _prestructured_evidence(wr_step)
+        up_ev = res_ev if upstream_step is res_step else _prestructured_evidence(upstream_step)
 
         if extractor:
             if res_ev is None and res_step:
-                res_ev = extractor.extract(res_step.output, agent="researcher")
+                res_ev = extractor.extract(res_step.output, agent=res_step.agent)
             if wr_ev is None and wr_step:
-                wr_ev = extractor.extract(wr_step.output, agent="writer")
-        # Note: verifier extraction is done in consistency_validator.py (Day 22 split)
-
-        # Reasoning: researcher_quality_v1 (skip if researcher already had a tool execution failure)
-        has_res_exec_failure = any(e.agent == "researcher" for e in evidence)
-        if res_step and res_ev and not res_ev.extraction_failed and not has_res_exec_failure:
-            if res_ev.source_count < min_sources:
-                evidence.append(
-                    self._make_record(
-                        rule_id="researcher_quality_v1",
-                        category=FailureCategory.REASONING,
-                        description=f"Researcher source count ({res_ev.source_count}) below threshold ({min_sources}).",
-                        agent="researcher",
-                        step_idx=res_step.step,
-                    )
+                wr_ev = extractor.extract(wr_step.output, agent=wr_step.agent)
+            if up_ev is None and upstream_step:
+                up_ev = (
+                    res_ev
+                    if upstream_step is res_step
+                    else extractor.extract(upstream_step.output, agent=upstream_step.agent)
                 )
 
-        # Reasoning: hallucination_v1
+        # Reasoning: researcher_quality_v1 (fires on information_gatherer role)
+        if res_step:
+            has_res_exec_failure = any(e.agent == res_step.agent for e in evidence)
+            if res_ev and not res_ev.extraction_failed and not has_res_exec_failure:
+                if res_ev.source_count < min_sources:
+                    evidence.append(
+                        self._make_record(
+                            rule_id="researcher_quality_v1",
+                            category=FailureCategory.REASONING,
+                            description=(
+                                f"Agent '{res_step.agent}' source count ({res_ev.source_count}) "
+                                f"below threshold ({min_sources})."
+                            ),
+                            agent=res_step.agent,
+                            step_idx=res_step.step,
+                        )
+                    )
+
+        # Reasoning: hallucination_v1 (fires on synthesizer role vs its upstream receives_from agent)
         if (
-            res_step
+            upstream_step
             and wr_step
-            and res_ev
+            and up_ev
             and wr_ev
-            and not res_ev.extraction_failed
+            and not up_ev.extraction_failed
             and not wr_ev.extraction_failed
         ):
-            entity_gain = wr_ev.entity_count - res_ev.entity_count
+            entity_gain = wr_ev.entity_count - up_ev.entity_count
             if entity_gain > entity_gain_threshold:
                 evidence.append(
                     self._make_record(
                         rule_id="hallucination_v1",
                         category=FailureCategory.REASONING,
-                        description=f"Writer hallucinated entities (gain of {entity_gain}).",
-                        agent="writer",
+                        description=(
+                            f"Agent '{wr_step.agent}' hallucinated entities "
+                            f"(gain of {entity_gain} over '{upstream_step.agent}')."
+                        ),
+                        agent=wr_step.agent,
                         step_idx=wr_step.step,
                     )
                 )
-
-        # Note: verifier_passthrough_v1 and claim_drift_v1 are owned by
-        # consistency_validator.py (Day 22 split).
 
         return AnalysisResult(evidence=evidence, analyzer_id=self.analyzer_id)
 

@@ -505,8 +505,15 @@ def run_full_analysis(run_id: str, db: DatabaseManager | None = None) -> Analysi
             ev = extractor.extract(step.raw_output, agent=step.agent)
             state.extracted[step.agent] = ev
 
-        r_ev = state.extracted.get("researcher")
-        w_ev = state.extracted.get("writer")
+        from config.topology import ROLE_GATHERER, ROLE_SYNTHESIZER, get_topology
+
+        topo = get_topology()
+        gatherer_id = topo.primary_agent_for_role(ROLE_GATHERER) or "researcher"
+        synth_id = topo.primary_agent_for_role(ROLE_SYNTHESIZER) or "writer"
+        upstream_id = topo.upstream_agent_for(synth_id) or gatherer_id
+
+        r_ev = state.extracted.get(upstream_id) or state.extracted.get(gatherer_id)
+        w_ev = state.extracted.get(synth_id)
 
         all_ev: list[EvidenceRecord] = []
         if r_ev and w_ev:
@@ -514,6 +521,8 @@ def run_full_analysis(run_id: str, db: DatabaseManager | None = None) -> Analysi
                 researcher_evidence=r_ev,
                 writer_evidence=w_ev,
                 run_id=run_id,
+                source_agent=upstream_id,
+                target_agent=synth_id,
             )
             ev_rec = evidence_from_information_loss(state.loss_result)
             if ev_rec:

@@ -104,11 +104,22 @@ dashboard:
   default_run_limit: 50                    # Max runs shown in Run Explorer
 
 # ─────────────────────────────────────────────
-# Pipeline Agent Behaviour
-# Customize what each agent is asked to produce.
-# Change these values — no code changes needed.
+# Pipeline Agent Topology & Behaviour (Day 40a)
+# Customize agent topology (id, role, receives_from) and prompt settings here.
+# Switching pipelines (e.g. planner -> coder -> reviewer) requires only config changes.
 # ─────────────────────────────────────────────
 pipeline:
+  name: "research_report_pipeline"
+  agents:
+    - id: "researcher"
+      role: "information_gatherer"
+    - id: "writer"
+      role: "synthesizer"
+      receives_from: "researcher"
+    - id: "verifier"
+      role: "quality_checker"
+      receives_from: "writer"
+
   researcher:
     min_sources: 5                        # Minimum sources the researcher must cite
     max_sources: 8                        # Upper guidance (LLM will aim for this range)

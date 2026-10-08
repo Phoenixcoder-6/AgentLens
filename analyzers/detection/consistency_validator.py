@@ -102,34 +102,38 @@ class ConsistencyValidator(Analyzer):
         if os.getenv("GROQ_API_KEY"):
             extractor = EvidenceExtractor()
 
-        # Identify agent steps
-        researcher_steps = [s for s in trace.steps if s.agent == "researcher"]
-        writer_steps = [s for s in trace.steps if s.agent == "writer"]
-        verifier_steps = [s for s in trace.steps if s.agent == "verifier"]
+        # Identify agent steps by configured topology role (Day 40a)
+        from config.topology import (
+            ROLE_CHECKER,
+            ROLE_GATHERER,
+            ROLE_SYNTHESIZER,
+            get_topology,
+        )
 
-        res_step = researcher_steps[-1] if researcher_steps else None
-        wr_step = writer_steps[-1] if writer_steps else None
-        ver_step = verifier_steps[-1] if verifier_steps else None
+        topo = get_topology()
+        res_step = topo.find_step_for_role(trace.steps, ROLE_GATHERER)
+        wr_step = topo.find_step_for_role(trace.steps, ROLE_SYNTHESIZER)
+        ver_step = topo.find_step_for_role(trace.steps, ROLE_CHECKER)
+        upstream_step = topo.find_upstream_step(trace.steps, wr_step) or res_step
 
-        res_ev = _prestructured_evidence(res_step)
+        res_ev = _prestructured_evidence(upstream_step)
         wr_ev = _prestructured_evidence(wr_step)
         ver_ev = _prestructured_evidence(ver_step)
 
         if extractor:
-            if res_ev is None and res_step:
-                res_ev = extractor.extract(res_step.output, agent="researcher")
+            if res_ev is None and upstream_step:
+                res_ev = extractor.extract(upstream_step.output, agent=upstream_step.agent)
             if wr_ev is None and wr_step:
-                wr_ev = extractor.extract(wr_step.output, agent="writer")
+                wr_ev = extractor.extract(wr_step.output, agent=wr_step.agent)
             if ver_ev is None and ver_step:
-                ver_ev = extractor.extract(ver_step.output, agent="verifier")
+                ver_ev = extractor.extract(ver_step.output, agent=ver_step.agent)
 
         # ── Rule: verifier_passthrough_v1 ─────────────────────────────────────
-        # Fires when the verifier's entity count equals the writer's entity count
-        # AND the writer had hallucinated new entities (gain > threshold).
-        # This means the verifier "passed through" hallucinated content unchanged.
+        # Fires when the quality_checker's entity count equals the synthesizer's entity count
+        # AND the synthesizer had hallucinated new entities (gain > threshold).
         passthrough_fired = False
         if (
-            res_step
+            upstream_step
             and wr_step
             and ver_step
             and res_ev is not None
@@ -147,10 +151,10 @@ class ConsistencyValidator(Analyzer):
                         rule_id="verifier_passthrough_v1",
                         category=FailureCategory.VERIFICATION,
                         description=(
-                            f"Verifier passed through {entity_gain} hallucinated "
+                            f"Agent '{ver_step.agent}' passed through {entity_gain} hallucinated "
                             "entities without flagging them."
                         ),
-                        agent="verifier",
+                        agent=ver_step.agent,
                         step_idx=ver_step.step,
                     )
                 )
@@ -161,31 +165,29 @@ class ConsistencyValidator(Analyzer):
                     rule_id="verifier_passthrough_v1",
                     category=FailureCategory.VERIFICATION,
                     description=(
-                        "Always-approve verifier rubber-stamped output without "
-                        "rejecting flagged or unverified claims."
+                        f"Always-approve quality checker '{ver_step.agent}' rubber-stamped output "
+                        "without rejecting flagged or unverified claims."
                     ),
-                    agent="verifier",
+                    agent=ver_step.agent,
                     step_idx=ver_step.step,
                 )
             )
 
         # ── Rule: claim_drift_v1 ──────────────────────────────────────────────
-        # Fires when the writer introduces claims that were NOT in the researcher
-        # output, indicating unsupported or hallucinated factual claims.
-        # Requires Day-20 extraction: both res_ev.claims and wr_ev.claims.
+        # Fires when the synthesizer introduces claims that were NOT in the upstream
+        # gatherer output, indicating unsupported or hallucinated factual claims.
         if (
-            res_step
+            upstream_step
             and wr_step
             and res_ev is not None
             and wr_ev is not None
             and not res_ev.extraction_failed
             and not wr_ev.extraction_failed
-            and res_ev.claims  # only fire if researcher had extractable claims
+            and res_ev.claims  # only fire if upstream gatherer had extractable claims
         ):
             res_claim_set = set(c.lower().strip() for c in res_ev.claims)
             wr_claim_set = set(c.lower().strip() for c in wr_ev.claims)
 
-            # Claims in writer output not present in researcher output
             new_claims = wr_claim_set - res_claim_set
             if new_claims:
                 evidence.append(
@@ -193,10 +195,10 @@ class ConsistencyValidator(Analyzer):
                         rule_id="claim_drift_v1",
                         category=FailureCategory.VERIFICATION,
                         description=(
-                            f"Writer introduced {len(new_claims)} claim(s) not found "
-                            f"in researcher output: {list(new_claims)[:3]}"
+                            f"Agent '{wr_step.agent}' introduced {len(new_claims)} claim(s) not found "
+                            f"in '{upstream_step.agent}' output: {list(new_claims)[:3]}"
                         ),
-                        agent="writer",
+                        agent=wr_step.agent,
                         step_idx=wr_step.step,
                     )
                 )

@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from analyzers.evidence_extraction.extractor import ExtractedEvidence
-from schema.models import SCHEMA_VERSION
+from schema.models import SCHEMA_VERSION, RunTrace
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Result model
@@ -56,6 +56,8 @@ class InformationLossResult:
     run_id: str
     rule_id: str = "information_loss_v1"
     rule_category: str = "workflow"
+    source_agent: str = "researcher"
+    target_agent: str = "writer"
 
     # Per-field diffs
     source_diff: FieldDiff | None = None
@@ -82,18 +84,9 @@ class InformationLossResult:
 
 class InformationLossRule:
     """
-    Compares ExtractedEvidence from Researcher and Writer to detect
+    Compares ExtractedEvidence from an upstream gatherer agent and a downstream
+    synthesizer agent (resolved via `pipeline.agents` topology) to detect
     information loss or unexpected information gain.
-
-    Usage:
-        rule = InformationLossRule()
-        result = rule.evaluate(
-            run_id="run_abc",
-            researcher_evidence=ev_researcher,
-            writer_evidence=ev_writer,
-        )
-        print(result.verdict)   # "PASS" | "WARNING" | "FAIL"
-        print(result.summary)
     """
 
     # Default thresholds (overridden by arbiter.information_loss in config.yaml)
@@ -124,21 +117,26 @@ class InformationLossRule:
         run_id: str,
         researcher_evidence: ExtractedEvidence,
         writer_evidence: ExtractedEvidence,
+        source_agent: str | None = None,
+        target_agent: str | None = None,
     ) -> InformationLossResult:
         """
-        Run the information loss rule.
-
-        Args:
-            run_id:               The pipeline run ID (for storage linkage).
-            researcher_evidence:  ExtractedEvidence from the Researcher step.
-            writer_evidence:      ExtractedEvidence from the Writer step.
-
-        Returns:
-            InformationLossResult with verdict, per-field diffs, and summary.
+        Run the information loss rule on an upstream -> synthesizer handoff.
         """
+        if source_agent is None or target_agent is None:
+            from config.topology import ROLE_GATHERER, ROLE_SYNTHESIZER, get_topology
+
+            topo = get_topology()
+            if source_agent is None:
+                source_agent = topo.primary_agent_for_role(ROLE_GATHERER) or "researcher"
+            if target_agent is None:
+                target_agent = topo.primary_agent_for_role(ROLE_SYNTHESIZER) or "writer"
+
         result = InformationLossResult(
             schema_version=SCHEMA_VERSION,
             run_id=run_id,
+            source_agent=source_agent,
+            target_agent=target_agent,
         )
 
         # If either extraction failed, we can't run the rule reliably
@@ -147,8 +145,8 @@ class InformationLossRule:
             result.verdict = "PASS"  # don't flag when evidence is unreliable
             result.confidence = 0.0
             result.error_message = (
-                f"Researcher extraction_failed={researcher_evidence.extraction_failed}, "
-                f"Writer extraction_failed={writer_evidence.extraction_failed}"
+                f"{source_agent} extraction_failed={researcher_evidence.extraction_failed}, "
+                f"{target_agent} extraction_failed={writer_evidence.extraction_failed}"
             )
             result.summary = "Rule skipped — evidence extraction failed on one or both steps."
             return result
@@ -195,6 +193,35 @@ class InformationLossRule:
 
         result.summary = self._build_summary(source_diff, entity_diff, result.verdict)
         return result
+
+    def evaluate_trace(self, trace: RunTrace) -> InformationLossResult | None:
+        """
+        Evaluate information loss directly on a RunTrace by resolving the
+        `synthesizer` step and its `receives_from` upstream step via `PipelineTopology`.
+        """
+        from analyzers.detection.rule_engine import _prestructured_evidence
+        from config.topology import ROLE_GATHERER, ROLE_SYNTHESIZER, get_topology
+
+        topo = get_topology()
+        synth_step = topo.find_step_for_role(trace.steps, ROLE_SYNTHESIZER)
+        upstream_step = topo.find_upstream_step(trace.steps, synth_step) or topo.find_step_for_role(
+            trace.steps, ROLE_GATHERER
+        )
+        if not upstream_step or not synth_step:
+            return None
+
+        up_ev = _prestructured_evidence(upstream_step)
+        synth_ev = _prestructured_evidence(synth_step)
+        if up_ev is None or synth_ev is None:
+            return None
+
+        return self.evaluate(
+            run_id=trace.run_id,
+            researcher_evidence=up_ev,
+            writer_evidence=synth_ev,
+            source_agent=upstream_step.agent,
+            target_agent=synth_step.agent,
+        )
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
