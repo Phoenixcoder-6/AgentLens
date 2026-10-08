@@ -224,15 +224,16 @@ def main() -> int:
                 ConsistencyValidator(),
             ]
             for da in det_analyzers:
-                res = da.run(trace)
+                res = da.analyze(trace)
                 assert isinstance(res, AnalysisResult)
                 assert res.analyzer_id == da.analyzer_id
             # InformationLossRule should detect the 5 -> 2 source drop
             il_res = InformationLossRule().run(trace)
             assert len(il_res.evidence) == 1
+            assert il_res.evidence[0].rule_match is not None
             assert il_res.evidence[0].rule_match.rule_id == "information_loss_v1"
             print(
-                "[PASS] Check 5: All 5 Detection sub-modules implement Analyzer (.analyze & .run)"
+                "[PASS] Check 5: All 5 Detection sub-modules implement Analyzer (.analyze)"
             )
             passed += 1
         except Exception as exc:
@@ -242,7 +243,7 @@ def main() -> int:
         try:
             empty_trace = RunTrace(run_id="run_empty", workflow="research_summary", steps=[])
             for a in analyzers:
-                res = a.run(empty_trace)
+                res = a.analyze(empty_trace)
                 assert isinstance(res, AnalysisResult)
                 assert res.skipped is True, f"{type(a).__name__} did not set skipped=True"
                 assert res.evidence == []
