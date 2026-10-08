@@ -28,7 +28,7 @@ if str(ROOT) not in sys.path:
 
 from alembic.config import Config  # noqa: E402
 
-from alembic import command  # noqa: E402
+import alembic.command as command  # noqa: E402
 from analyzers.alerter import Alerter  # noqa: E402
 from analyzers.arbiter import Arbiter  # noqa: E402
 from analyzers.detection.workflow_validator import WorkflowValidator  # noqa: E402
