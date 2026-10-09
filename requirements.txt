@@ -27,7 +27,8 @@ python-dotenv>=1.0.0
 
 # Storage
 # sqlite3 is built-in to Python — no extra package needed
-alembic>=1.13.0   # schema migrations (Day 27)
+SQLAlchemy>=2.0,<2.1  # Keep within tested 2.0 series
+alembic>=1.13.0       # Schema migrations (Day 27)
 
 # Utilities
 numpy>=1.26.0
