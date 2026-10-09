@@ -1,0 +1,358 @@
+{
+  "generated_at": "2026-10-09T13:14:03.820137+00:00",
+  "schema_version": "1.0",
+  "passed": true,
+  "accuracy_gate_passed": true,
+  "no_regressions_passed": true,
+  "min_accuracy_threshold": 0.75,
+  "total_runs": 20,
+  "day35_exact_correct": 16,
+  "day35_exact_accuracy": 0.8,
+  "day43_exact_correct": 16,
+  "day43_exact_accuracy": 0.8,
+  "accuracy_delta": 0.0,
+  "regressed_count": 0,
+  "regressed_runs": [],
+  "binary_regressed_count": 0,
+  "binary_regressed_runs": [],
+  "improved_count": 0,
+  "improved_runs": [],
+  "verdict_drift_count": 0,
+  "verdict_drift_runs": [],
+  "failure_reasons": [],
+  "run_comparisons": [
+    {
+      "run_id": "run_lbl_pass_01",
+      "expected_category": "pass",
+      "expected_primary_agent": null,
+      "day35_category": "pass",
+      "day35_agent": null,
+      "day35_exact_match": true,
+      "day43_category": "pass",
+      "day43_agent": null,
+      "day43_exact_match": true,
+      "day43_priority": "P5",
+      "day43_rules_fired": [],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_pass_02",
+      "expected_category": "pass",
+      "expected_primary_agent": null,
+      "day35_category": "pass",
+      "day35_agent": null,
+      "day35_exact_match": true,
+      "day43_category": "pass",
+      "day43_agent": null,
+      "day43_exact_match": true,
+      "day43_priority": "P5",
+      "day43_rules_fired": [],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_pass_03",
+      "expected_category": "pass",
+      "expected_primary_agent": null,
+      "day35_category": "pass",
+      "day35_agent": null,
+      "day35_exact_match": true,
+      "day43_category": "pass",
+      "day43_agent": null,
+      "day43_exact_match": true,
+      "day43_priority": "P5",
+      "day43_rules_fired": [],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_pass_04",
+      "expected_category": "pass",
+      "expected_primary_agent": null,
+      "day35_category": "pass",
+      "day35_agent": null,
+      "day35_exact_match": true,
+      "day43_category": "pass",
+      "day43_agent": null,
+      "day43_exact_match": true,
+      "day43_priority": "P5",
+      "day43_rules_fired": [],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_reasoning_01",
+      "expected_category": "reasoning_failure",
+      "expected_primary_agent": "writer",
+      "day35_category": "reasoning_failure",
+      "day35_agent": "writer",
+      "day35_exact_match": true,
+      "day43_category": "reasoning_failure",
+      "day43_agent": "writer",
+      "day43_exact_match": true,
+      "day43_priority": "P2",
+      "day43_rules_fired": [
+        "hallucination_v1",
+        "information_loss_v1",
+        "verifier_passthrough_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_reasoning_02",
+      "expected_category": "reasoning_failure",
+      "expected_primary_agent": "writer",
+      "day35_category": "reasoning_failure",
+      "day35_agent": "writer",
+      "day35_exact_match": true,
+      "day43_category": "reasoning_failure",
+      "day43_agent": "writer",
+      "day43_exact_match": true,
+      "day43_priority": "P2",
+      "day43_rules_fired": [
+        "hallucination_v1",
+        "information_loss_v1",
+        "verifier_passthrough_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_reasoning_03",
+      "expected_category": "reasoning_failure",
+      "expected_primary_agent": "writer",
+      "day35_category": "reasoning_failure",
+      "day35_agent": "writer",
+      "day35_exact_match": true,
+      "day43_category": "reasoning_failure",
+      "day43_agent": "writer",
+      "day43_exact_match": true,
+      "day43_priority": "P2",
+      "day43_rules_fired": [
+        "hallucination_v1",
+        "information_loss_v1",
+        "verifier_passthrough_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_reasoning_04",
+      "expected_category": "reasoning_failure",
+      "expected_primary_agent": "writer",
+      "day35_category": "reasoning_failure",
+      "day35_agent": "writer",
+      "day35_exact_match": true,
+      "day43_category": "reasoning_failure",
+      "day43_agent": "writer",
+      "day43_exact_match": true,
+      "day43_priority": "P2",
+      "day43_rules_fired": [
+        "hallucination_v1",
+        "information_loss_v1",
+        "verifier_passthrough_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_execution_01",
+      "expected_category": "execution_failure",
+      "expected_primary_agent": "researcher",
+      "day35_category": "execution_failure",
+      "day35_agent": "researcher",
+      "day35_exact_match": true,
+      "day43_category": "execution_failure",
+      "day43_agent": "researcher",
+      "day43_exact_match": true,
+      "day43_priority": "P2",
+      "day43_rules_fired": [
+        "tool_failure_v1",
+        "skipped_step_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_execution_02",
+      "expected_category": "execution_failure",
+      "expected_primary_agent": "researcher",
+      "day35_category": "execution_failure",
+      "day35_agent": "researcher",
+      "day35_exact_match": true,
+      "day43_category": "execution_failure",
+      "day43_agent": "researcher",
+      "day43_exact_match": true,
+      "day43_priority": "P2",
+      "day43_rules_fired": [
+        "missing_tool_output_v1",
+        "skipped_step_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_execution_03",
+      "expected_category": "execution_failure",
+      "expected_primary_agent": "researcher",
+      "day35_category": "execution_failure",
+      "day35_agent": "researcher",
+      "day35_exact_match": true,
+      "day43_category": "execution_failure",
+      "day43_agent": "researcher",
+      "day43_exact_match": true,
+      "day43_priority": "P2",
+      "day43_rules_fired": [
+        "tool_failure_v1",
+        "tool_failure_v1",
+        "skipped_step_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_execution_04",
+      "expected_category": "execution_failure",
+      "expected_primary_agent": "researcher",
+      "day35_category": "execution_failure",
+      "day35_agent": "researcher",
+      "day35_exact_match": true,
+      "day43_category": "execution_failure",
+      "day43_agent": "researcher",
+      "day43_exact_match": true,
+      "day43_priority": "P2",
+      "day43_rules_fired": [
+        "missing_tool_output_v1",
+        "skipped_step_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_workflow_01",
+      "expected_category": "workflow_failure",
+      "expected_primary_agent": "verifier",
+      "day35_category": "workflow_failure",
+      "day35_agent": "verifier",
+      "day35_exact_match": true,
+      "day43_category": "workflow_failure",
+      "day43_agent": "verifier",
+      "day43_exact_match": true,
+      "day43_priority": "P3",
+      "day43_rules_fired": [
+        "skipped_step_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_workflow_02",
+      "expected_category": "workflow_failure",
+      "expected_primary_agent": "verifier",
+      "day35_category": "workflow_failure",
+      "day35_agent": "verifier",
+      "day35_exact_match": true,
+      "day43_category": "workflow_failure",
+      "day43_agent": "verifier",
+      "day43_exact_match": true,
+      "day43_priority": "P3",
+      "day43_rules_fired": [
+        "skipped_step_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_workflow_03",
+      "expected_category": "workflow_failure",
+      "expected_primary_agent": "researcher",
+      "day35_category": "workflow_failure",
+      "day35_agent": "researcher",
+      "day35_exact_match": true,
+      "day43_category": "workflow_failure",
+      "day43_agent": "researcher",
+      "day43_exact_match": true,
+      "day43_priority": "P3",
+      "day43_rules_fired": [
+        "skipped_step_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_workflow_04",
+      "expected_category": "workflow_failure",
+      "expected_primary_agent": "verifier",
+      "day35_category": "workflow_failure",
+      "day35_agent": "verifier",
+      "day35_exact_match": true,
+      "day43_category": "workflow_failure",
+      "day43_agent": "verifier",
+      "day43_exact_match": true,
+      "day43_priority": "P3",
+      "day43_rules_fired": [
+        "skipped_step_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_verification_01",
+      "expected_category": "verification_failure",
+      "expected_primary_agent": "verifier",
+      "day35_category": "reasoning_failure",
+      "day35_agent": "writer",
+      "day35_exact_match": false,
+      "day43_category": "reasoning_failure",
+      "day43_agent": "writer",
+      "day43_exact_match": false,
+      "day43_priority": "P2",
+      "day43_rules_fired": [
+        "hallucination_v1",
+        "information_loss_v1",
+        "verifier_passthrough_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_verification_02",
+      "expected_category": "verification_failure",
+      "expected_primary_agent": "verifier",
+      "day35_category": "reasoning_failure",
+      "day35_agent": "writer",
+      "day35_exact_match": false,
+      "day43_category": "reasoning_failure",
+      "day43_agent": "writer",
+      "day43_exact_match": false,
+      "day43_priority": "P2",
+      "day43_rules_fired": [
+        "hallucination_v1",
+        "information_loss_v1",
+        "verifier_passthrough_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_verification_03",
+      "expected_category": "verification_failure",
+      "expected_primary_agent": "verifier",
+      "day35_category": "reasoning_failure",
+      "day35_agent": "writer",
+      "day35_exact_match": false,
+      "day43_category": "reasoning_failure",
+      "day43_agent": "writer",
+      "day43_exact_match": false,
+      "day43_priority": "P2",
+      "day43_rules_fired": [
+        "hallucination_v1",
+        "information_loss_v1",
+        "verifier_passthrough_v1"
+      ],
+      "status": "STABLE"
+    },
+    {
+      "run_id": "run_lbl_verification_04",
+      "expected_category": "verification_failure",
+      "expected_primary_agent": "verifier",
+      "day35_category": "reasoning_failure",
+      "day35_agent": "writer",
+      "day35_exact_match": false,
+      "day43_category": "reasoning_failure",
+      "day43_agent": "writer",
+      "day43_exact_match": false,
+      "day43_priority": "P2",
+      "day43_rules_fired": [
+        "hallucination_v1",
+        "information_loss_v1",
+        "verifier_passthrough_v1"
+      ],
+      "status": "STABLE"
+    }
+  ]
+}

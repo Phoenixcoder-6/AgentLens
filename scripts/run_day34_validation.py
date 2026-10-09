@@ -30,11 +30,11 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from analyzers.arbiter import Arbiter, evidence_from_information_loss  # noqa: E402
+from analyzers.arbiter import Arbiter  # noqa: E402
 from analyzers.detection.consistency_validator import ConsistencyValidator  # noqa: E402
 from analyzers.detection.ground_truth import GroundTruthValidator  # noqa: E402
 from analyzers.detection.information_loss import InformationLossRule  # noqa: E402
-from analyzers.detection.rule_engine import RuleEngine, _prestructured_evidence  # noqa: E402
+from analyzers.detection.rule_engine import RuleEngine  # noqa: E402
 from analyzers.detection.statistical_detector import StatisticalDetector  # noqa: E402
 from analyzers.detection.workflow_validator import WorkflowValidator  # noqa: E402
 from dashboard.state import persist_rule_matches  # noqa: E402
@@ -177,18 +177,9 @@ def run_validation() -> dict[str, Any]:
         if not re_res.skipped:
             evidence.extend(re_res.evidence)
 
-        # Information loss check (researcher -> writer)
-        res_steps = [s for s in trace.steps if s.agent == "researcher"]
-        wr_steps = [s for s in trace.steps if s.agent == "writer"]
-        res_ev = _prestructured_evidence(res_steps[-1]) if res_steps else None
-        wr_ev = _prestructured_evidence(wr_steps[-1]) if wr_steps else None
-        if res_ev is not None and wr_ev is not None:
-            loss_res = info_loss_rule.evaluate(
-                run_id=run_id, researcher_evidence=res_ev, writer_evidence=wr_ev
-            )
-            loss_ev = evidence_from_information_loss(loss_res)
-            if loss_ev is not None:
-                evidence.append(loss_ev)
+        il_res = info_loss_rule.analyze(trace)
+        if not il_res.skipped:
+            evidence.extend(il_res.evidence)
 
         wv_res = workflow_val.analyze(trace)
         if not wv_res.skipped:
