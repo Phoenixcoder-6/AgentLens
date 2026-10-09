@@ -1,267 +1,216 @@
-# AgentLens Architecture Guide
+# AgentLens Architecture & Technical Specification (v1.0.0)
 
-**Schema Version:** `1.0`
-
-AgentLens is a deterministic-first observability and root-cause attribution platform for multi-agent LLM pipelines. Its core invariant is:
-
-> **Same evidence in $\rightarrow$ same verdict out, every time.**
-> The LLM is never used to decide whether a run failed or which agent is responsible—it is only used (1) in bounded JSON-mode evidence extraction of unstructured agent outputs and (2) *after* the Arbiter has produced a deterministic `AnalysisBundle`, to narrate the root cause in plain English.
+This document details the internal architecture, design guarantees, data flow, storage schema, and extensibility patterns of AgentLens.
 
 ---
 
-## 1. End-to-End Component Diagram
+## 1. System Design Principles
 
-```mermaid
-flowchart TD
-    subgraph P1["1. Capture Layer (capture/)"]
-        CS["CaptureSession + @trace_step"]
-        HC["HandoffCapture (input / filtered / output state)"]
-        CS --> HC
-    end
+AgentLens is built around three core architectural tenets:
 
-    subgraph P2["2. Storage & Normalization (storage/, normalizer/)"]
-        SW["StorageWriter (data/traces/*.json + SQLite)"]
-        NORM["Normalizer (RunTrace -> NormalizedRun)"]
-        DB[("SQLite DB (storage/db.py)\n6 Tables")]
-    end
+1. **Deterministic Attribution Over Probabilistic Guessing:**  
+   LLM-based judges produce non-deterministic results that shift with temperature, model updates, and prompt phrasing. AgentLens resolves failure causes using deterministic, rule-based heuristics and a mathematically predictable priority order. The LLM is used strictly downstream to *explain* the deterministic finding.
+2. **Fail-Safe Capture:**  
+   Observability must never crash the workload it monitors. The `@trace_step` decorator and `CaptureSession` capture state, latency, and errors inside protective try-catch boundaries. If storage, serialization, or disk writes fail, the host pipeline executes unimpeded.
+3. **Strict Priority Hierarchy ($P_1 \to P_5$):**  
+   When multiple errors co-occur (e.g., an upstream hallucination followed by downstream verifier rubber-stamping), the Arbiter applies a strict priority ordering to isolate the primary root cause without human ambiguity.
 
-    subgraph P3["3. Evidence Extraction (analyzers/evidence_extraction/)"]
-        EX["EvidenceExtractor (Groq JSON mode + retry-once)"]
-        CACHE[("llm_cache table")]
-        EX <--> CACHE
-    end
+---
 
-    subgraph P4["4. Deterministic Detection Layer (analyzers/detection/)"]
-        GT["GroundTruthValidator (P1)"]
-        RE["RuleEngine (P2)"]
-        IL["InformationLossRule (P2/P3)"]
-        WV["WorkflowValidator (P3)"]
-        CV["ConsistencyValidator (P2/P3)"]
-        SD["StatisticalDetector + MetricsAnalyzer (P4)"]
-    end
+## 2. End-to-End Data Flow
 
-    subgraph P5["5. Verdict & Post-Processing (analyzers/)"]
-        ARB["Arbiter (P1-P5 Priority + Tie-Break)"]
-        ALT["Alerter (Log / Slack Webhook + Cooldown)"]
-        EXP["LLMExplainer (Reads AnalysisBundle ONLY)"]
-    end
-
-    subgraph P6["6. Presentation & API (dashboard/, api/)"]
-        UI["NiceGUI Dashboard (7 Views)"]
-        API["FastAPI REST Layer (/api/* + /health)"]
-    end
-
-    HC --> SW
-    SW --> DB
-    DB --> NORM
-    NORM --> EX
-    NORM --> GT & RE & WV & SD
-    EX --> RE & IL & CV
-    GT & RE & IL & WV & CV & SD -->|"list[EvidenceRecord]"| ARB
-    ARB -->|"AnalysisBundle"| ALT
-    ARB -->|"AnalysisBundle"| EXP
-    ARB -->|"persist_rule_matches()"| DB
-    EXP -->|"AnalysisBundle (with summary)"| UI & API
-    DB --> UI & API
+```
+Agent Pipeline Node
+       │  (Wraps execution in @trace_step)
+       ▼
+HandoffCapture ───────► Computes 3-State Snapshots:
+                         - input_state (full state before agent)
+                         - filtered_state (partial state returned by agent)
+                         - output_state (merged state after handoff)
+       │
+       ▼
+CaptureSession ───────► PII Scrubber (Redacts emails, keys, tokens)
+       │               Saves trace JSON to data/traces/{run_id}.json
+       │               Saves canonical run & steps to SQLite DB
+       ▼
+Normalizer ───────────► Validates schema conformance (SCHEMA_VERSION = "1.0")
+       │
+       ▼
+Detection Analyzers (Parallel / Independent):
+ ├── GroundTruthValidator   (P1: Output diff vs expected output)
+ ├── RuleEngine             (P2: Tool failures & Reasoning hallucination)
+ ├── ConsistencyValidator   (P2: Verifier rubber-stamping & passthrough)
+ ├── WorkflowValidator      (P3: Skipped nodes, invalid sequences)
+ ├── InformationLossRule    (P3: Handoff entity/source drops or gains)
+ └── StatisticalDetector    (P4: Per-agent Latency & Token Z-Score Outliers)
+       │
+       ▼
+The Arbiter ──────────► Priority Ranking (P1 > P2 > P3 > P4 > P5)
+                        Tie-Break Resolver (Ascending rule_id sort)
+                        Produces AnalysisBundle
+       │
+       ▼
+Presentation & Alerting:
+ ├── LLMExplainer           (LLM synthesizes natural language summary)
+ ├── Alerter                (Dispatches Slack Webhook on P1 / P2 alerts)
+ └── NiceGUI Dashboard      (6 Interactive Views: Runs, Timeline, Evidence, Diff, Metrics, Rules)
 ```
 
 ---
 
-## 2. Data Flow & Component Contracts
+## 3. The 5-Tier Priority Resolution Hierarchy
 
-Every layer communicates exclusively through typed Pydantic v2 models (`schema/models.py`) or dataclasses (`normalizer/normalizer.py`). Raw untyped dicts never cross layer boundaries.
+The Arbiter resolves all collected `EvidenceRecord` items into a single final `AnalysisBundle` according to this strict ladder:
 
-| Stage | Module / Class | Input Type | Output Type | Responsibility |
+| Priority | Category | Evidence Source | Criteria | Default Verdict |
 |---|---|---|---|---|
-| **1. Capture** | `capture/session.py` (`CaptureSession`), `capture/tracer.py` (`@trace_step`), `capture/handoff.py` (`HandoffCapture`) | Live LangGraph / Python agent execution | `RunTrace` containing ordered ` list[AgentStep]` + `HandoffState` | Wraps each agent invocation, records latency, token counts (`TokenUsage`), tool calls, and three-stage state snapshots (`input_state`, `filtered_state`, `output_state`). |
-| **2. Storage** | `storage/writer.py` (`StorageWriter`), `storage/db.py` (`DatabaseManager`) | `RunTrace` | SQLite rows (`runs`, `steps`, `metrics`) + `data/traces/{run_id}.json` | Writes the full trace JSON blob to disk and indexes metadata and step metrics in SQLite. |
-| **3. Normalizer** | `normalizer/normalizer.py` (`Normalizer`) | `RunTrace` | `NormalizedRun` (`list[NormalizedStep]`) | Deserializes JSON strings safely (`safe_loads`), enforces UTC-aware timestamps, stamps `schema_version = "1.0"`, and guarantees JSON-serializable state dicts. |
-| **4. Evidence Extractor** | `analyzers/evidence_extraction/extractor.py` (`EvidenceExtractor`) | `raw_output: str`, `agent: str` | `ExtractedEvidence` | Calls Groq LLM (with SQLite `LLMCache`, fallback model, and 1x stricter-prompt retry) to extract structured counts and lists: `source_count`, `entity_count`, `tool_calls`, `claims`, `references`, `numbers`, `dates`. Sets `extraction_failed=True` on double failure so downstream rules skip gracefully. |
-| **5a. Ground Truth** | `analyzers/detection/ground_truth.py` (`GroundTruthValidator`) | `RunTrace` (with `expected_output`) | `AnalysisResult` (`list[EvidenceRecord]` at **P1**) | Compares final output against `expected_output`. Fires `gt_mismatch_v1` (`grounded=True`) when similarity falls below `p1_similarity_threshold`. |
-| **5b. Rule Engine** | `analyzers/detection/rule_engine.py` (`RuleEngine`) | `RunTrace` + `ExtractedEvidence` | `AnalysisResult` (`list[EvidenceRecord]` at **P2**) | Evaluates deterministic execution and reasoning rules (`missing_tool_output_v1`, `tool_failure_v1`, `researcher_quality_v1`, `hallucination_v1`). |
-| **5c. Information Loss** | `analyzers/detection/information_loss.py` (`InformationLossRule`) | `researcher: ExtractedEvidence`, `writer: ExtractedEvidence` | `InformationLossResult` $\rightarrow$ `EvidenceRecord` (**P2**) | Detects dropped sources/entities between Researcher and Writer (`information_loss_v1`). |
-| **5d. Workflow Validator** | `analyzers/detection/workflow_validator.py` (`WorkflowValidator`) | `RunTrace` | `AnalysisResult` (`list[EvidenceRecord]` at **P3**) | Validates agent execution topology against `arbiter.workflow.required_agents` (`skipped_step_v1`, `wrong_order_v1`). |
-| **5e. Consistency Validator** | `analyzers/detection/consistency_validator.py` (`ConsistencyValidator`) | `RunTrace` + `ExtractedEvidence` | `AnalysisResult` (`list[EvidenceRecord]` at **P3**) | Detects verifier false-approvals and factual drift (`verifier_passthrough_v1`, `claim_drift_v1`). |
-| **5f. Statistical Detector** | `analyzers/detection/statistical_detector.py` (`StatisticalDetector`) | `run_id: str` + historical DB steps | `StatisticalAnomalyReport` (`list[EvidenceRecord]` at **P4**) | Computes per-agent z-scores across historical runs (`min_runs_for_baseline = 5`). Emits `STAT-LAT-*` and `STAT-TOK-*` when latency or tokens exceed $\mu + 2.5\sigma$. |
-| **5g. Diff Engine** | `diff_engine/` (`GraphAligner`, `SemanticSimilarityEngine`) | `trace_a: RunTrace`, `trace_b: RunTrace` | `AlignmentResult` + `SimilarityReport` | Aligns steps across two runs by agent topology (`MATCHED`, `MISSING_IN_A`, `MISSING_IN_B`) and computes `all-MiniLM-L6-v2` cosine similarity to pinpoint `first_divergence_agent`. |
-| **6. Arbiter** | `analyzers/arbiter.py` (`Arbiter`) | `run_id: str`, `list[EvidenceRecord]` | `AnalysisBundle` | Resolves all evidence into a single deterministic verdict using strict priority ordering (`P1 > P2 > P3 > P4 > P5`) and ascending `rule_id` tie-breaking. |
-| **7. Alerter** | `analyzers/alerter.py` (`Alerter`) | `run_id: str`, `AnalysisBundle` | `bool` (writes `logs/alerts.log` or POSTs Slack webhook) | Fires alerts when `bundle.priority_level` is in `alerting.on_verdict` (`[P1, P2]`), subject to per-run `cooldown_minutes`. |
-| **8. LLM Explainer** | `analyzers/explainer.py` (`LLMExplainer`) | `AnalysisBundle` | `AnalysisBundle` (with `summary` populated) | Generates a plain-English root-cause explanation strictly from `AnalysisBundle`. Uses hedged language when `bundle.grounded == False`. |
-| **9. Dashboard & API** | `dashboard/app.py`, `dashboard/state.py`, `api/router.py` | SQLite DB + `AnalysisBundle` | 7 NiceGUI pages + 6 REST endpoints | Interactive Run Explorer, Vertical State-Diff Timeline, Evidence View, Explain View, Diff Viewer, Rule Explorer (`/rules`), Aggregate Metrics (`/metrics`), and `/api/*` JSON endpoints. |
+| **$P_1$** | **Grounded Failure** | `GROUND_TRUTH` | Direct factual contradiction against known ground truth | `FAIL` (grounded=True) |
+| **$P_2$** | **Deterministic Rule** | `RULE_ENGINE`, `CONSISTENCY_VALIDATOR` | Execution crashes, missing tool output, severe hallucinations, verifier passthrough | `FAIL` (grounded=False) |
+| **$P_3$** | **Workflow / Handoff** | `WORKFLOW_VALIDATOR`, `INFORMATION_LOSS` | Missing required agent, skipped nodes, moderate information loss/gain | `FAIL` (grounded=False) |
+| **$P_4$** | **Statistical Anomaly** | `STATISTICAL_ANOMALY`, `METRICS_ANALYZER` | Latency or token consumption exceeds $>2.5\sigma$ of agent historical baseline | `FAIL` (grounded=True) |
+| **$P_5$** | **Clean / Unknown** | None / Fallback | All checks passed, or no deterministic rule fired | `PASS` (or unknown) |
+
+### Deterministic Tie-Breaking
+If multiple pieces of evidence fire at the **same** priority tier (e.g., two $P_2$ rules fire: `hallucination_v1` on Writer and `verifier_passthrough_v1` on Verifier):
+1. The Arbiter sorts candidate records alphabetically by `rule_id` ascending.
+2. In the case above, `hallucination_v1` sorts before `verifier_passthrough_v1`.
+3. The Arbiter crowns the upstream reasoning fault (`hallucination_v1`) as the primary cause, perfectly reflecting that downstream verifier passthrough was triggered by upstream corruption.
+4. The exact same evidence list will yield the exact same verdict **100% of the time**.
 
 ---
 
-## 3. Database Schema Diagram
+## 4. Grounded vs. Heuristic Signals
 
-All 6 tables are managed by `DatabaseManager.initialize()` in [`storage/db.py`](file:///C:/Users/Ankita%20Ghosh/OneDrive/Documents/AgentLens/AgentLensCode/storage/db.py) using `CREATE TABLE IF NOT EXISTS` with foreign keys enabled (`PRAGMA foreign_keys = ON`).
+AgentLens enforces a strict distinction in telemetry and reporting:
 
-```mermaid
-erDiagram
-    runs ||--o{ steps : "run_id"
-    runs ||--o{ analysis : "run_id"
-    runs ||--o{ metrics : "run_id"
-    runs ||--o{ rule_matches : "run_id (ON DELETE CASCADE)"
-
-    runs {
-        TEXT run_id PK
-        TEXT workflow
-        TEXT timestamp
-        TEXT status
-        REAL total_latency_ms
-        INTEGER total_tokens
-        TEXT schema_version
-        TEXT trace_path
-        TEXT trace_json
-        TEXT expected_output
-    }
-
-    steps {
-        INTEGER id PK
-        TEXT run_id FK
-        INTEGER step
-        TEXT agent
-        TEXT node_type
-        TEXT status
-        REAL latency_ms
-        INTEGER tokens_prompt
-        INTEGER tokens_completion
-        INTEGER tokens_total
-        TEXT model
-        TEXT error
-        TEXT timestamp
-        TEXT schema_version
-    }
-
-    analysis {
-        INTEGER id PK
-        TEXT run_id FK
-        TEXT analyzer
-        TEXT verdict
-        REAL confidence
-        TEXT category
-        TEXT affected_agent
-        INTEGER affected_step
-        TEXT details_json
-        TEXT timestamp
-        TEXT schema_version
-    }
-
-    metrics {
-        INTEGER id PK
-        TEXT run_id FK
-        INTEGER step
-        TEXT agent
-        TEXT metric_name
-        REAL metric_value
-        TEXT timestamp
-        TEXT schema_version
-    }
-
-    rule_matches {
-        INTEGER id PK
-        TEXT run_id FK
-        TEXT rule_id
-        TEXT rule_version
-        TEXT category
-        TEXT severity
-        TEXT agent
-        INTEGER step
-        TEXT description
-        TEXT matched_at
-    }
-
-    llm_cache {
-        TEXT cache_key PK
-        TEXT prompt
-        TEXT model
-        TEXT response_text
-        INTEGER token_cost
-        TEXT created_at
-        TEXT expires_at
-    }
-```
+- **Grounded Attribution (`grounded = True`):**  
+  The failure is verified against an objective anchor outside the LLM's opinion:
+  - Factual mismatch against verified `expected_output` ($P_1$).
+  - Mathematical statistical outlier exceeding $2.5\sigma$ of recorded population history ($P_4$).
+- **Heuristic Attribution (`grounded = False`):**  
+  The failure was inferred via behavioral rules and schema inspection ($P_2$, $P_3$). While highly accurate, it represents structural inference rather than mathematical ground-truth proof.
 
 ---
 
-## 4. How to Add a New Deterministic Rule (Step-by-Step)
+## 5. Storage Architecture & Alembic Schema
 
-Suppose you want to add a new reasoning rule `citation_url_missing_v1` that flags the Writer if it produces references without any URLs.
+AgentLens stores telemetry in SQLite (`data/agentlens.db` by default, configurable via `DB_PATH` or `config.yaml`):
 
-### Step 1: Add any configurable thresholds to `config/config.yaml`
-Never hardcode thresholds in rule code. Add the setting under `arbiter.reasoning` in [`config/config.yaml`](file:///C:/Users/Ankita%20Ghosh/OneDrive/Documents/AgentLens/AgentLensCode/config/config.yaml):
-```yaml
-arbiter:
-  reasoning:
-    researcher_min_sources: 1
-    hallucination_entity_gain_threshold: 0
-    require_url_in_references: true   # <-- new threshold
+```sql
+-- Core execution tables
+runs (
+    run_id TEXT PRIMARY KEY,
+    workflow TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    status TEXT NOT NULL,
+    total_latency_ms REAL,
+    total_tokens INTEGER,
+    schema_version TEXT,
+    trace_path TEXT,
+    trace_json TEXT,
+    expected_output TEXT
+);
+
+steps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL REFERENCES runs(run_id),
+    step INTEGER NOT NULL,
+    agent TEXT NOT NULL,
+    status TEXT NOT NULL,
+    latency_ms REAL,
+    tokens_prompt INTEGER,
+    tokens_completion INTEGER,
+    tokens_total INTEGER,
+    diff_summary TEXT,
+    error TEXT,
+    timestamp TEXT NOT NULL,
+    schema_version TEXT,
+    UNIQUE (run_id, step)
+);
+
+-- Analysis & Observability tables
+analysis (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL REFERENCES runs(run_id),
+    step INTEGER,
+    analyzer TEXT NOT NULL,
+    category TEXT,
+    verdict TEXT,
+    confidence REAL,
+    details_json TEXT,
+    timestamp TEXT NOT NULL,
+    schema_version TEXT
+);
+
+rule_matches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL REFERENCES runs(run_id),
+    rule_id TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
+    category TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    agent TEXT,
+    step_idx INTEGER,
+    description TEXT,
+    evidence_detail TEXT,
+    timestamp TEXT NOT NULL
+);
+
+-- Performance Indexes (Alembic-managed)
+CREATE INDEX ix_runs_timestamp ON runs (timestamp);
+CREATE INDEX ix_steps_run_id ON steps (run_id);
+CREATE INDEX ix_analysis_run_id ON analysis (run_id);
+CREATE INDEX ix_rule_matches_run_id ON rule_matches (run_id);
+CREATE INDEX ix_rule_matches_rule_id ON rule_matches (rule_id);
 ```
 
-### Step 2: Register the rule in `analyzers/rule_catalog.py`
-Add the metadata entry to `RULE_CATALOG` in [`analyzers/rule_catalog.py`](file:///C:/Users/Ankita%20Ghosh/OneDrive/Documents/AgentLens/AgentLensCode/analyzers/rule_catalog.py) so it appears automatically in the `/rules` Rule Explorer (even before it fires for the first time):
+Database migrations are tracked via Alembic (`alembic/versions/`). Full test coverage guarantees that `upgrade("head")` and `downgrade("base")` execute cleanly.
+
+---
+
+## 6. How to Add a New Detection Rule
+
+Adding a new deterministic failure rule takes 3 simple steps:
+
+### Step 1: Register in `analyzers/rule_catalog.py`
 ```python
-    "citation_url_missing_v1": {
-        "name": "Missing Citation URL",
-        "category": "reasoning",
-        "version": "1.0.0",
-        "description": "Writer cited references but none contained an explicit URL.",
-        "source": "rule_engine",
-    },
+RuleDefinition(
+    rule_id="custom_retry_loop_v1",
+    version="1.0.0",
+    category=FailureCategory.WORKFLOW,
+    severity=RuleSeverity.MEDIUM,
+    description="Agent entered an unconstrained retry loop exceeding max iterations.",
+    priority=PriorityLevel.P3,
+)
 ```
 
-### Step 3: Implement the check in the appropriate detector
-Open [`analyzers/detection/rule_engine.py`](file:///C:/Users/Ankita%20Ghosh/OneDrive/Documents/AgentLens/AgentLensCode/analyzers/detection/rule_engine.py) (or `workflow_validator.py` / `consistency_validator.py` depending on category). Inside `RuleEngine.analyze()`, check `not wr_ev.extraction_failed` first (to preserve graceful degradation), then append an `EvidenceRecord` using `self._make_record()`:
+### Step 2: Implement Logic in the Target Analyzer
+Implement the check inside `RuleEngine.analyze()`, `WorkflowValidator.analyze()`, or a dedicated analyzer:
 ```python
-require_url = reasoning_config.get("require_url_in_references", False)
-if require_url and wr_step and wr_ev and not wr_ev.extraction_failed:
-    if wr_ev.references and not any("http" in r for r in wr_ev.references):
-        evidence.append(
-            self._make_record(
-                rule_id="citation_url_missing_v1",
-                category=FailureCategory.REASONING,
-                description="Writer references contain no URLs.",
-                agent="writer",
-                step_idx=wr_step.step,
-            )
+if agent_retry_count > max_retries:
+    evidence.append(
+        EvidenceRecord(
+            source=EvidenceSource.WORKFLOW_VALIDATOR,
+            description=f"Agent '{step.agent}' retried {agent_retry_count} times.",
+            value="FAIL",
+            rule_match=RuleMatch(
+                rule_id="custom_retry_loop_v1",
+                category=FailureCategory.WORKFLOW,
+                severity=RuleSeverity.MEDIUM,
+                agent=step.agent,
+                step_idx=step.step,
+                description="Retry loop exceeded limit.",
+            ),
+            agent=step.agent,
+            confidence=1.0,
         )
+    )
 ```
-> **Note on rule versioning & staleness:** When modifying the logic of an existing rule, bump its `rule_version` (e.g. `"1.0.0"` $\rightarrow$ `"1.1.0"`). The Run Explorer compares stored verdict versions and displays a `⚠ Stale` badge on runs analyzed under older versions.
 
-### Step 4: Add unit tests
-Add a positive test, negative test, and `extraction_failed=True` skip test in `tests/test_rules.py`.
-
----
-
-## 5. How to Add a New Agent Extractor or Extraction Field (Step-by-Step)
-
-AgentLens extracts structured facts from unstructured agent prose in a single JSON-mode LLM call per step via [`analyzers/evidence_extraction/extractor.py`](file:///C:/Users/Ankita%20Ghosh/OneDrive/Documents/AgentLens/AgentLensCode/analyzers/evidence_extraction/extractor.py).
-
-### Case A: Adding a new extracted field across steps
-1. **Update `config/config.yaml`**: Add the field name under `extraction.fields`.
-2. **Extend `ExtractedEvidence`** in [`analyzers/evidence_extraction/extractor.py`](file:///C:/Users/Ankita%20Ghosh/OneDrive/Documents/AgentLens/AgentLensCode/analyzers/evidence_extraction/extractor.py):
-   Always provide a safe default so existing callers and cached payloads remain valid:
-   ```python
-   sentiment: str = Field(
-       default="neutral",
-       description="Overall tone of the output: positive | neutral | negative",
-   )
-   ```
-3. **Update `_SYSTEM_PROMPT`**: Add the field definition and include it in the JSON return template inside `_SYSTEM_PROMPT`.
-4. **Update `_parse_response()` and `_build_evidence()`**: Validate the field type in `_parse_response()` and pass it into `ExtractedEvidence(...)` in `_build_evidence()`.
-
-### Case B: Adding a new agent role to the pipeline
-1. **Decorate the agent function** in [`app/pipeline.py`](file:///C:/Users/Ankita%20Ghosh/OneDrive/Documents/AgentLens/AgentLensCode/app/pipeline.py) with `@trace_step(agent_name="fact_checker", node_type=NodeType.LLM)` and record its state handoff via `HandoffCapture`.
-2. **Register required workflow order** (if mandatory) in [`config/config.yaml`](file:///C:/Users/Ankita%20Ghosh/OneDrive/Documents/AgentLens/AgentLensCode/config/config.yaml) under `arbiter.workflow.required_agents`.
-3. **Extract step evidence in `dashboard/state.py` and Detectors**:
-   `EvidenceExtractor.extract(step.raw_output, agent=step.agent)` is already called for **every** step in `norm.steps` during `run_full_analysis()` (`state.extracted[step.agent] = ev`). To write cross-agent rules for the new agent:
-   - Retrieve `fc_ev = state.extracted.get("fact_checker")` (or in `RuleEngine.analyze()`, find steps where `s.agent == "fact_checker"`).
-   - Guard with `if fc_ev and not fc_ev.extraction_failed:` before evaluating rules.
-4. **Add agent color styling** in [`dashboard/theme.py`](file:///C:/Users/Ankita%20Ghosh/OneDrive/Documents/AgentLens/AgentLensCode/dashboard/theme.py) under `STEP_COLOR`:
-   ```python
-   STEP_COLOR = {
-       "researcher": "#3b82f6",
-       "writer": "#8b5cf6",
-       "verifier": "#10b981",
-       "fact_checker": "#f59e0b",
-   }
-   ```
+### Step 3: Run the Verification Suite
+Ensure unit tests and the frozen benchmark pass:
+```bash
+pytest tests/ -v
+python scripts/run_day43_regression.py
+```
+The regression runner will automatically verify that your new rule did not cause unintended verdict drift across the 20 benchmark traces.

@@ -1,179 +1,150 @@
-# AgentLens_demo
+# AgentLens v1.0.0
 
 [![AgentLens CI](https://github.com/Phoenixcoder-6/AgentLens/actions/workflows/ci.yml/badge.svg)](https://github.com/Phoenixcoder-6/AgentLens/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Coverage >= 75%](https://img.shields.io/badge/coverage-%3E%3D%2075%25-brightgreen.svg)](https://github.com/Phoenixcoder-6/AgentLens)
+[![Version: 1.0.0](https://img.shields.io/badge/version-1.0.0-purple.svg)](CHANGELOG.md)
 
 **Multi-Agent Failure Attribution, Trace Diffing & Explainability Platform**
 
-AgentLens answers a single question precisely: *why did a multi-agent workflow fail, and which agent was responsible?*
+AgentLens answers a single question with mathematical precision:  
+*Why did a multi-agent workflow fail, and which agent was responsible?*
 
-> The model never decides what happened — it only explains what deterministic analysis has already established.
+> **Core Philosophy:**  
+> The LLM never decides what happened — it only explains what deterministic analysis has already proven.
 
-## Architecture
+---
+
+## 1. Why AgentLens?
+
+When complex LLM agent swarms fail (hallucinating facts, dropping instructions, crashing tools, or rubber-stamping bad output), debugging with standard logs or APMs is overwhelming:
+- Traditional tracing tools (Datadog, OpenTelemetry) record *latencies* and *spans*, but understand nothing about *agent semantics*, *handoff contracts*, or *reasoning integrity*.
+- LLM-as-a-judge approaches are probabilistic, non-deterministic, and frequently hallucinate their own blame attributions.
+
+**AgentLens introduces Deterministic Multi-Tier Failure Attribution:**
+1. **Deterministic Rule Engine (P1–P3):** Isolates the exact faulty agent using verifiable rules (tool failures, information loss/gain, step omission, verifier passthrough).
+2. **Deterministic 5-Tier Arbiter:** Guarantees that the exact same evidence always yields the exact same verdict ($P_1 \to P_5$).
+3. **Graph-Aligned Trace Diffing:** Aligns multi-agent execution traces step-by-step to pinpoint the exact moment two runs diverged.
+4. **Grounded vs. Heuristic Separation:** Clearly flags whether a failure was proven against external ground-truth ($P_1$) or detected via behavioral heuristics ($P_2–P_4$).
+
+---
+
+## 2. Architecture Overview
 
 ```
-agentlens/
-├── app/                         # Application entry point
-├── capture/                     # @trace_step decorator — captures input/output/handoff
-├── normalizer/                  # Converts raw events → Canonical Trace Schema
-├── schema/                      # Pydantic models (RunTrace, AgentStep, etc.)
-├── storage/                     # SQLite + JSON blob storage
-├── analyzers/
-│   ├── evidence_extraction/     # Schema-constrained LLM fact extraction
-│   ├── detection/
-│   │   ├── rule_engine.py       # Deterministic rules for known failure patterns
-│   │   ├── workflow_validator.py# Handoff/workflow violation detection (P3)
-│   │   └── consistency_validator.py  # Verifier behavior checking
-│   ├── diff_engine.py           # Graph-aligned cross-run comparison
-│   ├── metrics_analyzer.py      # Latency, token, statistical anomaly detection (P4)
-│   └── arbiter.py               # Priority-ranked evidence merger → final verdict
-├── dashboard/                   # Streamlit UI
-├── replay.py                    # CLI to re-run a workflow with original inputs
-├── tests/
-├── sample_data/
-├── config/
-│   └── config.yaml              # All thresholds, models, paths — nothing hardcoded
-└── docs/
+                                 [ MULTI-AGENT PIPELINE ]
+                                 Researcher → Writer → Verifier
+                                              │
+                                              ▼
+                                 [ @trace_step / CaptureSession ]
+                                 (Fail-Safe State & Token Interception)
+                                              │
+                                              ▼
+                                  [ Normalizer & Storage ]
+                                  (SQLite + JSON Traces)
+                                              │
+           ┌──────────────────────────────────┴──────────────────────────────────┐
+           ▼                                                                     ▼
+[ Ground Truth Validator (P1) ]                                        [ Rule Engine (P2) ]
+(Sequence Matching vs Expected Output)                                 (Tool Failures & Hallucination)
+           │                                                                     │
+           ▼                                                                     ▼
+[ Consistency Validator (P2) ]                                     [ Workflow Validator (P3) ]
+(Verifier Passthrough / Rubber-Stamping)                               (Skipped Steps / Deadlocks)
+           │                                                                     │
+           ▼                                                                     ▼
+[ Information Loss Rule (P3) ]                                    [ Statistical Detector (P4) ]
+(Handoff Entity / Source Drops)                                       (Latency / Token Z-Scores)
+           │                                                                     │
+           └──────────────────────────────────┬──────────────────────────────────┘
+                                              ▼
+                                    [ THE ARBITER ]
+                        (5-Tier Priority & Tie-Break Resolver)
+                                              │
+                                              ▼
+                                    [ ANALYSIS BUNDLE ]
+                        Verdict: P1..P5 | Primary Agent | Grounded?
+                                              │
+                     ┌────────────────────────┴────────────────────────┐
+                     ▼                                                 ▼
+             [ LLM Explainer ]                               [ 6-View Dashboard ]
+             (Deterministic Insights)                        (Runs, Diff, Metrics, Evidence)
 ```
 
-## Quickstart
+---
+
+## 3. Quickstart (Zero-Setup in 3 Commands)
+
+### Option A: Local Python Package Installation
 
 ```bash
-# 1. Clone and enter the project
-git clone <your-repo-url>
-cd AgentLensCode
+# 1. Install editable package
+pip install -e .
 
-# 2. Create the conda environment (bundles MSVC runtime — fixes PyTorch DLL issues on Windows)
-conda create -n agentlens python=3.12 -y
-conda activate agentlens
+# 2. Seed pre-computed zero-setup demo traces (PASS, Grounded P1, Heuristic P2/P3, Diff Pairs)
+agentlens-seed
 
-# 3. Install PyTorch via conda FIRST (properly handles C++ runtime dependencies)
-conda install pytorch cpuonly -c pytorch -y
-
-# 4. Install remaining dependencies
-pip install -r requirements.txt
-
-# 5. Set your API key
-copy .env.example .env
-# Edit .env and set GROQ_API_KEY=gsk_...
-
-# 6. Run the verification smoke test
-python verify_groq.py
-
-# 7. Apply database migrations (indexes and future schema changes)
-alembic upgrade head
-
-# 8. Run the dashboard
-streamlit run dashboard/app.py
+# 3. Launch the AgentLens interactive dashboard
+agentlens-dashboard
 ```
+Open **`http://localhost:8080`** in your browser.
 
-> **Windows note:** Using conda (not pip venv) is required on Windows to ensure PyTorch's C++ runtime DLLs are correctly installed alongside the package.
+---
 
-> **Database migrations:** AgentLens uses [Alembic](https://alembic.sqlalchemy.org/) for schema migrations.
-> After pulling new code, always run `alembic upgrade head` to apply pending migrations.
-> Migration files live in `alembic/versions/` and are version-controlled alongside the source code.
+### Option B: One-Command Docker Setup
 
-## Design Principles
+```bash
+docker compose up --build
+```
+The NiceGUI dashboard and FastAPI REST endpoints are exposed at **`http://localhost:8080`**.  
+Liveness/readiness is monitored via `GET http://localhost:8080/health`.
 
-- **Evidence before verdicts** — every finding is backed by a verifiable trace record
-- **Deterministic core** — the Arbiter's P1–P5 priority system produces the same output for the same input, always
-- **LLM confined to explanation** — the model explains what analysis established; it never assigns blame
-- **Configuration over code** — all thresholds, model choices, and paths live in `config/config.yaml`
+---
 
-## Arbiter Priority System
+## 4. Benchmark Accuracy & Validation
 
-| Priority | Source | Example |
+AgentLens is evaluated on a frozen 20-trace benchmark (`sample_data/labels.json`) covering clean runs, tool crashes, reasoning hallucinations, skipped nodes, and verifier bypasses:
+
+| Metric | Target | Verified Actual | Status |
+|---|---|---|---|
+| **Binary PASS / FAIL Detection** | $\ge 90\%$ | **100.0%** (20/20) | **PASS** |
+| **Exact Category & Agent Attribution** | $\ge 75\%$ | **80.0%** (16/20) | **PASS** |
+| **Test Suite Code Coverage Gate** | $\ge 75\%$ | **93.0%** | **PASS** |
+| **Type Checking (`mypy`)** | Strict PEP 561 | **0 issues** (46 source files) | **PASS** |
+| **Formatting & Linting (`ruff`)** | Clean | **0 issues** | **PASS** |
+
+Continuous regression testing is enforced on every PR to `main` via [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+---
+
+## 5. REST API
+
+AgentLens includes a built-in FastAPI REST service mounted at `/api` and `/health`:
+
+| Method | Endpoint | Description |
 |---|---|---|
-| P1 | Ground truth mismatch | Output ≠ `expected_output` |
-| P2 | Rule match | Information loss detected by rule engine |
-| P3 | Workflow violation | Handoff dropped a key |
-| P4 | Statistical anomaly | Latency spike beyond threshold |
-| P5 | Unknown | No evidence matched |
+| `GET` | `/health` | Liveness & readiness check (`status`, `db`, `llm`, `uptime_seconds`) |
+| `GET` | `/api/runs` | List recorded runs with pagination & verdict level filters |
+| `GET` | `/api/runs/{run_id}` | Full trace details including per-agent steps & state diffs |
+| `GET` | `/api/runs/{run_id}/verdict` | Final Arbiter verdict bundle & primary cause |
+| `POST` | `/api/analyze/{run_id}` | Trigger deterministic analysis on an existing trace |
+| `GET` | `/api/metrics` | Aggregated latency, token, and run counts per agent |
 
-## Tech Stack
+Interactive Swagger documentation is available at `http://localhost:8080/docs`.
 
-| Layer | Technology |
-|---|---|
-| Agent Framework | LangGraph |
-| Schema/Validation | Pydantic v2 |
-| Storage | SQLite + JSON blobs |
-| Evidence/Explanation | Groq API |
-| Diff Engine | sentence-transformers (local) |
-| Dashboard | Streamlit |
+---
 
-## Replay CLI (`replay.py`)
+## 6. Project Documentation Index
 
-> **Note:** `replay.py` is a deliberate addition beyond the original MVP, included because it directly supports cross-run diff validation and CI/CD pipeline gating.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Deep dive into the 5-tier Arbiter, component data flow, storage schema, and how to write custom rules.
+- **[RULES.md](RULES.md)**: Exhaustive catalog of all built-in deterministic detection rules (P1–P4).
+- **[LIMITATIONS.md](LIMITATIONS.md)**: Benchmark error analysis, scope boundaries, and dual-fault tie-break dynamics.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**: Developer setup, test guidelines, pre-commit hooks, and PR workflow.
+- **[CHANGELOG.md](CHANGELOG.md)**: Complete release history from v0.1.0 to v1.0.0.
 
-Re-run or deterministically evaluate a captured workflow run by `run_id`:
+---
 
-```bash
-# Re-run or evaluate a run by ID
-python replay.py run_lbl_pass_01
+## 7. License
 
-# Dry-run mode (evaluate deterministically without calling LLMs)
-python replay.py run_lbl_pass_01 --dry-run
-
-# Machine-readable JSON output for CI scripting
-python replay.py run_lbl_execution_01 --dry-run --json
-
-# Replay with a different topic to test attribution stability and diff validation
-python replay.py run_lbl_reasoning_01 --dry-run --override-topic "Quantum error correction"
-```
-
-### Exit Codes for CI Gating
-
-| Exit Code | Verdict | Meaning |
-|---|---|---|
-| `0` | `PASS` | `P5` — No failures or anomalies detected |
-| `1` | `WARNING` | `P3` / `P4` — Workflow violation or statistical outlier |
-| `2` | `FAIL` | `P1` / `P2` — Ground-truth mismatch or critical rule failure |
-| `3` | `ERROR` | Run ID not found, malformed trace, or runtime error |
-
-```bash
-python replay.py <run_id> --dry-run --json
-if [ $? -ge 2 ]; then exit 1; fi
-```
-
-## CI/CD & Branch Protection
-
-Every push to `main` / `dev` and every pull request targeting `main` runs the GitHub Actions workflow in `.github/workflows/ci.yml`:
-
-1. **Lint & Type Check (`lint`)**: `ruff check .`, `ruff format --check .`, and `mypy . --ignore-missing-imports`.
-2. **Unit & Error Injection Tests (`test`)**: `pytest tests/ --cov=. --cov-fail-under=70`.
-3. **Validation Accuracy Gate (`validation-gate`)**: Runs the 20-trace frozen labeled dataset (`scripts/run_day34_validation.py` + `scripts/evaluate_day35_accuracy.py`) and fails the build if exact root-cause attribution accuracy drops below **75% (15/20)**.
-
-### Branch Protection Setup (`main`)
-Pull requests targeting `main` require all three CI status checks to pass before merging:
-- Enable **Require a pull request before merging** in GitHub `Settings -> Branches -> Branch protection rules (main)`.
-- Enable **Require status checks to pass before merging** and select:
-  - `Lint & Type Check`
-  - `Unit & Error Injection Tests (Coverage >= 70%)`
-  - `Validation Accuracy Gate (>= 75%)`
-
-## Data Privacy, PII Scrubbing & Trace Retention
-
-> **Warning:** Traces contain full LLM I/O. Enable `pii_scrubbing` before using on user data.
-
-- **Fail-Safe Capture (`capture.fail_safe: true`)**: Exceptions inside `CaptureSession`, `HandoffCapture`, `@trace_step`, or `StorageWriter` are caught and logged as warnings; they never crash or alter the underlying agent workflow execution.
-- **Config-Driven PII Scrubbing (`capture/pii_scrubber.py`)**: Set `capture.pii_scrubbing.enabled: true` in `config/config.yaml` to redact emails (`[REDACTED_EMAIL]`), phone numbers (`[REDACTED_PHONE]`), SSNs (`[REDACTED_SSN]`), API keys (`[REDACTED_API_KEY]`), and credit cards (`[REDACTED_CREDIT_CARD]`) via configurable regex patterns, plus optional `spaCy` (`en_core_web_sm`) NER entity redaction when installed.
-- **Trace Retention Policy (`capture.retention_days: 90`)**: Run the cleanup utility to delete traces older than `retention_days` from `data/traces/*.json` and `data/agentlens.db`:
-
-```bash
-# Preview traces older than 90 days (dry-run)
-python scripts/cleanup_old_traces.py --dry-run
-
-# Delete traces older than 30 days
-python scripts/cleanup_old_traces.py --days 30
-```
-
-## Status
-
-🚧 **Active development — v1.0 build in progress (45-day plan)**
-
-See `docs/` for the full Architecture & Requirements Document.
-
-## Limitations
-
-See `LIMITATIONS.md` (generated after validation in Week 7).
-
-
+AgentLens is open-source software licensed under the [MIT License](LICENSE).
