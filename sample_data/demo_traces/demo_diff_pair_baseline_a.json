@@ -1,0 +1,188 @@
+{
+  "schema_version": "1.0",
+  "run_id": "demo_diff_pair_baseline_a",
+  "workflow": "research_report_pipeline",
+  "timestamp": "2026-10-09T12:20:00+00:00",
+  "steps": [
+    {
+      "schema_version": "1.0",
+      "run_id": "demo_diff_pair_baseline_a",
+      "step": 1,
+      "agent": "researcher",
+      "node_type": "llm",
+      "input": "{\"topic\": \"Quantum Computing Fault-Tolerant Error Correction\"}",
+      "output": "{\"research_findings\": \"Surface codes, topological qubits, neutral atom arrays, and magic state distillation reduce logical error rates below threshold across 6 studies and 8 hardware entities.\", \"source_count\": 6, \"entity_count\": 8}",
+      "expected_output": null,
+      "prompt": "Execute researcher step for run demo_diff_pair_baseline_a",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 300.0,
+      "tokens": {
+        "prompt": 180,
+        "completion": 140,
+        "total": 320
+      },
+      "tool_calls": [
+        {
+          "name": "arxiv_search",
+          "output": "6 quantum error correction papers"
+        }
+      ],
+      "handoff": {
+        "input_state": {
+          "topic": "Quantum Computing Fault-Tolerant Error Correction"
+        },
+        "filtered_state": {
+          "research_findings": "Surface codes, topological qubits, neutral atom arrays, and magic state distillation reduce logical error rates below threshold across 6 studies and 8 hardware entities.",
+          "source_count": 6,
+          "entity_count": 8
+        },
+        "output_state": {
+          "topic": "Quantum Computing Fault-Tolerant Error Correction",
+          "research_findings": "Surface codes, topological qubits, neutral atom arrays, and magic state distillation reduce logical error rates below threshold across 6 studies and 8 hardware entities.",
+          "source_count": 6,
+          "entity_count": 8
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-09T12:20:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "demo_diff_pair_baseline_a",
+      "step": 2,
+      "agent": "writer",
+      "node_type": "llm",
+      "input": "{\"topic\": \"Quantum Computing Fault-Tolerant Error Correction\", \"research_findings\": \"Surface codes, topological qubits, neutral atom arrays, and magic state distillation reduce logical error rates below threshold across 6 studies and 8 hardware entities.\", \"source_count\": 6, \"entity_count\": 8}",
+      "output": "{\"written_report\": \"Fault-tolerant quantum computing relies on surface code lattices, topological qubits, neutral atom arrays, and magic state distillation across all 8 documented platforms.\", \"source_count\": 6, \"entity_count\": 8}",
+      "expected_output": null,
+      "prompt": "Execute writer step for run demo_diff_pair_baseline_a",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 350.0,
+      "tokens": {
+        "prompt": 180,
+        "completion": 140,
+        "total": 320
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "Quantum Computing Fault-Tolerant Error Correction",
+          "research_findings": "Surface codes, topological qubits, neutral atom arrays, and magic state distillation reduce logical error rates below threshold across 6 studies and 8 hardware entities.",
+          "source_count": 6,
+          "entity_count": 8
+        },
+        "filtered_state": {
+          "written_report": "Fault-tolerant quantum computing relies on surface code lattices, topological qubits, neutral atom arrays, and magic state distillation across all 8 documented platforms.",
+          "source_count": 6,
+          "entity_count": 8
+        },
+        "output_state": {
+          "topic": "Quantum Computing Fault-Tolerant Error Correction",
+          "research_findings": "Surface codes, topological qubits, neutral atom arrays, and magic state distillation reduce logical error rates below threshold across 6 studies and 8 hardware entities.",
+          "source_count": 6,
+          "entity_count": 8,
+          "written_report": "Fault-tolerant quantum computing relies on surface code lattices, topological qubits, neutral atom arrays, and magic state distillation across all 8 documented platforms."
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-09T12:20:01+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "demo_diff_pair_baseline_a",
+      "step": 3,
+      "agent": "verifier",
+      "node_type": "llm",
+      "input": "{\"topic\": \"Quantum Computing Fault-Tolerant Error Correction\", \"research_findings\": \"Surface codes, topological qubits, neutral atom arrays, and magic state distillation reduce logical error rates below threshold across 6 studies and 8 hardware entities.\", \"source_count\": 6, \"entity_count\": 8, \"written_report\": \"Fault-tolerant quantum computing relies on surface code lattices, topological qubits, neutral atom arrays, and magic state distillation across all 8 documented platforms.\"}",
+      "output": "{\"verified\": true, \"approved\": true, \"verification_result\": \"APPROVED: Complete coverage of all 6 sources and 8 entities.\", \"revision_notes\": \"\", \"source_count\": 6, \"entity_count\": 8}",
+      "expected_output": null,
+      "prompt": "Execute verifier step for run demo_diff_pair_baseline_a",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 240.0,
+      "tokens": {
+        "prompt": 180,
+        "completion": 140,
+        "total": 320
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "Quantum Computing Fault-Tolerant Error Correction",
+          "research_findings": "Surface codes, topological qubits, neutral atom arrays, and magic state distillation reduce logical error rates below threshold across 6 studies and 8 hardware entities.",
+          "source_count": 6,
+          "entity_count": 8,
+          "written_report": "Fault-tolerant quantum computing relies on surface code lattices, topological qubits, neutral atom arrays, and magic state distillation across all 8 documented platforms."
+        },
+        "filtered_state": {
+          "verified": true,
+          "approved": true,
+          "verification_result": "APPROVED: Complete coverage of all 6 sources and 8 entities.",
+          "revision_notes": "",
+          "source_count": 6,
+          "entity_count": 8
+        },
+        "output_state": {
+          "topic": "Quantum Computing Fault-Tolerant Error Correction",
+          "research_findings": "Surface codes, topological qubits, neutral atom arrays, and magic state distillation reduce logical error rates below threshold across 6 studies and 8 hardware entities.",
+          "source_count": 6,
+          "entity_count": 8,
+          "written_report": "Fault-tolerant quantum computing relies on surface code lattices, topological qubits, neutral atom arrays, and magic state distillation across all 8 documented platforms.",
+          "verified": true,
+          "approved": true,
+          "verification_result": "APPROVED: Complete coverage of all 6 sources and 8 entities.",
+          "revision_notes": ""
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-09T12:20:02+00:00"
+    }
+  ],
+  "total_latency_ms": 890.0,
+  "total_tokens": 910,
+  "status": "SUCCESS",
+  "expected_output": null,
+  "trace_path": null,
+  "demo_metadata": {
+    "category": "diff_pair",
+    "description": "Baseline run A for side-by-side Diff View comparison",
+    "pair_id": "diff_pair_01",
+    "pair_role": "baseline_run_a",
+    "partner_run_id": "demo_diff_pair_diverged_b",
+    "verdict": "PASS",
+    "priority_level": "P5",
+    "primary_cause": "unknown",
+    "primary_agent": null,
+    "grounded": false,
+    "rules_fired": []
+  }
+}

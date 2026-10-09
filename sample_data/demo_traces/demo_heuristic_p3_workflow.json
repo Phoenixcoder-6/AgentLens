@@ -1,0 +1,131 @@
+{
+  "schema_version": "1.0",
+  "run_id": "demo_heuristic_p3_workflow",
+  "workflow": "research_report_pipeline",
+  "timestamp": "2026-10-09T12:15:00+00:00",
+  "steps": [
+    {
+      "schema_version": "1.0",
+      "run_id": "demo_heuristic_p3_workflow",
+      "step": 1,
+      "agent": "researcher",
+      "node_type": "llm",
+      "input": "{\"topic\": \"Global Semiconductor Supply Chain Resilience\"}",
+      "output": "{\"research_findings\": \"TSMC, ASML, and Samsung account for primary EUV lithography capacity.\", \"source_count\": 5, \"entity_count\": 6}",
+      "expected_output": null,
+      "prompt": "Execute researcher step for run demo_heuristic_p3_workflow",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 330.0,
+      "tokens": {
+        "prompt": 180,
+        "completion": 140,
+        "total": 320
+      },
+      "tool_calls": [
+        {
+          "name": "industry_db_query",
+          "output": "5 supply chain reports"
+        }
+      ],
+      "handoff": {
+        "input_state": {
+          "topic": "Global Semiconductor Supply Chain Resilience"
+        },
+        "filtered_state": {
+          "research_findings": "TSMC, ASML, and Samsung account for primary EUV lithography capacity.",
+          "source_count": 5,
+          "entity_count": 6
+        },
+        "output_state": {
+          "topic": "Global Semiconductor Supply Chain Resilience",
+          "research_findings": "TSMC, ASML, and Samsung account for primary EUV lithography capacity.",
+          "source_count": 5,
+          "entity_count": 6
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-09T12:15:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "demo_heuristic_p3_workflow",
+      "step": 2,
+      "agent": "writer",
+      "node_type": "llm",
+      "input": "{\"topic\": \"Global Semiconductor Supply Chain Resilience\", \"research_findings\": \"TSMC, ASML, and Samsung account for primary EUV lithography capacity.\", \"source_count\": 5, \"entity_count\": 6}",
+      "output": "{\"written_report\": \"Analysis of EUV lithography bottlenecks across TSMC, ASML, and Samsung.\", \"source_count\": 5, \"entity_count\": 6}",
+      "expected_output": null,
+      "prompt": "Execute writer step for run demo_heuristic_p3_workflow",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 340.0,
+      "tokens": {
+        "prompt": 180,
+        "completion": 140,
+        "total": 320
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "Global Semiconductor Supply Chain Resilience",
+          "research_findings": "TSMC, ASML, and Samsung account for primary EUV lithography capacity.",
+          "source_count": 5,
+          "entity_count": 6
+        },
+        "filtered_state": {
+          "written_report": "Analysis of EUV lithography bottlenecks across TSMC, ASML, and Samsung.",
+          "source_count": 5,
+          "entity_count": 6
+        },
+        "output_state": {
+          "topic": "Global Semiconductor Supply Chain Resilience",
+          "research_findings": "TSMC, ASML, and Samsung account for primary EUV lithography capacity.",
+          "source_count": 5,
+          "entity_count": 6,
+          "written_report": "Analysis of EUV lithography bottlenecks across TSMC, ASML, and Samsung."
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-09T12:15:01+00:00"
+    }
+  ],
+  "total_latency_ms": 670.0,
+  "total_tokens": 640,
+  "status": "SUCCESS",
+  "expected_output": null,
+  "trace_path": null,
+  "demo_metadata": {
+    "category": "heuristic",
+    "description": "Heuristic workflow failure (skipped_step_v1 on verifier, P3)",
+    "pair_id": null,
+    "pair_role": null,
+    "partner_run_id": null,
+    "verdict": "FAIL",
+    "priority_level": "P3",
+    "primary_cause": "workflow",
+    "primary_agent": "verifier",
+    "grounded": false,
+    "rules_fired": [
+      "skipped_step_v1"
+    ]
+  }
+}

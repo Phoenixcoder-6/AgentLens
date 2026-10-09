@@ -1,0 +1,244 @@
+{
+  "schema_version": "1.0",
+  "run_id": "demo_normal_pass_01",
+  "workflow": "research_report_pipeline",
+  "timestamp": "2026-10-09T12:00:00+00:00",
+  "steps": [
+    {
+      "schema_version": "1.0",
+      "run_id": "demo_normal_pass_01",
+      "step": 1,
+      "agent": "researcher",
+      "node_type": "llm",
+      "input": "{\"topic\": \"History of the Apollo Space Program\"}",
+      "output": "{\"research_findings\": \"Apollo 11 landed on the Moon on July 20, 1969. Neil Armstrong, Buzz Aldrin, and Michael Collins crewed the mission launched by Saturn V from Kennedy Space Center.\", \"source_count\": 6, \"entity_count\": 9, \"claims\": [\"Apollo 11 landed July 20, 1969\", \"Launched aboard Saturn V\"], \"references\": [\"NASA-SP-4205\", \"Apollo-11-Mission-Report\"]}",
+      "expected_output": null,
+      "prompt": "Execute researcher step for run demo_normal_pass_01",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 320.0,
+      "tokens": {
+        "prompt": 180,
+        "completion": 140,
+        "total": 320
+      },
+      "tool_calls": [
+        {
+          "name": "nasa_archive_search",
+          "output": "6 primary sources retrieved"
+        }
+      ],
+      "handoff": {
+        "input_state": {
+          "topic": "History of the Apollo Space Program"
+        },
+        "filtered_state": {
+          "research_findings": "Apollo 11 landed on the Moon on July 20, 1969. Neil Armstrong, Buzz Aldrin, and Michael Collins crewed the mission launched by Saturn V from Kennedy Space Center.",
+          "source_count": 6,
+          "entity_count": 9,
+          "claims": [
+            "Apollo 11 landed July 20, 1969",
+            "Launched aboard Saturn V"
+          ],
+          "references": [
+            "NASA-SP-4205",
+            "Apollo-11-Mission-Report"
+          ]
+        },
+        "output_state": {
+          "topic": "History of the Apollo Space Program",
+          "research_findings": "Apollo 11 landed on the Moon on July 20, 1969. Neil Armstrong, Buzz Aldrin, and Michael Collins crewed the mission launched by Saturn V from Kennedy Space Center.",
+          "source_count": 6,
+          "entity_count": 9,
+          "claims": [
+            "Apollo 11 landed July 20, 1969",
+            "Launched aboard Saturn V"
+          ],
+          "references": [
+            "NASA-SP-4205",
+            "Apollo-11-Mission-Report"
+          ]
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-09T12:00:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "demo_normal_pass_01",
+      "step": 2,
+      "agent": "writer",
+      "node_type": "llm",
+      "input": "{\"topic\": \"History of the Apollo Space Program\", \"research_findings\": \"Apollo 11 landed on the Moon on July 20, 1969. Neil Armstrong, Buzz Aldrin, and Michael Collins crewed the mission launched by Saturn V from Kennedy Space Center.\", \"source_count\": 6, \"entity_count\": 9, \"claims\": [\"Apollo 11 landed July 20, 1969\", \"Launched aboard Saturn V\"], \"references\": [\"NASA-SP-4205\", \"Apollo-11-Mission-Report\"]}",
+      "output": "{\"written_report\": \"The Apollo Space Program achieved its primary milestone on July 20, 1969 when Apollo 11 astronauts Neil Armstrong and Buzz Aldrin walked on the lunar surface, supported by Command Module Pilot Michael Collins and the Saturn V launch vehicle.\", \"source_count\": 6, \"entity_count\": 9, \"claims\": [\"Apollo 11 landed July 20, 1969\", \"Launched aboard Saturn V\"], \"references\": [\"NASA-SP-4205\", \"Apollo-11-Mission-Report\"]}",
+      "expected_output": null,
+      "prompt": "Execute writer step for run demo_normal_pass_01",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 380.0,
+      "tokens": {
+        "prompt": 180,
+        "completion": 140,
+        "total": 320
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "History of the Apollo Space Program",
+          "research_findings": "Apollo 11 landed on the Moon on July 20, 1969. Neil Armstrong, Buzz Aldrin, and Michael Collins crewed the mission launched by Saturn V from Kennedy Space Center.",
+          "source_count": 6,
+          "entity_count": 9,
+          "claims": [
+            "Apollo 11 landed July 20, 1969",
+            "Launched aboard Saturn V"
+          ],
+          "references": [
+            "NASA-SP-4205",
+            "Apollo-11-Mission-Report"
+          ]
+        },
+        "filtered_state": {
+          "written_report": "The Apollo Space Program achieved its primary milestone on July 20, 1969 when Apollo 11 astronauts Neil Armstrong and Buzz Aldrin walked on the lunar surface, supported by Command Module Pilot Michael Collins and the Saturn V launch vehicle.",
+          "source_count": 6,
+          "entity_count": 9,
+          "claims": [
+            "Apollo 11 landed July 20, 1969",
+            "Launched aboard Saturn V"
+          ],
+          "references": [
+            "NASA-SP-4205",
+            "Apollo-11-Mission-Report"
+          ]
+        },
+        "output_state": {
+          "topic": "History of the Apollo Space Program",
+          "research_findings": "Apollo 11 landed on the Moon on July 20, 1969. Neil Armstrong, Buzz Aldrin, and Michael Collins crewed the mission launched by Saturn V from Kennedy Space Center.",
+          "source_count": 6,
+          "entity_count": 9,
+          "claims": [
+            "Apollo 11 landed July 20, 1969",
+            "Launched aboard Saturn V"
+          ],
+          "references": [
+            "NASA-SP-4205",
+            "Apollo-11-Mission-Report"
+          ],
+          "written_report": "The Apollo Space Program achieved its primary milestone on July 20, 1969 when Apollo 11 astronauts Neil Armstrong and Buzz Aldrin walked on the lunar surface, supported by Command Module Pilot Michael Collins and the Saturn V launch vehicle."
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-09T12:00:01+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "demo_normal_pass_01",
+      "step": 3,
+      "agent": "verifier",
+      "node_type": "llm",
+      "input": "{\"topic\": \"History of the Apollo Space Program\", \"research_findings\": \"Apollo 11 landed on the Moon on July 20, 1969. Neil Armstrong, Buzz Aldrin, and Michael Collins crewed the mission launched by Saturn V from Kennedy Space Center.\", \"source_count\": 6, \"entity_count\": 9, \"claims\": [\"Apollo 11 landed July 20, 1969\", \"Launched aboard Saturn V\"], \"references\": [\"NASA-SP-4205\", \"Apollo-11-Mission-Report\"], \"written_report\": \"The Apollo Space Program achieved its primary milestone on July 20, 1969 when Apollo 11 astronauts Neil Armstrong and Buzz Aldrin walked on the lunar surface, supported by Command Module Pilot Michael Collins and the Saturn V launch vehicle.\"}",
+      "output": "{\"verified\": true, \"approved\": true, \"verification_result\": \"APPROVED: All 6 sources and 9 entities match upstream research.\", \"revision_notes\": \"\", \"source_count\": 6, \"entity_count\": 9}",
+      "expected_output": null,
+      "prompt": "Execute verifier step for run demo_normal_pass_01",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 240.0,
+      "tokens": {
+        "prompt": 180,
+        "completion": 140,
+        "total": 320
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "History of the Apollo Space Program",
+          "research_findings": "Apollo 11 landed on the Moon on July 20, 1969. Neil Armstrong, Buzz Aldrin, and Michael Collins crewed the mission launched by Saturn V from Kennedy Space Center.",
+          "source_count": 6,
+          "entity_count": 9,
+          "claims": [
+            "Apollo 11 landed July 20, 1969",
+            "Launched aboard Saturn V"
+          ],
+          "references": [
+            "NASA-SP-4205",
+            "Apollo-11-Mission-Report"
+          ],
+          "written_report": "The Apollo Space Program achieved its primary milestone on July 20, 1969 when Apollo 11 astronauts Neil Armstrong and Buzz Aldrin walked on the lunar surface, supported by Command Module Pilot Michael Collins and the Saturn V launch vehicle."
+        },
+        "filtered_state": {
+          "verified": true,
+          "approved": true,
+          "verification_result": "APPROVED: All 6 sources and 9 entities match upstream research.",
+          "revision_notes": "",
+          "source_count": 6,
+          "entity_count": 9
+        },
+        "output_state": {
+          "topic": "History of the Apollo Space Program",
+          "research_findings": "Apollo 11 landed on the Moon on July 20, 1969. Neil Armstrong, Buzz Aldrin, and Michael Collins crewed the mission launched by Saturn V from Kennedy Space Center.",
+          "source_count": 6,
+          "entity_count": 9,
+          "claims": [
+            "Apollo 11 landed July 20, 1969",
+            "Launched aboard Saturn V"
+          ],
+          "references": [
+            "NASA-SP-4205",
+            "Apollo-11-Mission-Report"
+          ],
+          "written_report": "The Apollo Space Program achieved its primary milestone on July 20, 1969 when Apollo 11 astronauts Neil Armstrong and Buzz Aldrin walked on the lunar surface, supported by Command Module Pilot Michael Collins and the Saturn V launch vehicle.",
+          "verified": true,
+          "approved": true,
+          "verification_result": "APPROVED: All 6 sources and 9 entities match upstream research.",
+          "revision_notes": ""
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-09T12:00:02+00:00"
+    }
+  ],
+  "total_latency_ms": 940.0,
+  "total_tokens": 960,
+  "status": "SUCCESS",
+  "expected_output": null,
+  "trace_path": null,
+  "demo_metadata": {
+    "category": "normal",
+    "description": "Clean 3-agent run resolving to PASS (P5)",
+    "pair_id": null,
+    "pair_role": null,
+    "partner_run_id": null,
+    "verdict": "PASS",
+    "priority_level": "P5",
+    "primary_cause": "unknown",
+    "primary_agent": null,
+    "grounded": false,
+    "rules_fired": []
+  }
+}

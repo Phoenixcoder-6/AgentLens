@@ -1993,17 +1993,23 @@ def _render_explanation(bundle, analysis):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Entry point
+# Entry point & Route Mounting (Day 29 & Day 44)
 # ─────────────────────────────────────────────────────────────────────────────
 
-if __name__ in {"__main__", "__mp_main__"}:
+_ROUTES_MOUNTED = False
+
+
+def mount_routes() -> None:
+    """Mount static assets, /api REST endpoints, and /health endpoint onto NiceGUI's FastAPI app."""
+    global _ROUTES_MOUNTED
+    if _ROUTES_MOUNTED:
+        return
     import os
 
-    # Serve dashboard/assets/ at /assets so logo.png is reachable
     assets_dir = os.path.join(os.path.dirname(__file__), "assets")
-    app.add_static_files("/assets", assets_dir)
+    if os.path.isdir(assets_dir):
+        app.add_static_files("/assets", assets_dir)
 
-    # ── Mount REST API (Day 29) ───────────────────────────────────────────────
     try:
         from fastapi import FastAPI as _FastAPI
 
@@ -2019,19 +2025,45 @@ if __name__ in {"__main__", "__mp_main__"}:
         _api_app.include_router(api_router)
         app.mount("/api", _api_app)
 
-        _health_app = _FastAPI()
-        _health_app.include_router(health_router)
-        app.mount("/health", _health_app)
+        # Include health_router directly on NiceGUI's FastAPI app so GET /health works
+        app.include_router(health_router)
+        _ROUTES_MOUNTED = True
     except Exception as _mount_err:
         print(f"[Warning] REST API mount failed: {_mount_err}")
 
+
+def main() -> None:
+    """Launch the AgentLens NiceGUI dashboard (used by `python -m dashboard.app` & `agentlens-dashboard`)."""
+    import os
+
+    mount_routes()
+
+    # Zero-setup demo seeding if DB is empty and auto-seed is enabled
+    if os.getenv("AGENTLENS_AUTO_SEED", "1") != "0":
+        try:
+            db = state.get_db()
+            if not db.list_runs(limit=1):
+                from sample_data.generate_demo_traces import generate_demo_traces
+
+                generate_demo_traces(seed_db=True)
+        except Exception as _seed_err:
+            print(f"[Warning] Demo seed skipped: {_seed_err}")
+
+    assets_dir = os.path.join(os.path.dirname(__file__), "assets")
+    host = os.getenv("AGENTLENS_HOST", "0.0.0.0")
+    port = int(os.getenv("AGENTLENS_PORT", os.getenv("PORT", "8080")))
+
     ui.run(
         title="AgentLens",
-        host="127.0.0.1",
-        port=8080,
+        host=host,
+        port=port,
         reload=False,
         dark=True,
         favicon=os.path.join(assets_dir, "logo.png")
         if os.path.exists(os.path.join(assets_dir, "logo.png"))
         else "🔬",
     )
+
+
+if __name__ in {"__main__", "__mp_main__"}:
+    main()

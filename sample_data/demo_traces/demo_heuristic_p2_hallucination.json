@@ -1,0 +1,192 @@
+{
+  "schema_version": "1.0",
+  "run_id": "demo_heuristic_p2_hallucination",
+  "workflow": "research_report_pipeline",
+  "timestamp": "2026-10-09T12:10:00+00:00",
+  "steps": [
+    {
+      "schema_version": "1.0",
+      "run_id": "demo_heuristic_p2_hallucination",
+      "step": 1,
+      "agent": "researcher",
+      "node_type": "llm",
+      "input": "{\"topic\": \"CRISPR Gene Editing Clinical Applications\"}",
+      "output": "{\"research_findings\": \"Casgevy approved for sickle cell disease; 4 clinical sources and 5 entities documented.\", \"source_count\": 4, \"entity_count\": 5}",
+      "expected_output": null,
+      "prompt": "Execute researcher step for run demo_heuristic_p2_hallucination",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 310.0,
+      "tokens": {
+        "prompt": 180,
+        "completion": 140,
+        "total": 320
+      },
+      "tool_calls": [
+        {
+          "name": "pubmed_search",
+          "output": "4 clinical trial records"
+        }
+      ],
+      "handoff": {
+        "input_state": {
+          "topic": "CRISPR Gene Editing Clinical Applications"
+        },
+        "filtered_state": {
+          "research_findings": "Casgevy approved for sickle cell disease; 4 clinical sources and 5 entities documented.",
+          "source_count": 4,
+          "entity_count": 5
+        },
+        "output_state": {
+          "topic": "CRISPR Gene Editing Clinical Applications",
+          "research_findings": "Casgevy approved for sickle cell disease; 4 clinical sources and 5 entities documented.",
+          "source_count": 4,
+          "entity_count": 5
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-09T12:10:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "demo_heuristic_p2_hallucination",
+      "step": 2,
+      "agent": "writer",
+      "node_type": "llm",
+      "input": "{\"topic\": \"CRISPR Gene Editing Clinical Applications\", \"research_findings\": \"Casgevy approved for sickle cell disease; 4 clinical sources and 5 entities documented.\", \"source_count\": 4, \"entity_count\": 5}",
+      "output": "{\"written_report\": \"Writer fabricated 11 additional unverified pharmaceutical trials and 6 extra citations not present in upstream research findings.\", \"source_count\": 10, \"entity_count\": 16}",
+      "expected_output": null,
+      "prompt": "Execute writer step for run demo_heuristic_p2_hallucination",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 460.0,
+      "tokens": {
+        "prompt": 180,
+        "completion": 140,
+        "total": 320
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "CRISPR Gene Editing Clinical Applications",
+          "research_findings": "Casgevy approved for sickle cell disease; 4 clinical sources and 5 entities documented.",
+          "source_count": 4,
+          "entity_count": 5
+        },
+        "filtered_state": {
+          "written_report": "Writer fabricated 11 additional unverified pharmaceutical trials and 6 extra citations not present in upstream research findings.",
+          "source_count": 10,
+          "entity_count": 16
+        },
+        "output_state": {
+          "topic": "CRISPR Gene Editing Clinical Applications",
+          "research_findings": "Casgevy approved for sickle cell disease; 4 clinical sources and 5 entities documented.",
+          "source_count": 10,
+          "entity_count": 16,
+          "written_report": "Writer fabricated 11 additional unverified pharmaceutical trials and 6 extra citations not present in upstream research findings."
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-09T12:10:01+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "demo_heuristic_p2_hallucination",
+      "step": 3,
+      "agent": "verifier",
+      "node_type": "llm",
+      "input": "{\"topic\": \"CRISPR Gene Editing Clinical Applications\", \"research_findings\": \"Casgevy approved for sickle cell disease; 4 clinical sources and 5 entities documented.\", \"source_count\": 10, \"entity_count\": 16, \"written_report\": \"Writer fabricated 11 additional unverified pharmaceutical trials and 6 extra citations not present in upstream research findings.\"}",
+      "output": "{\"verified\": false, \"approved\": false, \"verification_result\": \"REJECTED: Entity count inflated from 5 to 16 (+11 entities).\", \"revision_notes\": \"Remove unverified clinical trial entities.\", \"source_count\": 10, \"entity_count\": 16}",
+      "expected_output": null,
+      "prompt": "Execute verifier step for run demo_heuristic_p2_hallucination",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 280.0,
+      "tokens": {
+        "prompt": 180,
+        "completion": 140,
+        "total": 320
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "topic": "CRISPR Gene Editing Clinical Applications",
+          "research_findings": "Casgevy approved for sickle cell disease; 4 clinical sources and 5 entities documented.",
+          "source_count": 10,
+          "entity_count": 16,
+          "written_report": "Writer fabricated 11 additional unverified pharmaceutical trials and 6 extra citations not present in upstream research findings."
+        },
+        "filtered_state": {
+          "verified": false,
+          "approved": false,
+          "verification_result": "REJECTED: Entity count inflated from 5 to 16 (+11 entities).",
+          "revision_notes": "Remove unverified clinical trial entities.",
+          "source_count": 10,
+          "entity_count": 16
+        },
+        "output_state": {
+          "topic": "CRISPR Gene Editing Clinical Applications",
+          "research_findings": "Casgevy approved for sickle cell disease; 4 clinical sources and 5 entities documented.",
+          "source_count": 10,
+          "entity_count": 16,
+          "written_report": "Writer fabricated 11 additional unverified pharmaceutical trials and 6 extra citations not present in upstream research findings.",
+          "verified": false,
+          "approved": false,
+          "verification_result": "REJECTED: Entity count inflated from 5 to 16 (+11 entities).",
+          "revision_notes": "Remove unverified clinical trial entities."
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-09T12:10:02+00:00"
+    }
+  ],
+  "total_latency_ms": 1050.0,
+  "total_tokens": 1020,
+  "status": "SUCCESS",
+  "expected_output": null,
+  "trace_path": null,
+  "demo_metadata": {
+    "category": "heuristic",
+    "description": "Heuristic reasoning failure (hallucination_v1 + information_loss_v1, P2)",
+    "pair_id": null,
+    "pair_role": null,
+    "partner_run_id": null,
+    "verdict": "FAIL",
+    "priority_level": "P2",
+    "primary_cause": "reasoning",
+    "primary_agent": "writer",
+    "grounded": false,
+    "rules_fired": [
+      "hallucination_v1",
+      "information_loss_v1",
+      "verifier_passthrough_v1"
+    ]
+  }
+}

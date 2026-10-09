@@ -114,9 +114,11 @@ class MetricsResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str  # "ok" | "degraded"
+    db: str  # "connected" | "disconnected" (Day 44)
+    llm: str  # "reachable" | "unreachable" (Day 44)
     uptime_seconds: float
-    db_status: str  # "ok" | "error"
-    version: str
+    db_status: str = "ok"  # "ok" | "error" (Day 29 backward compat)
+    version: str = "1.0.0"
 
 
 # ── Startup time for uptime calculation ───────────────────────────────────────
@@ -261,23 +263,51 @@ def get_metrics() -> MetricsResponse:
 health_router = APIRouter()
 
 
+def _check_llm_reachability() -> str:
+    """
+    Lightweight readiness check for the LLM subsystem (Day 44).
+    Verifies LLM configuration and driver availability without burning API tokens
+    on every 30s container healthcheck poll.
+    """
+    import os
+
+    if os.getenv("AGENTLENS_FORCE_LLM_UNREACHABLE") == "1":
+        return "unreachable"
+    try:
+        from config.config_loader import get as cfg_get
+
+        model_name = cfg_get("llm", "model")
+        if not model_name:
+            return "unreachable"
+        import langchain_groq  # noqa: F401
+
+        return "reachable"
+    except Exception:
+        return "unreachable"
+
+
 @health_router.get("/health", response_model=HealthResponse)
 def health_check() -> HealthResponse:
-    """Liveness / readiness check."""
-    uptime = (datetime.datetime.now(datetime.UTC) - _START_TIME).total_seconds()
+    """Liveness / readiness check (Day 29 & Day 44)."""
+    uptime = max(0.0, (datetime.datetime.now(datetime.UTC) - _START_TIME).total_seconds())
 
     db_status = "ok"
+    db_conn = "connected"
     try:
         db = _state.get_db()
         db.list_runs(limit=1)
     except Exception:
         db_status = "error"
+        db_conn = "disconnected"
 
-    overall = "ok" if db_status == "ok" else "degraded"
+    llm_state = _check_llm_reachability()
+    overall = "ok" if (db_conn == "connected" and llm_state == "reachable") else "degraded"
 
     return HealthResponse(
         status=overall,
+        db=db_conn,
+        llm=llm_state,
         uptime_seconds=round(uptime, 1),
         db_status=db_status,
-        version="1.0.0-day29",
+        version="1.0.0",
     )

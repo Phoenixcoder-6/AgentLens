@@ -164,19 +164,25 @@ class DatabaseManager:
         db.initialize()                  # create tables if not exist
     """
 
-    def __init__(self, db_path: str | None = None) -> None:
-        if db_path is None:
-            if DEFAULT_DB_PATH != "data/agentlens.db":
-                db_path = DEFAULT_DB_PATH
-            else:
-                try:
-                    from config.config_loader import get
+    def __init__(self, db_path: str | os.PathLike[str] | None = None) -> None:
+        if db_path is not None:
+            resolved_path = os.fspath(db_path)
+        elif DEFAULT_DB_PATH != "data/agentlens.db":
+            resolved_path = DEFAULT_DB_PATH
+        elif os.getenv("DB_PATH"):
+            resolved_path = str(os.getenv("DB_PATH"))
+        else:
+            try:
+                from config.config_loader import get
 
-                    db_path = str(get("storage", "db_path", DEFAULT_DB_PATH) or DEFAULT_DB_PATH)
-                except Exception:
-                    db_path = DEFAULT_DB_PATH
-        self.db_path = db_path
-        os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else ".", exist_ok=True)
+                resolved_path = str(get("storage", "db_path", DEFAULT_DB_PATH) or DEFAULT_DB_PATH)
+            except Exception:
+                resolved_path = DEFAULT_DB_PATH
+        self.db_path = resolved_path
+        os.makedirs(
+            os.path.dirname(self.db_path) if os.path.dirname(self.db_path) else ".",
+            exist_ok=True,
+        )
 
     @contextmanager
     def connection(self) -> Generator[sqlite3.Connection, None, None]:

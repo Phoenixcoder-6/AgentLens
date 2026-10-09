@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  agentlens:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentlens-dashboard
+    ports:
+      - "${AGENTLENS_PORT:-8080}:8080"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - DB_PATH=${DB_PATH:-/app/data/agentlens.db}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - AGENTLENS_HOST=0.0.0.0
+      - AGENTLENS_PORT=8080
+      - AGENTLENS_AUTO_SEED=${AGENTLENS_AUTO_SEED:-1}
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped

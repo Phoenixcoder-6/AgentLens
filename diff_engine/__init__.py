@@ -87,6 +87,11 @@ class DiffEngine(Analyzer):
         """Standard Analyzer execution alias."""
         return self.analyze(trace, baseline_trace=baseline_trace)
 
+    def compare(self, trace_a: RunTrace, trace_b: RunTrace) -> SimilarityReport:
+        """Align two traces and return their semantic SimilarityReport."""
+        alignment = GraphAligner.align_traces(trace_a, trace_b)
+        return self.similarity_engine.score(alignment)
+
 
 __all__ = [
     "DiffEngine",

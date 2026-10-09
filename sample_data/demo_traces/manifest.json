@@ -1,0 +1,134 @@
+{
+  "generated_at": "2026-10-09T19:19:52.517905+00:00",
+  "schema_version": "1.0",
+  "total_traces": 6,
+  "categories": {
+    "normal": [
+      "demo_normal_pass_01"
+    ],
+    "grounded": [
+      "demo_grounded_p1_01"
+    ],
+    "heuristic": [
+      "demo_heuristic_p2_hallucination",
+      "demo_heuristic_p3_workflow"
+    ],
+    "diff_pair": [
+      "demo_diff_pair_baseline_a",
+      "demo_diff_pair_diverged_b"
+    ]
+  },
+  "diff_pairs": [
+    {
+      "pair_id": "diff_pair_01",
+      "run_a": "demo_diff_pair_baseline_a",
+      "run_b": "demo_diff_pair_diverged_b",
+      "expected_first_divergence": "writer"
+    }
+  ],
+  "traces": [
+    {
+      "run_id": "demo_normal_pass_01",
+      "file": "demo_normal_pass_01.json",
+      "category": "normal",
+      "description": "Clean 3-agent run resolving to PASS (P5)",
+      "pair_id": null,
+      "pair_role": null,
+      "partner_run_id": null,
+      "verdict": "PASS",
+      "priority_level": "P5",
+      "primary_cause": "unknown",
+      "primary_agent": null,
+      "grounded": false,
+      "rules_fired": []
+    },
+    {
+      "run_id": "demo_grounded_p1_01",
+      "file": "demo_grounded_p1_01.json",
+      "category": "grounded",
+      "description": "Ground-truth factual contradiction resolving to FAIL (P1, grounded=True)",
+      "pair_id": null,
+      "pair_role": null,
+      "partner_run_id": null,
+      "verdict": "FAIL",
+      "priority_level": "P1",
+      "primary_cause": "reasoning",
+      "primary_agent": "verifier",
+      "grounded": true,
+      "rules_fired": [
+        "gt_mismatch_v1",
+        "hallucination_v1",
+        "information_loss_v1",
+        "verifier_passthrough_v1"
+      ]
+    },
+    {
+      "run_id": "demo_heuristic_p2_hallucination",
+      "file": "demo_heuristic_p2_hallucination.json",
+      "category": "heuristic",
+      "description": "Heuristic reasoning failure (hallucination_v1 + information_loss_v1, P2)",
+      "pair_id": null,
+      "pair_role": null,
+      "partner_run_id": null,
+      "verdict": "FAIL",
+      "priority_level": "P2",
+      "primary_cause": "reasoning",
+      "primary_agent": "writer",
+      "grounded": false,
+      "rules_fired": [
+        "hallucination_v1",
+        "information_loss_v1",
+        "verifier_passthrough_v1"
+      ]
+    },
+    {
+      "run_id": "demo_heuristic_p3_workflow",
+      "file": "demo_heuristic_p3_workflow.json",
+      "category": "heuristic",
+      "description": "Heuristic workflow failure (skipped_step_v1 on verifier, P3)",
+      "pair_id": null,
+      "pair_role": null,
+      "partner_run_id": null,
+      "verdict": "FAIL",
+      "priority_level": "P3",
+      "primary_cause": "workflow",
+      "primary_agent": "verifier",
+      "grounded": false,
+      "rules_fired": [
+        "skipped_step_v1"
+      ]
+    },
+    {
+      "run_id": "demo_diff_pair_baseline_a",
+      "file": "demo_diff_pair_baseline_a.json",
+      "category": "diff_pair",
+      "description": "Baseline run A for side-by-side Diff View comparison",
+      "pair_id": "diff_pair_01",
+      "pair_role": "baseline_run_a",
+      "partner_run_id": "demo_diff_pair_diverged_b",
+      "verdict": "PASS",
+      "priority_level": "P5",
+      "primary_cause": "unknown",
+      "primary_agent": null,
+      "grounded": false,
+      "rules_fired": []
+    },
+    {
+      "run_id": "demo_diff_pair_diverged_b",
+      "file": "demo_diff_pair_diverged_b.json",
+      "category": "diff_pair",
+      "description": "Diverged run B (diverges at writer with severe information loss) for Diff View",
+      "pair_id": "diff_pair_01",
+      "pair_role": "diverged_run_b",
+      "partner_run_id": "demo_diff_pair_baseline_a",
+      "verdict": "FAIL",
+      "priority_level": "P2",
+      "primary_cause": "workflow",
+      "primary_agent": "writer",
+      "grounded": false,
+      "rules_fired": [
+        "information_loss_v1"
+      ]
+    }
+  ]
+}
