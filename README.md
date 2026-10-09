@@ -30,47 +30,148 @@ When complex LLM agent swarms fail (hallucinating facts, dropping instructions, 
 
 ---
 
-## 2. Architecture Overview
+### 2. Architecture: Evolution from Legacy Prototype to v1.0.0 Production
 
+AgentLens evolved from a simple linear capture script with manual error guessing into a production-grade, fail-safe observability and deterministic failure attribution platform.
+
+### Phase 1: Legacy Early Architecture (v0.1 Prototype)
+In the initial prototype, tracing was synchronous and unshielded. Detection relied on basic post-hoc parsing with unranked, conflicting heuristic outputs and no tie-break determinism:
+
+```mermaid
+flowchart TD
+    subgraph S1["1. Pipeline Execution"]
+        A1["Researcher Agent"] --> A2["Writer Agent"]
+        A2 --> A3["Verifier Agent"]
+    end
+
+    subgraph S2["2. Raw Capture (Unshielded)"]
+        A1 -.->|"Synchronous hooks\n(Crash risk)"| B1["Raw Logs & Console Print"]
+        A2 -.-> B1
+        A3 -.-> B1
+        B1 --> B2[("Unindexed Flat JSON")]
+    end
+
+    subgraph S3["3. Ad-Hoc Heuristics"]
+        B2 --> C1["Manual String Inspection"]
+        B2 --> C2["Unranked Heuristics\n(Conflicting outputs)"]
+        C1 --> D1["LLM-as-a-Judge Prompt\n(Probabilistic & Non-deterministic)"]
+        C2 --> D1
+    end
+
+    subgraph S4["4. Output"]
+        D1 --> E1["Terminal Output / Basic Script"]
+    end
+
+    classDef legacy fill:#ffebee,stroke:#c62828,stroke-width:1px,color:#b71c1c;
+    class A1,A2,A3,B1,B2,C1,C2,D1,E1 legacy;
 ```
-                                 [ MULTI-AGENT PIPELINE ]
-                                 Researcher → Writer → Verifier
-                                              │
-                                              ▼
-                                 [ @trace_step / CaptureSession ]
-                                 (Fail-Safe State & Token Interception)
-                                              │
-                                              ▼
-                                  [ Normalizer & Storage ]
-                                  (SQLite + JSON Traces)
-                                              │
-           ┌──────────────────────────────────┴──────────────────────────────────┐
-           ▼                                                                     ▼
-[ Ground Truth Validator (P1) ]                                        [ Rule Engine (P2) ]
-(Sequence Matching vs Expected Output)                                 (Tool Failures & Hallucination)
-           │                                                                     │
-           ▼                                                                     ▼
-[ Consistency Validator (P2) ]                                     [ Workflow Validator (P3) ]
-(Verifier Passthrough / Rubber-Stamping)                               (Skipped Steps / Deadlocks)
-           │                                                                     │
-           ▼                                                                     ▼
-[ Information Loss Rule (P3) ]                                    [ Statistical Detector (P4) ]
-(Handoff Entity / Source Drops)                                       (Latency / Token Z-Scores)
-           │                                                                     │
-           └──────────────────────────────────┬──────────────────────────────────┘
-                                              ▼
-                                    [ THE ARBITER ]
-                        (5-Tier Priority & Tie-Break Resolver)
-                                              │
-                                              ▼
-                                    [ ANALYSIS BUNDLE ]
-                        Verdict: P1..P5 | Primary Agent | Grounded?
-                                              │
-                     ┌────────────────────────┴────────────────────────┐
-                     ▼                                                 ▼
-             [ LLM Explainer ]                               [ 6-View Dashboard ]
-             (Deterministic Insights)                        (Runs, Diff, Metrics, Evidence)
+
+---
+
+### Phase 2: Current Production Architecture (v1.0.0 Enterprise Core)
+v1.0.0 introduces a fail-safe capture envelope, canonical normalization, 6 multi-tier detection analyzers, the deterministic 5-tier Arbiter ($P_1 \to P_5$), and dual presentation interfaces (NiceGUI + FastAPI):
+
+```mermaid
+flowchart TB
+    subgraph G_PIPELINE["1. AGENT EXECUTION LAYER"]
+        direction LR
+        P_NODE["Multi-Agent Node<br/><i>LangGraph / Custom</i>"]
+        P_WRAP["@trace_step Wrapper<br/><i>Fail-Safe Boundary</i>"]
+        P_NODE --- P_WRAP
+    end
+
+    subgraph G_CAPTURE["2. FAIL-SAFE TELEMETRY & STORAGE"]
+        direction TB
+        HC["HandoffCapture Engine<br/><i>(input_state · filtered_state · output_state)</i>"]
+        PII["PII Scrubber<br/><i>(Regex Redaction: emails, API keys, tokens)</i>"]
+        CS["CaptureSession Coordinator"]
+        
+        P_WRAP -->|"Execute & Intercept"| HC
+        HC --> PII
+        PII --> CS
+        
+        DB_SQL[("SQLite DB<br/><i>Alembic Indexed</i>")]
+        FS_BLOB[("JSON Trace Store<br/><i>data/traces/*.json</i>")]
+        NORM["Trace Normalizer<br/><i>Schema v1.0 Standardizer</i>"]
+        
+        CS --> NORM
+        NORM --> DB_SQL
+        NORM --> FS_BLOB
+    end
+
+    subgraph G_ANALYZERS["3. PARALLEL DETECTION ENGINES"]
+        direction TB
+        A_P1["Ground Truth Validator [P1]<br/><i>SequenceMatcher vs expected_output</i>"]
+        A_P2A["RuleEngine [P2]<br/><i>tool_failure_v1 · hallucination_v1</i>"]
+        A_P2B["Consistency Validator [P2]<br/><i>verifier_passthrough_v1</i>"]
+        A_P3A["Workflow Validator [P3]<br/><i>skipped_step_v1</i>"]
+        A_P3B["Information Loss Rule [P3]<br/><i>Handoff source/entity drops</i>"]
+        A_P4["Statistical Detector [P4]<br/><i>Per-agent Latency & Token Z-Scores</i>"]
+    end
+
+    DB_SQL --> A_P1
+    DB_SQL --> A_P2A
+    DB_SQL --> A_P2B
+    DB_SQL --> A_P3A
+    DB_SQL --> A_P3B
+    DB_SQL --> A_P4
+
+    subgraph G_ARBITER["4. THE ARBITER (Deterministic Resolver)"]
+        direction TB
+        ARB_SORT["Priority Filter<br/>P1 &gt; P2 &gt; P3 &gt; P4 &gt; P5"]
+        ARB_TIE["Alphabetical Rule-ID Tie-Break<br/><i>Deterministic: Same Input &rarr; Same Verdict</i>"]
+        ARB_BUNDLE["AnalysisBundle Payload<br/><i>(verdict · primary_cause · primary_agent · grounded)</i>"]
+        
+        ARB_SORT --> ARB_TIE
+        ARB_TIE --> ARB_BUNDLE
+    end
+
+    A_P1 -->|"EvidenceRecord"| ARB_SORT
+    A_P2A -->|"EvidenceRecord"| ARB_SORT
+    A_P2B -->|"EvidenceRecord"| ARB_SORT
+    A_P3A -->|"EvidenceRecord"| ARB_SORT
+    A_P3B -->|"EvidenceRecord"| ARB_SORT
+    A_P4 -->|"EvidenceRecord"| ARB_SORT
+
+    subgraph G_DELIVERY["5. EXPLAINABILITY & PRESENTATION"]
+        direction TB
+        EXPLAIN["LLM Explainer<br/><i>(Explains deterministic finding)</i>"]
+        ALERT["Alerter<br/><i>Slack Webhooks for P1/P2</i>"]
+        DASH["NiceGUI Dashboard<br/><i>6 Views: Runs, Timeline, Evidence, Diff, Metrics, Rules</i>"]
+        REST["FastAPI REST Service<br/><i>GET /health &middot; /api/runs &middot; /api/metrics</i>"]
+        
+        ARB_BUNDLE --> EXPLAIN
+        ARB_BUNDLE --> ALERT
+        ARB_BUNDLE --> DASH
+        ARB_BUNDLE --> REST
+    end
+
+    classDef pipeClass fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0369a1;
+    classDef capClass fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#15803d;
+    classDef anaClass fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#b45309;
+    classDef arbClass fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#6d28d9;
+    classDef delivClass fill:#fdf2f8,stroke:#db2777,stroke-width:2px,color:#be185d;
+
+    class P_NODE,P_WRAP pipeClass;
+    class HC,PII,CS,NORM,DB_SQL,FS_BLOB capClass;
+    class A_P1,A_P2A,A_P2B,A_P3A,A_P3B,A_P4 anaClass;
+    class ARB_SORT,ARB_TIE,ARB_BUNDLE arbClass;
+    class EXPLAIN,ALERT,DASH,REST delivClass;
 ```
+
+---
+
+### Architectural Comparison: Prototype vs. v1.0.0 Production
+
+| Dimension | Legacy Prototype (v0.1) | AgentLens v1.0.0 Production |
+|---|---|---|
+| **Pipeline Safety** | Unhandled logging crashes pipeline | **Fail-Safe Envelope**: telemetry errors are trapped; pipeline never fails |
+| **Privacy & Security** | Plaintext state dump to disk | **PII Scrubber**: automated redaction of emails, API keys, bearer tokens |
+| **Attribution Logic** | LLM-as-a-judge probabilistic guesswork | **Deterministic Arbiter**: strict 5-tier priority ladder with rule-id tie-breaking |
+| **Co-occurrence Handling**| Conflicting rules produce chaotic alerts | **Upstream Root-Cause Prioritization**: upstream errors take precedence |
+| **Ground Truth Support** | None (pure heuristic) | **Explicit Grounded Boundary**: $P_1$ factual contracts vs. $P_2–P_4$ structural heuristics |
+| **Storage Engine** | Flat unstructured JSON files | **Indexed SQLite + Alembic Migrations**: 5 performance indexes & schema versioning |
+| **Delivery Interfaces** | Terminal CLI script only | **NiceGUI Interactive Dashboard (6 Views) + FastAPI REST API + Docker** |
 
 ---
 

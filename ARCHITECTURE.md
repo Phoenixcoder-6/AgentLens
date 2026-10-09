@@ -17,43 +17,89 @@ AgentLens is built around three core architectural tenets:
 
 ---
 
-## 2. End-to-End Data Flow
+## 2. End-to-End Architectural Pipeline & Data Flow
 
-```
-Agent Pipeline Node
-       │  (Wraps execution in @trace_step)
-       ▼
-HandoffCapture ───────► Computes 3-State Snapshots:
-                         - input_state (full state before agent)
-                         - filtered_state (partial state returned by agent)
-                         - output_state (merged state after handoff)
-       │
-       ▼
-CaptureSession ───────► PII Scrubber (Redacts emails, keys, tokens)
-       │               Saves trace JSON to data/traces/{run_id}.json
-       │               Saves canonical run & steps to SQLite DB
-       ▼
-Normalizer ───────────► Validates schema conformance (SCHEMA_VERSION = "1.0")
-       │
-       ▼
-Detection Analyzers (Parallel / Independent):
- ├── GroundTruthValidator   (P1: Output diff vs expected output)
- ├── RuleEngine             (P2: Tool failures & Reasoning hallucination)
- ├── ConsistencyValidator   (P2: Verifier rubber-stamping & passthrough)
- ├── WorkflowValidator      (P3: Skipped nodes, invalid sequences)
- ├── InformationLossRule    (P3: Handoff entity/source drops or gains)
- └── StatisticalDetector    (P4: Per-agent Latency & Token Z-Score Outliers)
-       │
-       ▼
-The Arbiter ──────────► Priority Ranking (P1 > P2 > P3 > P4 > P5)
-                        Tie-Break Resolver (Ascending rule_id sort)
-                        Produces AnalysisBundle
-       │
-       ▼
-Presentation & Alerting:
- ├── LLMExplainer           (LLM synthesizes natural language summary)
- ├── Alerter                (Dispatches Slack Webhook on P1 / P2 alerts)
- └── NiceGUI Dashboard      (6 Interactive Views: Runs, Timeline, Evidence, Diff, Metrics, Rules)
+```mermaid
+flowchart TD
+    subgraph S_HOST["1. Host Execution & Fail-Safe Capture"]
+        NODE["Multi-Agent Node<br/><i>LangGraph / Custom Function</i>"]
+        DECOR["@trace_step Decorator<br/><i>Fail-Safe Boundary</i>"]
+        HC["HandoffCapture<br/><i>Captures input, filtered & output states</i>"]
+        PII["PII Scrubber<br/><i>Regex Redaction Engine</i>"]
+        CS["CaptureSession<br/><i>Session State & Token Staging</i>"]
+
+        NODE --> DECOR
+        DECOR --> HC
+        HC --> PII
+        PII --> CS
+    end
+
+    subgraph S_STORE["2. Normalization & Persistence"]
+        NORM["Normalizer<br/><i>SchemaValidator (SCHEMA_VERSION = 1.0)</i>"]
+        SQL[("SQLite Database<br/><i>runs · steps · analysis · rule_matches</i>")]
+        FS[("Raw Trace Store<br/><i>data/traces/{run_id}.json</i>")]
+
+        CS --> NORM
+        NORM --> SQL
+        NORM --> FS
+    end
+
+    subgraph S_ENGINES["3. Six Parallel Detection Analyzers"]
+        direction TB
+        GT["GroundTruthValidator [P1]<br/><i>Sequence similarity vs expected_output</i>"]
+        RE["RuleEngine [P2]<br/><i>tool_failure_v1 · hallucination_v1</i>"]
+        CV["ConsistencyValidator [P2]<br/><i>verifier_passthrough_v1</i>"]
+        WV["WorkflowValidator [P3]<br/><i>skipped_step_v1</i>"]
+        IL["InformationLossRule [P3]<br/><i>source & entity delta tracking</i>"]
+        SD["StatisticalDetector [P4]<br/><i>Latency & Token Z-Score Outliers</i>"]
+
+        SQL --> GT
+        SQL --> RE
+        SQL --> CV
+        SQL --> WV
+        SQL --> IL
+        SQL --> SD
+    end
+
+    subgraph S_ARBITER["4. Deterministic Arbiter"]
+        RANK["5-Tier Priority Resolver<br/><i>P1 &gt; P2 &gt; P3 &gt; P4 &gt; P5</i>"]
+        TIE["Ascending rule_id Tie-Breaker<br/><i>Guarantees 100% Determinism</i>"]
+        BUNDLE["AnalysisBundle<br/><i>verdict · primary_cause · primary_agent · grounded</i>"]
+
+        GT -->|"EvidenceRecord"| RANK
+        RE -->|"EvidenceRecord"| RANK
+        CV -->|"EvidenceRecord"| RANK
+        WV -->|"EvidenceRecord"| RANK
+        IL -->|"EvidenceRecord"| RANK
+        SD -->|"EvidenceRecord"| RANK
+
+        RANK --> TIE
+        TIE --> BUNDLE
+    end
+
+    subgraph S_SURFACE["5. Storage, Alerting & UI Presentation"]
+        EXPLAIN["LLM Explainer<br/><i>Natural language synthesis</i>"]
+        ALERT["Alerter<br/><i>Slack webhook alerts for P1/P2</i>"]
+        DASH["NiceGUI Dashboard<br/><i>6 Views: Runs, Timeline, Evidence, Diff, Metrics, Rules</i>"]
+        API["FastAPI REST Service<br/><i>/health · /api/runs · /api/metrics</i>"]
+
+        BUNDLE --> EXPLAIN
+        BUNDLE --> ALERT
+        BUNDLE --> DASH
+        BUNDLE --> API
+    end
+
+    classDef hostStyle fill:#f0f9ff,stroke:#0369a1,stroke-width:2px,color:#0c4a6e;
+    classDef storeStyle fill:#f0fdf4,stroke:#15803d,stroke-width:2px,color:#14532d;
+    classDef engineStyle fill:#fffbeb,stroke:#b45309,stroke-width:2px,color:#78350f;
+    classDef arbiterStyle fill:#faf5ff,stroke:#6b21a8,stroke-width:2px,color:#3b0764;
+    classDef surfaceStyle fill:#fff1f2,stroke:#be123c,stroke-width:2px,color:#881337;
+
+    class NODE,DECOR,HC,PII,CS hostStyle;
+    class NORM,SQL,FS storeStyle;
+    class GT,RE,CV,WV,IL,SD engineStyle;
+    class RANK,TIE,BUNDLE arbiterStyle;
+    class EXPLAIN,ALERT,DASH,API surfaceStyle;
 ```
 
 ---
