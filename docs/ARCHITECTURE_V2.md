@@ -41,6 +41,7 @@ AgentLens **v1.0.0** successfully established a deterministic failure attributio
 - **3-Line Drop-in SDK:** Expose a unified public interface:
   ```python
   import agentlens
+
   agentlens.init(project="my-swarm")
   ```
 - **Framework Auto-Tracers:** Out-of-the-box callback handlers for LangGraph, CrewAI, and AutoGen.
