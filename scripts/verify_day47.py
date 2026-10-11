@@ -17,6 +17,7 @@ import random
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import patch
 
 from capture.context import (
     clear_context,
@@ -67,7 +68,8 @@ def check_2_trace_context_manager() -> bool:
         if active.run_id != "ctx_scope_001":
             print("[FAIL] Context manager did not yield trace")
             return False
-        if get_current_trace() is None or get_current_trace().run_id != "ctx_scope_001":
+        current = get_current_trace()
+        if current is None or current.run_id != "ctx_scope_001":
             print("[FAIL] get_current_trace inside context does not match")
             return False
 
@@ -87,7 +89,8 @@ def check_3_session_delegation() -> bool:
         print("[FAIL] CaptureSession.start_trace failed")
         return False
 
-    if get_current_trace() is None or get_current_trace().run_id != "del_001":
+    current_trace = get_current_trace()
+    if current_trace is None or current_trace.run_id != "del_001":
         print("[FAIL] Context did not receive trace from CaptureSession")
         return False
 
@@ -95,27 +98,29 @@ def check_3_session_delegation() -> bool:
     CaptureSession.add_step(step)
 
     current = CaptureSession.get_current_trace()
+    if current is None:
+        print("[FAIL] No current trace returned")
+        return False
+
     if len(current.steps) != 1:
         print("[FAIL] Step was not appended to current context trace")
         return False
 
-    # Prevent writing during unit check
-    orig_save_db = CaptureSession._save_trace_to_db
-    orig_save_disk = CaptureSession._save_trace_to_disk
-    CaptureSession._save_db = classmethod(lambda cls, t: None)
-    CaptureSession._save_disk = classmethod(lambda cls, t: None)
-    try:
-        ended = CaptureSession.end_trace()
-        if ended is None or ended.run_id != "del_001":
-            print("[FAIL] CaptureSession.end_trace returned invalid trace")
-            return False
-        if get_current_trace() is not None:
-            print("[FAIL] Context was not cleared after end_trace")
-            return False
-    finally:
-        CaptureSession._save_db = orig_save_db
-        CaptureSession._save_disk = orig_save_disk
+    # Prevent persistence during this unit check.
 
+    with (
+        patch.object(CaptureSession, "_save_trace_to_db", lambda t: None),
+        patch.object(CaptureSession, "_save_trace_to_disk", lambda t: None),
+    ):
+        ended = CaptureSession.end_trace()
+
+    if ended is None or ended.run_id != "del_001":
+        print("[FAIL] CaptureSession.end_trace returned invalid trace")
+        return False
+
+    if get_current_trace() is not None:
+        print("[FAIL] Context was not cleared after end_trace")
+        return False
     print("[PASS] CaptureSession delegates trace lifecycle directly to ContextVar.")
     return True
 
@@ -169,18 +174,13 @@ def check_5_multithreaded_isolation() -> bool:
         thread_step({"tid": tid})
         thread_step({"tid": tid})
 
-        # Finalize without saving to DB to keep clean
-        orig_db = CaptureSession._save_trace_to_db
-        orig_disk = CaptureSession._save_trace_to_disk
-        CaptureSession._save_trace_to_db = classmethod(lambda cls, t: None)
-        CaptureSession._save_trace_to_disk = classmethod(lambda cls, t: None)
-        try:
-            return CaptureSession.end_trace()
-        finally:
-            CaptureSession._save_trace_to_db = orig_db
-            CaptureSession._save_trace_to_disk = orig_disk
+        return CaptureSession.end_trace()
 
-    with ThreadPoolExecutor(max_workers=20) as pool:
+    with (
+        patch.object(CaptureSession, "_save_trace_to_db", lambda t: None),
+        patch.object(CaptureSession, "_save_trace_to_disk", lambda t: None),
+        ThreadPoolExecutor(max_workers=20) as pool,
+    ):
         futures = [pool.submit(thread_worker, i) for i in range(20)]
         traces = [f.result() for f in futures]
 
@@ -189,6 +189,9 @@ def check_5_multithreaded_isolation() -> bool:
         return False
 
     for idx, trace in enumerate(traces):
+        if trace is None:
+            print(f"[FAIL] Missing trace for thread {idx}")
+            return False
         if trace.run_id != f"thread_{idx:02d}":
             print(f"[FAIL] Run ID mismatch in thread {idx}: {trace.run_id}")
             return False
@@ -221,24 +224,24 @@ def check_6_async_pipeline_isolation() -> bool:
             await async_node({"pid": pid})
             await async_node({"pid": pid})
 
-            orig_db = CaptureSession._save_trace_to_db
-            orig_disk = CaptureSession._save_trace_to_disk
-            CaptureSession._save_trace_to_db = classmethod(lambda cls, t: None)
-            CaptureSession._save_trace_to_disk = classmethod(lambda cls, t: None)
-            try:
-                return CaptureSession.end_trace()
-            finally:
-                CaptureSession._save_trace_to_db = orig_db
-                CaptureSession._save_trace_to_disk = orig_disk
+            return CaptureSession.end_trace()
 
         return await asyncio.gather(*[pipeline_worker(i) for i in range(50)])
 
-    traces = asyncio.run(run_all())
+    with (
+        patch.object(CaptureSession, "_save_trace_to_db", lambda t: None),
+        patch.object(CaptureSession, "_save_trace_to_disk", lambda t: None),
+    ):
+        traces = asyncio.run(run_all())
+
     if len(traces) != 50:
         print(f"[FAIL] Expected 50 traces, got {len(traces)}")
         return False
 
     for idx, trace in enumerate(traces):
+        if trace is None:
+            print(f"[FAIL] Missing trace for pipeline {idx}")
+            return False
         if trace.run_id != f"pipeline_{idx:03d}":
             print(f"[FAIL] Run ID mismatch: {trace.run_id}")
             return False
