@@ -239,6 +239,7 @@ Interactive Swagger documentation is available at `http://localhost:8080/docs`.
 ## 6. Project Documentation Index
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)**: Deep dive into the 5-tier Arbiter, component data flow, storage schema, and how to write custom rules.
+- **[docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md)**: Official architectural design and multi-phase roadmap for AgentLens v2.0 Enterprise.
 - **[RULES.md](RULES.md)**: Exhaustive catalog of all built-in deterministic detection rules (P1–P4).
 - **[LIMITATIONS.md](LIMITATIONS.md)**: Benchmark error analysis, scope boundaries, and dual-fault tie-break dynamics.
 - **[CONTRIBUTING.md](CONTRIBUTING.md)**: Developer setup, test guidelines, pre-commit hooks, and PR workflow.
