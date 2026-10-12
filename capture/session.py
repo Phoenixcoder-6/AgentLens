@@ -117,7 +117,10 @@ class CaptureSession(metaclass=_CaptureSessionMeta):
 
     @classmethod
     def end_trace(
-        cls, status: StepStatus = StepStatus.SUCCESS, error: str | None = None
+        cls,
+        status: StepStatus = StepStatus.SUCCESS,
+        error: str | None = None,
+        sync: bool | None = None,
     ) -> RunTrace | None:
         """Finalize and persist the active RunTrace in the current execution context."""
         trace = get_current_trace()
@@ -150,17 +153,49 @@ class CaptureSession(metaclass=_CaptureSessionMeta):
             except Exception as scrub_exc:
                 print(f"[CaptureSession] Warning: PII scrubbing failed: {scrub_exc}")
 
-            # 1. Save full JSON trace to disk (fail-safe)
-            cls._save_trace_to_disk(trace)
+            # 1. Non-blocking ingestion vs synchronous persistence (Day 48)
+            from capture.queue import (
+                get_global_queue,
+                get_global_worker,
+                is_async_logging_enabled,
+            )
 
-            # 2. Normalize and persist to SQLite (fail-safe)
-            cls._save_trace_to_db(trace)
+            use_sync = sync if sync is not None else not is_async_logging_enabled()
+            if use_sync:
+                cls._persist_trace(trace)
+            else:
+                enqueued = get_global_queue().enqueue(trace)
+                if not enqueued:
+                    # Ingestion buffer full: fail-safe synchronous fallback to prevent trace loss
+                    cls._persist_trace(trace)
+                else:
+                    get_global_worker().start()
         except Exception as exc:
             print(f"[CaptureSession] Warning: end_trace failed: {exc}")
         finally:
             set_current_trace(None)
 
         return trace
+
+    @classmethod
+    def _persist_trace(cls, trace: RunTrace) -> None:
+        """Persist trace directly to disk and SQLite database synchronously."""
+        cls._save_trace_to_disk(trace)
+        cls._save_trace_to_db(trace)
+
+    @classmethod
+    def flush(cls, timeout: float = 2.0) -> bool:
+        """Wait for all pending background traces to be persisted. Returns True if fully flushed."""
+        from capture.queue import flush_global_queue
+
+        return flush_global_queue(timeout=timeout)
+
+    @classmethod
+    def get_queue_stats(cls) -> dict[str, int]:
+        """Retrieve telemetry metrics from the in-memory ingestion buffer."""
+        from capture.queue import get_global_queue
+
+        return get_global_queue().stats()
 
     @classmethod
     def _save_trace_to_disk(cls, trace: RunTrace) -> None:
