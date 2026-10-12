@@ -207,7 +207,7 @@ def test_overhead_benchmark_under_half_millisecond(monkeypatch):
         t1 = time.perf_counter()
 
         assert res["val"] == i + 1
-        total_interception_time += (t1 - t0)
+        total_interception_time += t1 - t0
 
     avg_overhead_ms = (total_interception_time / iterations) * 1000.0
     print(f"\n[Benchmark] Average interception & end_trace overhead: {avg_overhead_ms:.4f} ms")

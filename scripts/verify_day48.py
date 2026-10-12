@@ -65,7 +65,9 @@ def check_2_nonblocking_and_overflow() -> bool:
         print(f"[FAIL] Dropped count mismatch: {stats}")
         return False
 
-    print("[PASS] Non-blocking buffer correctly drops excess traces and increments dropped counter.")
+    print(
+        "[PASS] Non-blocking buffer correctly drops excess traces and increments dropped counter."
+    )
     return True
 
 
@@ -208,7 +210,7 @@ def check_7_interception_overhead_benchmark() -> bool:
             bench_node({"i": i})
             CaptureSession.end_trace()
             t1 = time.perf_counter()
-            total_time += (t1 - t0)
+            total_time += t1 - t0
 
         avg_ms = (total_time / iterations) * 1000.0
         print(f"[INFO] Measured average interception + queuing latency: {avg_ms:.4f} ms")
