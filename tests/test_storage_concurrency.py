@@ -202,7 +202,9 @@ def test_retry_backoff_on_simulated_locks(test_db_path: str):
         call_count += 1
         if call_count < 3:
             raise sqlite3.OperationalError("database is locked")
-        conn.execute("INSERT OR REPLACE INTO runs (run_id, workflow, timestamp, status, schema_version) VALUES ('flaky_01', 'wf', '2026-01-01', 'SUCCESS', '1.0')")
+        conn.execute(
+            "INSERT OR REPLACE INTO runs (run_id, workflow, timestamp, status, schema_version) VALUES ('flaky_01', 'wf', '2026-01-01', 'SUCCESS', '1.0')"
+        )
         return "success"
 
     res = db.execute_with_retry(flaky_operation, max_retries=5, base_delay=0.01)

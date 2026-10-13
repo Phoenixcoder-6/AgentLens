@@ -70,7 +70,9 @@ def check_2_high_concurrency_pragmas(tmp_dir: Path) -> bool:
         return False
 
     db.close()
-    print("[PASS] High-concurrency pragmas verified (busy_timeout=10000, synchronous=NORMAL, foreign_keys=ON).")
+    print(
+        "[PASS] High-concurrency pragmas verified (busy_timeout=10000, synchronous=NORMAL, foreign_keys=ON)."
+    )
     return True
 
 
@@ -102,7 +104,9 @@ def check_3_connection_pooling(tmp_dir: Path) -> bool:
         return False
 
     db.close()
-    print(f"[PASS] Connection pool bounded to {stats['max_connections']} connections and cleanly reused.")
+    print(
+        f"[PASS] Connection pool bounded to {stats['max_connections']} connections and cleanly reused."
+    )
     return True
 
 
@@ -119,7 +123,9 @@ def check_4_retry_backoff(tmp_dir: Path) -> bool:
         attempts += 1
         if attempts < 3:
             raise sqlite3.OperationalError("database is locked")
-        conn.execute("INSERT OR REPLACE INTO runs (run_id, workflow, timestamp, status, schema_version) VALUES ('retry_01', 'wf', '2026-01-01', 'SUCCESS', '1.0')")
+        conn.execute(
+            "INSERT OR REPLACE INTO runs (run_id, workflow, timestamp, status, schema_version) VALUES ('retry_01', 'wf', '2026-01-01', 'SUCCESS', '1.0')"
+        )
         return "recovered"
 
     res = db.execute_with_retry(locked_operation, max_retries=5, base_delay=0.01)
@@ -194,7 +200,9 @@ def check_5_100_concurrent_writes(tmp_dir: Path) -> bool:
 
     elapsed = t1 - t0
     ops_per_sec = 100.0 / elapsed
-    print(f"[INFO] 100 full multi-step runs persisted in {elapsed:.2f}s ({ops_per_sec:.1f} runs/sec).")
+    print(
+        f"[INFO] 100 full multi-step runs persisted in {elapsed:.2f}s ({ops_per_sec:.1f} runs/sec)."
+    )
 
     db.close()
     print("[PASS] 100 concurrent writes completed with 0 errors and 100% data integrity.")

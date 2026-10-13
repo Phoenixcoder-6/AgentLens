@@ -413,6 +413,7 @@ class DatabaseManager:
         conn: sqlite3.Connection | None = None,
     ) -> None:
         """Insert or replace a run record."""
+
         def _exec(c: sqlite3.Connection) -> None:
             c.execute(
                 """
@@ -494,6 +495,7 @@ class DatabaseManager:
         conn: sqlite3.Connection | None = None,
     ) -> None:
         """Insert or replace a step record."""
+
         def _exec(c: sqlite3.Connection) -> None:
             c.execute(
                 """
@@ -550,6 +552,7 @@ class DatabaseManager:
         conn: sqlite3.Connection | None = None,
     ) -> None:
         """Insert an analysis result row."""
+
         def _exec(c: sqlite3.Connection) -> None:
             c.execute(
                 """
@@ -592,6 +595,7 @@ class DatabaseManager:
         conn: sqlite3.Connection | None = None,
     ) -> None:
         """Insert a named metric row."""
+
         def _exec(c: sqlite3.Connection) -> None:
             c.execute(
                 """
