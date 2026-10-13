@@ -15,6 +15,7 @@ analysis table is left empty here — it will be populated by future analyzers
 from __future__ import annotations
 
 from datetime import UTC
+from typing import Any
 
 from normalizer.normalizer import NormalizedRun, NormalizedStep
 from schema.models import SCHEMA_VERSION
@@ -42,7 +43,7 @@ class StorageWriter:
         trace_path: str | None = None,
     ) -> None:
         """
-        Write a complete NormalizedRun to the database.
+        Write a complete NormalizedRun to the database in a single atomic transaction.
 
         Args:
             run:        The normalized run to persist.
@@ -52,25 +53,32 @@ class StorageWriter:
         ts = _iso(run.timestamp)
         status_str = run.status.value if hasattr(run.status, "value") else str(run.status)
 
-        # 1. Insert the run row
-        self.db.insert_run(
-            run_id=run.run_id,
-            workflow=run.workflow,
-            timestamp=ts,
-            status=status_str,
-            total_latency_ms=run.total_latency_ms,
-            total_tokens=run.total_tokens,
-            schema_version=SCHEMA_VERSION,
-            trace_path=trace_path,
-            trace_json=trace_json,
-            expected_output=run.expected_output,
-        )
+        with self.db.connection() as conn:
+            # 1. Insert the run row
+            self.db.insert_run(
+                run_id=run.run_id,
+                workflow=run.workflow,
+                timestamp=ts,
+                status=status_str,
+                total_latency_ms=run.total_latency_ms,
+                total_tokens=run.total_tokens,
+                schema_version=SCHEMA_VERSION,
+                trace_path=trace_path,
+                trace_json=trace_json,
+                expected_output=run.expected_output,
+                conn=conn,
+            )
 
-        # 2. Insert each step + its metrics
-        for step in run.steps:
-            self._write_step(run.run_id, step)
+            # 2. Insert each step + its metrics
+            for step in run.steps:
+                self._write_step(run.run_id, step, conn=conn)
 
-    def _write_step(self, run_id: str, step: NormalizedStep) -> None:
+    def _write_step(
+        self,
+        run_id: str,
+        step: NormalizedStep,
+        conn: Any = None,
+    ) -> None:
         """Write one step row and its per-step metrics."""
         ts = _iso(step.timestamp)
         status_str = step.status.value if hasattr(step.status, "value") else str(step.status)
@@ -88,6 +96,7 @@ class StorageWriter:
             error=step.error,
             timestamp=ts,
             schema_version=SCHEMA_VERSION,
+            conn=conn,
         )
 
         # Write latency metric
@@ -100,6 +109,7 @@ class StorageWriter:
             metric_unit="ms",
             timestamp=ts,
             schema_version=SCHEMA_VERSION,
+            conn=conn,
         )
 
         # Write execution_time_ms (wall-clock = latency for current pipeline)
@@ -112,6 +122,7 @@ class StorageWriter:
             metric_unit="ms",
             timestamp=ts,
             schema_version=SCHEMA_VERSION,
+            conn=conn,
         )
 
         # Write token metrics — always write rows so MetricsAnalyzer can read them
@@ -130,6 +141,7 @@ class StorageWriter:
                 metric_unit="tokens",
                 timestamp=ts,
                 schema_version=SCHEMA_VERSION,
+                conn=conn,
             )
 
 

@@ -26,6 +26,8 @@ storage:
   db_path: "data/agentlens.db"             # SQLite database path
   traces_dir: "data/traces"                # JSON blob storage for full trace payloads
   schema_version: "1.0"                    # Stamped on every normalized record
+  pool_size: 10                            # Thread-safe connection pool size (Day 49)
+  busy_timeout_ms: 10000                   # SQLite lock contention busy timeout in ms (Day 49)
 
 # ─────────────────────────────────────────────
 # Evidence Extraction
