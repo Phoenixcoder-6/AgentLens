@@ -346,6 +346,12 @@ class DatabaseManager:
         """Close all connections in the pool."""
         self.pool.close_all()
 
+    def get_adapter(self) -> Any:
+        """Return a SQLiteStorageAdapter wrapping this DatabaseManager instance."""
+        from storage.sqlite_adapter import SQLiteStorageAdapter
+
+        return SQLiteStorageAdapter(db=self)
+
     def execute_with_retry(
         self,
         func: Callable[[sqlite3.Connection], Any],

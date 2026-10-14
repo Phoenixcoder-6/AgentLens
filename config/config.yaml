@@ -24,6 +24,7 @@ llm:
 # ─────────────────────────────────────────────
 storage:
   db_path: "data/agentlens.db"             # SQLite database path
+  db_url: ""                               # Database URL (e.g. postgresql://... or sqlite:///...)
   traces_dir: "data/traces"                # JSON blob storage for full trace payloads
   schema_version: "1.0"                    # Stamped on every normalized record
   pool_size: 10                            # Thread-safe connection pool size (Day 49)

@@ -33,8 +33,11 @@ class StorageWriter:
         writer.write_run(normalized_run, trace_json=raw_json_string)
     """
 
-    def __init__(self, db: DatabaseManager) -> None:
-        self.db = db
+    def __init__(self, db: DatabaseManager | Any) -> None:
+        if hasattr(db, "db") and isinstance(db.db, DatabaseManager):
+            self.db: DatabaseManager = db.db
+        else:
+            self.db = db
 
     def write_run(
         self,
