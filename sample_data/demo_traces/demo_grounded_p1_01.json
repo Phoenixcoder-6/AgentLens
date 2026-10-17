@@ -188,6 +188,7 @@
       "timestamp": "2026-10-09T12:05:02+00:00"
     }
   ],
+  "spans": [],
   "total_latency_ms": 1120.0,
   "total_tokens": 1080,
   "status": "SUCCESS",

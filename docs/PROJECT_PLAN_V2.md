@@ -62,10 +62,10 @@ Total: 80 Actionable Engineering Tasks
 ## WEEK 11: Phase B — Universal DAG Topology & Semantic NLI
 
 ### Day 52 — OpenInference Span DAG Schema
-- [ ] **Task 52.1:** Create `schema/span.py` implementing `TraceSpan` with `span_id`, `trace_id`, `parent_span_id`, `span_type` (`agent` | `tool` | `chain`), and `iteration_index`.
-- [ ] **Task 52.2:** Update `RunTrace` model to support both legacy linear `steps: list[AgentStep]` and hierarchical `spans: list[TraceSpan]` with bidirectional converters.
-- [ ] **Task 52.3:** Write `tests/test_span_dag.py` modeling parallel execution branches (3 agents in parallel) and reflection loops ($A \to B \to A$).
-- [ ] **Task 52.4:** Create and verify `scripts/verify_day52.py` (8 checks: span hierarchy validation, cycle iteration indexing, parent-child tree serialization, legacy step conversion).
+- [x] **Task 52.1:** Create `schema/span.py` implementing `TraceSpan` with `span_id`, `trace_id`, `parent_span_id`, `span_type` (`agent` | `tool` | `chain`), and `iteration_index`.
+- [x] **Task 52.2:** Update `RunTrace` model to support both legacy linear `steps: list[AgentStep]` and hierarchical `spans: list[TraceSpan]` with bidirectional converters.
+- [x] **Task 52.3:** Write `tests/test_span_dag.py` modeling parallel execution branches (3 agents in parallel) and reflection loops ($A \to B \to A$).
+- [x] **Task 52.4:** Create and verify `scripts/verify_day52.py` (8 checks: span hierarchy validation, cycle iteration indexing, parent-child tree serialization, legacy step conversion).
 
 ---
 

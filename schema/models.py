@@ -296,8 +296,14 @@ class RunTrace(BaseModel):
         default_factory=lambda: datetime.now(UTC), description="When this run started"
     )
 
-    # All steps in this run, in order
+    # All steps in this run, in order (legacy linear representation)
     steps: list[AgentStep] = Field(default_factory=list)
+
+    # Hierarchical OpenInference span DAG representation (v2.0)
+    spans: list[TraceSpan] = Field(
+        default_factory=list,
+        description="Hierarchical OpenInference span DAG representation",
+    )
 
     # Aggregate metrics (computed after capture)
     total_latency_ms: float = Field(default=0.0)
@@ -315,6 +321,22 @@ class RunTrace(BaseModel):
     trace_path: str | None = Field(
         default=None, description="Relative path to the full JSON trace blob in data/traces/"
     )
+
+    def ensure_spans(self) -> list[TraceSpan]:
+        """Ensure `self.spans` is populated from `self.steps` if currently empty."""
+        if not self.spans and self.steps:
+            from schema.span import steps_to_spans
+
+            self.spans = steps_to_spans(self.steps, self.run_id)
+        return self.spans
+
+    def ensure_steps(self) -> list[AgentStep]:
+        """Ensure `self.steps` is populated from `self.spans` if currently empty."""
+        if not self.steps and self.spans:
+            from schema.span import spans_to_steps
+
+            self.steps = spans_to_steps(self.spans, self.run_id)
+        return self.steps
 
     @field_serializer("timestamp")
     def serialize_timestamp(self, v: datetime) -> str:
@@ -448,3 +470,9 @@ class AnalysisBundle(BaseModel):
         return v.isoformat()
 
     model_config = {}
+
+
+# Resolve circular type references for RunTrace.spans
+from schema.span import TraceSpan  # noqa: E402
+
+RunTrace.model_rebuild()
