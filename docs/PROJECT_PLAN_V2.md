@@ -52,10 +52,10 @@ Total: 80 Actionable Engineering Tasks
 ---
 
 ### Day 51 — Phase A Stabilization Gate & Regression Run
-- [ ] **Task 51.1:** Run full v1.0 regression suite (`scripts/run_day43_regression.py`); verify **zero regressions** on all 20 frozen benchmark traces ($16/20 = 80\%$, $20/20 = 100\%$).
-- [ ] **Task 51.2:** Update `tests/test_api.py` and `tests/test_day44_package_docker.py` under multi-threaded concurrency; verify all 22 existing API/Docker tests pass.
-- [ ] **Task 51.3:** Enforce test coverage gate (`pytest --cov-fail-under=75`) and verify 100% clean typing (`mypy`) and linting (`ruff`).
-- [ ] **Task 51.4:** Create and verify `scripts/verify_day51.py` certifying **Phase A Stabilization Complete**.
+- [x] **Task 51.1:** Run full v1.0 regression suite (`scripts/run_day43_regression.py`); verify **zero regressions** on all 20 frozen benchmark traces ($16/20 = 80\%$, $20/20 = 100\%$).
+- [x] **Task 51.2:** Update `tests/test_api.py` and `tests/test_day44_package_docker.py` under multi-threaded concurrency; verify all 26 existing API/Docker tests pass.
+- [x] **Task 51.3:** Enforce test coverage gate (`pytest --cov-fail-under=75`) and verify 100% clean typing (`mypy`) and linting (`ruff`).
+- [x] **Task 51.4:** Create and verify `scripts/verify_day51.py` certifying **Phase A Stabilization Complete**.
 
 ---
 

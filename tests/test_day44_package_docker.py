@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import sys
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -195,3 +196,56 @@ class TestDay44DockerAndCompose:
         db.initialize()
         assert Path(db.db_path) == custom_db
         assert custom_db.exists()
+
+    def test_concurrent_healthcheck_requests(self) -> None:
+        """Verify Docker container healthcheck endpoint withstands concurrent burst probes."""
+        client = TestClient(fastapi_app, raise_server_exceptions=False)
+
+        def probe_health(_: int) -> int:
+            resp = client.get("/health")
+            assert resp.status_code == 200
+            assert resp.json()["status"] in ("ok", "degraded")
+            return resp.status_code
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(probe_health, range(20)))
+
+        assert len(results) == 20
+        assert all(r == 200 for r in results)
+
+    def test_concurrent_database_manager_with_env_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify concurrent multi-threaded usage with custom DB_PATH environment variable."""
+        custom_db = tmp_path / "concurrent_env.db"
+        monkeypatch.setenv("DB_PATH", str(custom_db))
+
+        db = DatabaseManager()
+        db.initialize()
+
+        def worker_write(idx: int) -> int:
+            with db.connection() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO metrics (run_id, step, metric_name, metric_value, timestamp, schema_version) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        f"run_conc_{idx}",
+                        1,
+                        "test_latency",
+                        10.0 * idx,
+                        "2026-10-17T00:00:00Z",
+                        "1.0",
+                    ),
+                )
+            return idx
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            written = list(pool.map(worker_write, range(20)))
+
+        assert len(written) == 20
+        with db.connection() as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM metrics WHERE run_id LIKE 'run_conc_%'"
+            ).fetchone()[0]
+        assert count == 20
+        db.close()
