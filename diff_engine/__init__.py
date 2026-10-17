@@ -24,6 +24,7 @@ from diff_engine.similarity import (
 from schema.models import RunTrace
 
 align_traces = GraphAligner.align_traces
+align_spans = GraphAligner.align_spans
 
 
 def score_similarity(
@@ -101,6 +102,7 @@ __all__ = [
     "AlignmentStatus",
     "GraphAlignmentResult",
     "align_traces",
+    "align_spans",
     # Day 25 — Similarity
     "SemanticSimilarityEngine",
     "SimilarityReport",

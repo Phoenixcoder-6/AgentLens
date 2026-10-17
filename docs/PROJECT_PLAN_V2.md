@@ -70,10 +70,10 @@ Total: 80 Actionable Engineering Tasks
 ---
 
 ### Day 53 — Graph Aligner Upgrade for DAGs & Loops
-- [ ] **Task 53.1:** Upgrade `diff_engine/aligner.py` (`GraphAligner`) to match steps across multi-agent loops by pairing identical `(agent, iteration_index)` coordinates.
-- [ ] **Task 53.2:** Upgrade `GraphAligner` to support parallel fork diffing, aligning branches independently by agent role and call stack depth.
-- [ ] **Task 53.3:** Add unit tests in `tests/test_diff_engine_dag.py` diffing a 3-iteration looping trace against a single-pass trace; verify correct alignment.
-- [ ] **Task 53.4:** Create and verify `scripts/verify_day53.py` (8 checks: loop alignment, parallel branch matching, missing node isolation in cycles, backward compatibility with v1.0 linear diffs).
+- [x] **Task 53.1:** Upgrade `diff_engine/aligner.py` (`GraphAligner`) to match steps across multi-agent loops by pairing identical `(agent, iteration_index)` coordinates.
+- [x] **Task 53.2:** Upgrade `GraphAligner` to support parallel fork diffing, aligning branches independently by agent role and call stack depth.
+- [x] **Task 53.3:** Add unit tests in `tests/test_diff_engine_dag.py` diffing a 3-iteration looping trace against a single-pass trace; verify correct alignment.
+- [x] **Task 53.4:** Create and verify `scripts/verify_day53.py` (8 checks: loop alignment, parallel branch matching, missing node isolation in cycles, backward compatibility with v1.0 linear diffs).
 
 ---
 

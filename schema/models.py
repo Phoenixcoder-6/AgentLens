@@ -248,12 +248,15 @@ class AgentStep(BaseModel):
     # Handoff — captures state transformation (not just input/output)
     handoff: HandoffState = Field(default_factory=HandoffState)
 
-    # Graph relationships
+    # Graph relationships & Reflection loops
     parent_step: str | None = Field(
         default=None, description="Step ID of the agent that produced input to this step"
     )
     child_step: str | None = Field(
         default=None, description="Step ID of the agent that will receive this step's output"
+    )
+    iteration_index: int = Field(
+        default=0, description="0-indexed loop iteration index for reflection cycles"
     )
 
     # Status

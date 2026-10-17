@@ -211,8 +211,13 @@ def steps_to_spans(steps: list[Any], run_id: str = "") -> list[TraceSpan]:
         agent_name = getattr(step, "agent", "agent")
         step_num = getattr(step, "step", 1)
 
-        iter_idx = agent_counts.get(agent_name, 0)
-        agent_counts[agent_name] = iter_idx + 1
+        explicit_iter = getattr(step, "iteration_index", None)
+        if explicit_iter is not None and explicit_iter > 0:
+            iter_idx = explicit_iter
+            agent_counts[agent_name] = max(agent_counts.get(agent_name, 0), iter_idx + 1)
+        else:
+            iter_idx = agent_counts.get(agent_name, 0)
+            agent_counts[agent_name] = iter_idx + 1
 
         span_id = f"span_{eff_run_id}_{step_num}"
         step_id_map[str(step_num)] = span_id
@@ -338,6 +343,7 @@ def spans_to_steps(spans: list[TraceSpan], run_id: str = "") -> list[Any]:
             tool_calls=tool_calls,
             handoff=handoff,
             parent_step=prev_step_str,
+            iteration_index=s.iteration_index,
             status=s.status,
             error=s.error,
             timestamp=s.start_time,
