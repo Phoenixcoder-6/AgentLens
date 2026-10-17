@@ -233,9 +233,7 @@ def test_factory_get_storage_adapter(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert info["sslmode"] == "require"
 
     # 5. AGENTLENS_DB_URL environment variable routing
-    monkeypatch.setenv(
-        "AGENTLENS_DB_URL", "postgresql://user:pass@127.0.0.1:5433/custom_agentlens"
-    )
+    monkeypatch.setenv("AGENTLENS_DB_URL", "postgresql://user:pass@127.0.0.1:5433/custom_agentlens")
     adapter5 = get_storage_adapter()
     assert isinstance(adapter5, PostgreSQLStorageAdapter)
     assert adapter5.get_connection_info()["port"] == 5433

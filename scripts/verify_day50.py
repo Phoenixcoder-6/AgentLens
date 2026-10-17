@@ -85,7 +85,9 @@ def check_1_base_adapter_contract() -> bool:
     print("\n--- Check 1: BaseStorageAdapter Abstract Contract Enforcement ---")
     try:
         BaseStorageAdapter()  # type: ignore[abstract]
-        print("[FAIL] BaseStorageAdapter allowed direct instantiation without implementing abstract methods.")
+        print(
+            "[FAIL] BaseStorageAdapter allowed direct instantiation without implementing abstract methods."
+        )
         return False
     except TypeError as exc:
         err = str(exc)
@@ -94,7 +96,9 @@ def check_1_base_adapter_contract() -> bool:
                 print(f"[FAIL] Expected abstract method '{meth}' in TypeError, got: {err}")
                 return False
 
-    print("[PASS] BaseStorageAdapter correctly enforces abstract methods (save_run, get_run, list_runs, save_analysis, query_metrics).")
+    print(
+        "[PASS] BaseStorageAdapter correctly enforces abstract methods (save_run, get_run, list_runs, save_analysis, query_metrics)."
+    )
     return True
 
 
@@ -121,7 +125,9 @@ def check_2_sqlite_adapter_initialization(tmp_dir: Path) -> bool:
         return False
 
     adapter.close()
-    print("[PASS] SQLiteStorageAdapter initialized with WAL mode, busy_timeout=10000, and synchronous=NORMAL.")
+    print(
+        "[PASS] SQLiteStorageAdapter initialized with WAL mode, busy_timeout=10000, and synchronous=NORMAL."
+    )
     return True
 
 
@@ -161,7 +167,9 @@ def check_3_sqlite_crud_parity(tmp_dir: Path) -> bool:
         return False
 
     adapter.close()
-    print("[PASS] SQLiteStorageAdapter CRUD parity verified (save_run, get_run, list_runs, get_steps).")
+    print(
+        "[PASS] SQLiteStorageAdapter CRUD parity verified (save_run, get_run, list_runs, get_steps)."
+    )
     return True
 
 
@@ -280,7 +288,9 @@ def check_6_factory_resolution(tmp_dir: Path) -> bool:
         else:
             os.environ.pop("AGENTLENS_DB_URL", None)
 
-    print("[PASS] get_storage_adapter() successfully resolved SQLite paths, sqlite:/// URIs, postgresql:// URIs, and AGENTLENS_DB_URL.")
+    print(
+        "[PASS] get_storage_adapter() successfully resolved SQLite paths, sqlite:/// URIs, postgresql:// URIs, and AGENTLENS_DB_URL."
+    )
     return True
 
 
@@ -312,7 +322,13 @@ def check_7_postgresql_adapter_schema() -> bool:
 
     ddl_list = adapter.get_ddl()
     full_ddl = "\n".join(ddl_list)
-    for expected_keyword in ["TIMESTAMPTZ", "JSONB", "BIGSERIAL", "DOUBLE PRECISION", "CREATE INDEX"]:
+    for expected_keyword in [
+        "TIMESTAMPTZ",
+        "JSONB",
+        "BIGSERIAL",
+        "DOUBLE PRECISION",
+        "CREATE INDEX",
+    ]:
         if expected_keyword not in full_ddl:
             print(f"[FAIL] PostgreSQL DDL missing expected keyword '{expected_keyword}'")
             return False
@@ -343,14 +359,20 @@ def check_8_day43_regression_preservation() -> bool:
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
-        print(f"[FAIL] Day 43 regression failed with returncode {result.returncode}:\n{result.stderr}\n{result.stdout}")
+        print(
+            f"[FAIL] Day 43 regression failed with returncode {result.returncode}:\n{result.stderr}\n{result.stdout}"
+        )
         return False
 
     if "16/20 (80.0%)" not in result.stdout or "Overall Regression Gate" not in result.stdout:
-        print(f"[FAIL] Regression output did not contain expected success message:\n{result.stdout}")
+        print(
+            f"[FAIL] Regression output did not contain expected success message:\n{result.stdout}"
+        )
         return False
 
-    print("[PASS] Day 43 regression benchmark preserved: 16/20 (80.0%) exact attribution, zero regressions.")
+    print(
+        "[PASS] Day 43 regression benchmark preserved: 16/20 (80.0%) exact attribution, zero regressions."
+    )
     return True
 
 
