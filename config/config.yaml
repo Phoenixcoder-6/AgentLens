@@ -75,6 +75,11 @@ arbiter:
     hallucination_entity_gain_threshold: 0 # Allowed entity count increase from researcher to writer
     hallucination_v2_enabled: true         # Enable Day 54 semantic entity set overlap detector
     hallucination_invented_threshold: 1    # Minimum invented entities to fire hallucination_v2
+    contradiction_v1_enabled: true         # Enable Day 55 local NLI semantic contradiction detector
+    contradiction_threshold: 0.70          # P(Contradiction) threshold to fire contradiction_v1
+    entailment_threshold: 0.75             # P(Entailment) threshold for faithful synthesis
+    nli_mode: "auto"                       # "auto" | "transformers" | "fallback"
+    nli_model: "cross-encoder/nli-deberta-v3-small"
   information_loss:
     severe_threshold: 3                    # |delta| >= 3 → HIGH severity (FAIL on drops)
     moderate_threshold: 1                  # |delta| >= 1 → MEDIUM severity (WARNING)

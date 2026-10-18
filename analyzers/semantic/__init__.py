@@ -11,10 +11,26 @@ from analyzers.semantic.entity_tracker import (
     compare_entity_sets,
     extract_entities,
 )
+from analyzers.semantic.nli_engine import (
+    NLIClaimScore,
+    NLIEngine,
+    NLIEvaluationReport,
+    NLILabel,
+    evaluate_pair_lexical_fallback,
+    get_nli_engine,
+    split_claims,
+)
 
 __all__ = [
     "EntityTracker",
     "EntityDeltaReport",
     "extract_entities",
     "compare_entity_sets",
+    "NLIEngine",
+    "NLILabel",
+    "NLIClaimScore",
+    "NLIEvaluationReport",
+    "split_claims",
+    "evaluate_pair_lexical_fallback",
+    "get_nli_engine",
 ]

@@ -190,44 +190,82 @@ class RuleEngine(Analyzer):
                     )
                 )
 
-        # Reasoning: hallucination_v2 (Day 54: Semantic entity set difference & substitution)
-        v2_enabled = reasoning_config.get("hallucination_v2_enabled", True)
-        invented_threshold = reasoning_config.get("hallucination_invented_threshold", 1)
-
-        if v2_enabled and upstream_step and wr_step:
-            # Guard: If upstream had execution failure, don't flag downstream hallucination
-            has_up_exec_failure = any(
+        # Check if upstream had execution failure to preserve crash root cause precedence
+        has_up_exec_failure = (
+            any(
                 e.agent == upstream_step.agent
                 and e.rule_match
                 and e.rule_match.category == FailureCategory.EXECUTION
                 for e in evidence
             )
-            if not has_up_exec_failure:
-                from analyzers.semantic.entity_tracker import EntityTracker
+            if upstream_step
+            else False
+        )
 
-                delta = EntityTracker.compare_steps(upstream_step, wr_step)
-                should_fire = delta.substitution_detected or (
-                    delta.has_hallucination
-                    and len(delta.invented_entities) >= invented_threshold
-                    and (delta.preservation_ratio < 0.9 or delta.hallucination_rate >= 0.3)
+        # Reasoning: hallucination_v2 (Day 54: Semantic entity set difference & substitution)
+        v2_enabled = reasoning_config.get("hallucination_v2_enabled", True)
+        invented_threshold = reasoning_config.get("hallucination_invented_threshold", 1)
+
+        if v2_enabled and upstream_step and wr_step and not has_up_exec_failure:
+            from analyzers.semantic.entity_tracker import EntityTracker
+
+            delta = EntityTracker.compare_steps(upstream_step, wr_step)
+            should_fire = delta.substitution_detected or (
+                delta.has_hallucination
+                and len(delta.invented_entities) >= invented_threshold
+                and (delta.preservation_ratio < 0.9 or delta.hallucination_rate >= 0.3)
+            )
+            if should_fire:
+                inv_sample = sorted(list(delta.invented_entities))[:5]
+                desc = (
+                    f"Agent '{wr_step.agent}' hallucinated invented entities "
+                    f"{inv_sample} not found in upstream '{upstream_step.agent}'."
                 )
-                if should_fire:
-                    inv_sample = sorted(list(delta.invented_entities))[:5]
-                    desc = (
-                        f"Agent '{wr_step.agent}' hallucinated invented entities "
-                        f"{inv_sample} not found in upstream '{upstream_step.agent}'."
+                if delta.substitution_detected:
+                    desc += " (Entity substitution detected)."
+                evidence.append(
+                    self._make_record(
+                        rule_id="hallucination_v2",
+                        category=FailureCategory.REASONING,
+                        description=desc,
+                        agent=wr_step.agent,
+                        step_idx=wr_step.step,
                     )
-                    if delta.substitution_detected:
-                        desc += " (Entity substitution detected)."
-                    evidence.append(
-                        self._make_record(
-                            rule_id="hallucination_v2",
-                            category=FailureCategory.REASONING,
-                            description=desc,
-                            agent=wr_step.agent,
-                            step_idx=wr_step.step,
-                        )
+                )
+
+        # Reasoning: contradiction_v1 (Day 55: Local Cross-Encoder NLI Engine)
+        contradiction_enabled = reasoning_config.get("contradiction_v1_enabled", True)
+        contradiction_thresh = float(reasoning_config.get("contradiction_threshold", 0.70))
+        nli_mode = reasoning_config.get("nli_mode", "auto")
+        nli_model = reasoning_config.get("nli_model", "cross-encoder/nli-deberta-v3-small")
+
+        if contradiction_enabled and upstream_step and wr_step and not has_up_exec_failure:
+            from analyzers.semantic.nli_engine import get_nli_engine
+
+            nli_engine = get_nli_engine(
+                model_name=nli_model,
+                mode=nli_mode,
+                contradiction_threshold=contradiction_thresh,
+            )
+            nli_report = nli_engine.evaluate_steps(upstream_step, wr_step)
+            if nli_report.has_contradiction:
+                worst_claim = max(
+                    nli_report.contradicted_claims, key=lambda c: c.contradiction_prob
+                )
+                desc = (
+                    f"Agent '{wr_step.agent}' asserted claim directly contradicting upstream "
+                    f"'{upstream_step.agent}': '{worst_claim.claim}' "
+                    f"(P(Contradiction)={worst_claim.contradiction_prob:.2f})."
+                )
+                evidence.append(
+                    self._make_record(
+                        rule_id="contradiction_v1",
+                        category=FailureCategory.REASONING,
+                        description=desc,
+                        agent=wr_step.agent,
+                        step_idx=wr_step.step,
                     )
+                )
 
         return AnalysisResult(evidence=evidence, analyzer_id=self.analyzer_id)
 
