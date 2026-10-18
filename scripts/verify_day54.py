@@ -194,6 +194,7 @@ def run_checks() -> bool:
         v2_record = next(
             e for e in res.evidence if e.rule_match and e.rule_match.rule_id == "hallucination_v2"
         )
+        assert v2_record.rule_match is not None
         assert v2_record.rule_match.category == FailureCategory.REASONING
         assert v2_record.agent == "writer"
         print("[PASS] Check 6: RuleEngine Integration: hallucination_v2 Firing on Substitution")
