@@ -68,6 +68,7 @@
       },
       "parent_step": null,
       "child_step": null,
+      "iteration_index": 0,
       "status": "SUCCESS",
       "error": null,
       "timestamp": "2026-10-09T12:00:00+00:00"
@@ -143,6 +144,7 @@
       },
       "parent_step": null,
       "child_step": null,
+      "iteration_index": 0,
       "status": "SUCCESS",
       "error": null,
       "timestamp": "2026-10-09T12:00:01+00:00"
@@ -218,6 +220,7 @@
       },
       "parent_step": null,
       "child_step": null,
+      "iteration_index": 0,
       "status": "SUCCESS",
       "error": null,
       "timestamp": "2026-10-09T12:00:02+00:00"

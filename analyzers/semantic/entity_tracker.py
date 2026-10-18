@@ -352,6 +352,20 @@ STOPWORDS: frozenset[str] = frozenset(
         "yet",
         "you",
         "your",
+        # Common occupational titles, honorifics, and role nouns
+        "command",
+        "module",
+        "pilot",
+        "astronaut",
+        "astronauts",
+        "director",
+        "president",
+        "officer",
+        "manager",
+        "chief",
+        "chairman",
+        "engineer",
+        "specialist",
     }
 )
 
@@ -452,15 +466,21 @@ class EntityDeltaReport(BaseModel):
 def normalize_entity(entity: str) -> str:
     """
     Normalize an entity string for robust canonical comparison.
-    Strips punctuation, trailing possessives ('s), and collapses whitespace.
+    Strips punctuation, trailing possessives ('s), collapses whitespace,
+    and removes leading/trailing stopwords and articles.
     """
     text = entity.strip().strip(".,;:!?\"'()[]{}*`")
     # Strip possessive suffix: "Apple's" -> "Apple"
     if text.endswith("'s") or text.endswith("’s"):
         text = text[:-2]
     # Collapse internal whitespace
-    text = re.sub(r"\s+", " ", text)
-    return text.lower()
+    text = re.sub(r"\s+", " ", text).lower()
+    words = text.split()
+    while words and words[0] in STOPWORDS:
+        words.pop(0)
+    while words and words[-1] in STOPWORDS:
+        words.pop()
+    return " ".join(words)
 
 
 def extract_entities(text: str) -> set[str]:
@@ -632,10 +652,15 @@ class EntityTracker:
         Compare entity sets between two AgentStep objects.
         Considers both step output and handoff state if available.
         """
-        # Combine output and handoff filtered_state for complete upstream context
+        # Combine input, output, and handoff state for complete upstream context
         up_text_parts = [upstream_step.output or ""]
-        if upstream_step.handoff and upstream_step.handoff.output_state:
-            up_text_parts.append(str(upstream_step.handoff.output_state))
+        if upstream_step.input:
+            up_text_parts.append(str(upstream_step.input))
+        if upstream_step.handoff:
+            if upstream_step.handoff.output_state:
+                up_text_parts.append(str(upstream_step.handoff.output_state))
+            if upstream_step.handoff.input_state:
+                up_text_parts.append(str(upstream_step.handoff.input_state))
 
         down_text_parts = [downstream_step.output or ""]
         if downstream_step.handoff and downstream_step.handoff.output_state:

@@ -206,7 +206,12 @@ class RuleEngine(Analyzer):
                 from analyzers.semantic.entity_tracker import EntityTracker
 
                 delta = EntityTracker.compare_steps(upstream_step, wr_step)
-                if delta.has_hallucination and len(delta.invented_entities) >= invented_threshold:
+                should_fire = delta.substitution_detected or (
+                    delta.has_hallucination
+                    and len(delta.invented_entities) >= invented_threshold
+                    and (delta.preservation_ratio < 0.9 or delta.hallucination_rate >= 0.3)
+                )
+                if should_fire:
                     inv_sample = sorted(list(delta.invented_entities))[:5]
                     desc = (
                         f"Agent '{wr_step.agent}' hallucinated invented entities "
