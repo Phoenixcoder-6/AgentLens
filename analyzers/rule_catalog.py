@@ -53,6 +53,13 @@ RULE_CATALOG: dict[str, RuleInfo] = {
         "description": "Writer introduced more entities than the researcher supplied.",
         "source": "rule_engine",
     },
+    "hallucination_v2": {
+        "name": "Semantic Entity Substitution Hallucination",
+        "category": "reasoning",
+        "version": "2.0.0",
+        "description": "Downstream agent invented named entities not found in upstream evidence.",
+        "source": "rule_engine",
+    },
     "verifier_passthrough_v1": {
         "name": "Verifier Passthrough",
         "category": "verification",

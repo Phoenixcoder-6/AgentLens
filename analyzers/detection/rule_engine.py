@@ -190,6 +190,40 @@ class RuleEngine(Analyzer):
                     )
                 )
 
+        # Reasoning: hallucination_v2 (Day 54: Semantic entity set difference & substitution)
+        v2_enabled = reasoning_config.get("hallucination_v2_enabled", True)
+        invented_threshold = reasoning_config.get("hallucination_invented_threshold", 1)
+
+        if v2_enabled and upstream_step and wr_step:
+            # Guard: If upstream had execution failure, don't flag downstream hallucination
+            has_up_exec_failure = any(
+                e.agent == upstream_step.agent
+                and e.rule_match
+                and e.rule_match.category == FailureCategory.EXECUTION
+                for e in evidence
+            )
+            if not has_up_exec_failure:
+                from analyzers.semantic.entity_tracker import EntityTracker
+
+                delta = EntityTracker.compare_steps(upstream_step, wr_step)
+                if delta.has_hallucination and len(delta.invented_entities) >= invented_threshold:
+                    inv_sample = sorted(list(delta.invented_entities))[:5]
+                    desc = (
+                        f"Agent '{wr_step.agent}' hallucinated invented entities "
+                        f"{inv_sample} not found in upstream '{upstream_step.agent}'."
+                    )
+                    if delta.substitution_detected:
+                        desc += " (Entity substitution detected)."
+                    evidence.append(
+                        self._make_record(
+                            rule_id="hallucination_v2",
+                            category=FailureCategory.REASONING,
+                            description=desc,
+                            agent=wr_step.agent,
+                            step_idx=wr_step.step,
+                        )
+                    )
+
         return AnalysisResult(evidence=evidence, analyzer_id=self.analyzer_id)
 
     def run(self, trace: RunTrace) -> AnalysisResult:

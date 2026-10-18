@@ -78,10 +78,10 @@ Total: 80 Actionable Engineering Tasks
 ---
 
 ### Day 54 — Semantic Entity Set Overlap Engine
-- [ ] **Task 54.1:** Create `analyzers/semantic/entity_tracker.py` using regex and entity extraction to parse actual named entity strings from agent outputs.
-- [ ] **Task 54.2:** Implement mathematical set difference: $E_{\text{invented}} = E_{\text{downstream}} \setminus E_{\text{upstream}}$ and $E_{\text{dropped}} = E_{\text{upstream}} \setminus E_{\text{downstream}}$.
-- [ ] **Task 54.3:** Update `RuleEngine` to register `hallucination_v2`, firing $P_2$ when $|E_{\text{invented}}| > 0$ even if total entity counts remain identical.
-- [ ] **Task 54.4:** Create and verify `scripts/verify_day54.py` (8 checks: exact set difference, entity substitution detection, preservation ratio calculation, zero false positives on identical sets).
+- [x] **Task 54.1:** Create `analyzers/semantic/entity_tracker.py` using regex and entity extraction to parse actual named entity strings from agent outputs.
+- [x] **Task 54.2:** Implement mathematical set difference: $E_{\text{invented}} = E_{\text{downstream}} \setminus E_{\text{upstream}}$ and $E_{\text{dropped}} = E_{\text{upstream}} \setminus E_{\text{downstream}}$.
+- [x] **Task 54.3:** Update `RuleEngine` to register `hallucination_v2`, firing $P_2$ when $|E_{\text{invented}}| > 0$ even if total entity counts remain identical.
+- [x] **Task 54.4:** Create and verify `scripts/verify_day54.py` (8 checks: exact set difference, entity substitution detection, preservation ratio calculation, zero false positives on identical sets).
 
 ---
 

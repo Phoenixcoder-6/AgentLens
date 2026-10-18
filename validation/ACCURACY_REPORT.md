@@ -1,6 +1,6 @@
 # AgentLens Validation Accuracy Report (Day 35)
 
-**Generated At:** `2026-10-17T20:48:43.300044+00:00`  
+**Generated At:** `2026-10-17T21:45:49.041222+00:00`  
 **Ground-Truth Baseline:** `sample_data/labels.json` (20 frozen traces from Day 15)  
 **Pipeline Results:** `validation/results_day34.json` (Day 34 full pipeline run)  
 **Target Threshold:** `>= 15/20 (75.0%)`  

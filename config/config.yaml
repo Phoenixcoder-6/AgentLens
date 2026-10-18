@@ -73,6 +73,8 @@ arbiter:
   reasoning:
     researcher_min_sources: 1              # Minimum required sources for researcher_quality_v1
     hallucination_entity_gain_threshold: 0 # Allowed entity count increase from researcher to writer
+    hallucination_v2_enabled: true         # Enable Day 54 semantic entity set overlap detector
+    hallucination_invented_threshold: 1    # Minimum invented entities to fire hallucination_v2
   information_loss:
     severe_threshold: 3                    # |delta| >= 3 → HIGH severity (FAIL on drops)
     moderate_threshold: 1                  # |delta| >= 1 → MEDIUM severity (WARNING)
