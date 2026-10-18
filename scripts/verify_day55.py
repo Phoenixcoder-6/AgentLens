@@ -224,7 +224,10 @@ def run_checks() -> bool:
             for e in res_contra.evidence
             if e.rule_match and e.rule_match.rule_id == "contradiction_v1"
         )
-        assert contra_ev.rule_match.category == FailureCategory.REASONING
+
+        rule_match = contra_ev.rule_match
+        assert rule_match is not None
+        assert rule_match.category == FailureCategory.REASONING
         assert contra_ev.agent == "writer"
 
         # Sub-check B: Upstream execution error suppresses downstream contradiction

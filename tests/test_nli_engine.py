@@ -185,7 +185,10 @@ class TestRuleEngineNLIIntegration:
             for e in result.evidence
             if e.rule_match and e.rule_match.rule_id == "contradiction_v1"
         )
-        assert contra_ev.rule_match.category == FailureCategory.REASONING
+
+        rule_match = contra_ev.rule_match
+        assert rule_match is not None
+        assert rule_match.category == FailureCategory.REASONING
         assert contra_ev.agent == "writer"
         assert "contradicting upstream" in contra_ev.description
 
