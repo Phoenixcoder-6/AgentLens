@@ -45,6 +45,7 @@ agentlens-seed = "sample_data.generate_demo_traces:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = [
+    "agentlens*",
     "api*",
     "app*",
     "analyzers*",
