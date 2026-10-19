@@ -1,0 +1,136 @@
+{
+  "timestamp": "2026-10-18T20:27:22.289980+00:00",
+  "total_runs": 5,
+  "metrics": {
+    "exact_attribution_correct": 5,
+    "exact_attribution_accuracy": 1.0,
+    "binary_detection_correct": 5,
+    "binary_detection_accuracy": 1.0,
+    "target_accuracy": 0.9,
+    "passed": true
+  },
+  "runs": [
+    {
+      "run_id": "trace_v2_loop_reflection_pass",
+      "category": "loop_reflection",
+      "description": "Cyclic self-correction loop resolving to PASS on iteration 2 (P5)",
+      "expected_verdict": "PASS",
+      "expected_priority": "P5",
+      "expected_agent": null,
+      "predicted_verdict": "PASS",
+      "predicted_priority": "P5",
+      "predicted_cause": "unknown",
+      "predicted_agent": null,
+      "rules_fired": [],
+      "binary_match": true,
+      "exact_match": true,
+      "component_checks": {
+        "span_alignment_count": 4,
+        "loop_iterations": [
+          0,
+          1
+        ],
+        "verified": true
+      }
+    },
+    {
+      "run_id": "trace_v2_parallel_fork_divergence",
+      "category": "parallel_fork",
+      "description": "Parallel analyst fork where financial analyst encounters tool crash (P2)",
+      "expected_verdict": "FAIL",
+      "expected_priority": "P2",
+      "expected_agent": "financial_analyst",
+      "predicted_verdict": "FAIL",
+      "predicted_priority": "P2",
+      "predicted_cause": "execution",
+      "predicted_agent": "financial_analyst",
+      "rules_fired": [
+        "tool_failure_v1"
+      ],
+      "binary_match": true,
+      "exact_match": true,
+      "component_checks": {
+        "tool_failure_detected": true,
+        "faulty_agent": "financial_analyst",
+        "verified": true
+      }
+    },
+    {
+      "run_id": "trace_v2_entity_substitution_swap",
+      "category": "entity_substitution",
+      "description": "Entity substitution swap (3 tech -> 3 pharma) caught by hallucination_v2 (P2)",
+      "expected_verdict": "FAIL",
+      "expected_priority": "P2",
+      "expected_agent": "writer",
+      "predicted_verdict": "FAIL",
+      "predicted_priority": "P2",
+      "predicted_cause": "reasoning",
+      "predicted_agent": "writer",
+      "rules_fired": [
+        "hallucination_v2"
+      ],
+      "binary_match": true,
+      "exact_match": true,
+      "component_checks": {
+        "substitution_detected": true,
+        "invented_entities": [
+          "biontech",
+          "moderna",
+          "pfizer"
+        ],
+        "dropped_entities": [
+          "amazon",
+          "google",
+          "microsoft"
+        ],
+        "rule_fired": true,
+        "verified": true
+      }
+    },
+    {
+      "run_id": "trace_v2_semantic_contradiction",
+      "category": "semantic_contradiction",
+      "description": "Semantic contradiction (failed -> met) caught by contradiction_v1 (P2)",
+      "expected_verdict": "FAIL",
+      "expected_priority": "P2",
+      "expected_agent": "writer",
+      "predicted_verdict": "FAIL",
+      "predicted_priority": "P2",
+      "predicted_cause": "reasoning",
+      "predicted_agent": "writer",
+      "rules_fired": [
+        "contradiction_v1"
+      ],
+      "binary_match": true,
+      "exact_match": true,
+      "component_checks": {
+        "has_contradiction": true,
+        "contradicted_claims_count": 2,
+        "rule_fired": true,
+        "verified": true
+      }
+    },
+    {
+      "run_id": "trace_v2_loop_deadlock_unresolved",
+      "category": "loop_deadlock",
+      "description": "Non-converging reflection loop caught by researcher_quality_v1 (P2)",
+      "expected_verdict": "FAIL",
+      "expected_priority": "P2",
+      "expected_agent": "researcher",
+      "predicted_verdict": "FAIL",
+      "predicted_priority": "P2",
+      "predicted_cause": "reasoning",
+      "predicted_agent": "researcher",
+      "rules_fired": [
+        "researcher_quality_v1"
+      ],
+      "binary_match": true,
+      "exact_match": true,
+      "component_checks": {
+        "quality_rule_fired": true,
+        "iterations_count": 3,
+        "verified": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,293 @@
+{
+  "schema_version": "1.0",
+  "run_id": "trace_v2_semantic_contradiction",
+  "workflow": "research_report_pipeline",
+  "timestamp": "2026-10-19T10:30:00+00:00",
+  "steps": [
+    {
+      "schema_version": "1.0",
+      "run_id": "trace_v2_semantic_contradiction",
+      "step": 1,
+      "agent": "researcher",
+      "node_type": "llm",
+      "input": "{\"trial\": \"NCT-0391\"}",
+      "output": "{\"research_findings\": \"Clinical study NCT-0391 failed to meet its primary safety endpoints in adult patients.\", \"source_count\": 2, \"entity_count\": 2}",
+      "expected_output": null,
+      "prompt": "Execute researcher step 1 for run trace_v2_semantic_contradiction",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 300.0,
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "trial": "NCT-0391"
+        },
+        "filtered_state": {
+          "research_findings": "Clinical study NCT-0391 failed to meet its primary safety endpoints in adult patients.",
+          "source_count": 2,
+          "entity_count": 2
+        },
+        "output_state": {
+          "research_findings": "Clinical study NCT-0391 failed to meet its primary safety endpoints in adult patients.",
+          "source_count": 2,
+          "entity_count": 2
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "iteration_index": 0,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-19T10:30:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "trace_v2_semantic_contradiction",
+      "step": 2,
+      "agent": "writer",
+      "node_type": "llm",
+      "input": "{\"research_findings\": \"Clinical study NCT-0391 failed to meet its primary safety endpoints in adult patients.\", \"source_count\": 2, \"entity_count\": 2}",
+      "output": "{\"written_report\": \"Clinical study NCT-0391 successfully met its primary safety endpoints in adult patients.\", \"source_count\": 2, \"entity_count\": 2}",
+      "expected_output": null,
+      "prompt": "Execute writer step 2 for run trace_v2_semantic_contradiction",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 300.0,
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "research_findings": "Clinical study NCT-0391 failed to meet its primary safety endpoints in adult patients.",
+          "source_count": 2,
+          "entity_count": 2
+        },
+        "filtered_state": {
+          "written_report": "Clinical study NCT-0391 successfully met its primary safety endpoints in adult patients.",
+          "source_count": 2,
+          "entity_count": 2
+        },
+        "output_state": {
+          "written_report": "Clinical study NCT-0391 successfully met its primary safety endpoints in adult patients.",
+          "source_count": 2,
+          "entity_count": 2
+        }
+      },
+      "parent_step": "1",
+      "child_step": null,
+      "iteration_index": 0,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-19T10:30:01+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "trace_v2_semantic_contradiction",
+      "step": 3,
+      "agent": "verifier",
+      "node_type": "llm",
+      "input": "{\"written_report\": \"Clinical study NCT-0391 successfully met its primary safety endpoints in adult patients.\", \"source_count\": 2, \"entity_count\": 2}",
+      "output": "{\"verified\": false, \"approved\": false, \"verification_result\": \"REJECTED: Finding directly contradicts upstream findings.\"}",
+      "expected_output": null,
+      "prompt": "Execute verifier step 3 for run trace_v2_semantic_contradiction",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 300.0,
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "written_report": "Clinical study NCT-0391 successfully met its primary safety endpoints in adult patients.",
+          "source_count": 2,
+          "entity_count": 2
+        },
+        "filtered_state": {
+          "verified": false,
+          "approved": false,
+          "verification_result": "REJECTED: Finding directly contradicts upstream findings."
+        },
+        "output_state": {
+          "verified": false,
+          "approved": false,
+          "verification_result": "REJECTED: Finding directly contradicts upstream findings."
+        }
+      },
+      "parent_step": "2",
+      "child_step": null,
+      "iteration_index": 0,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-19T10:30:02+00:00"
+    }
+  ],
+  "spans": [
+    {
+      "schema_version": "1.0",
+      "span_id": "span_trace_v2_semantic_contradiction_1",
+      "trace_id": "trace_v2_semantic_contradiction",
+      "parent_span_id": null,
+      "name": "researcher",
+      "span_type": "agent",
+      "iteration_index": 0,
+      "start_time": "2026-10-19T10:30:00+00:00",
+      "end_time": null,
+      "latency_ms": 300.0,
+      "status": "SUCCESS",
+      "error": null,
+      "input": "{\"trial\": \"NCT-0391\"}",
+      "output": "{\"research_findings\": \"Clinical study NCT-0391 failed to meet its primary safety endpoints in adult patients.\", \"source_count\": 2, \"entity_count\": 2}",
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "attributes": {
+        "step": 1,
+        "prompt": "Execute researcher step 1 for run trace_v2_semantic_contradiction",
+        "system_prompt": "",
+        "model": "",
+        "handoff": {
+          "input_state": {
+            "trial": "NCT-0391"
+          },
+          "filtered_state": {
+            "research_findings": "Clinical study NCT-0391 failed to meet its primary safety endpoints in adult patients.",
+            "source_count": 2,
+            "entity_count": 2
+          },
+          "output_state": {
+            "research_findings": "Clinical study NCT-0391 failed to meet its primary safety endpoints in adult patients.",
+            "source_count": 2,
+            "entity_count": 2
+          }
+        },
+        "expected_output": null
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "span_id": "span_trace_v2_semantic_contradiction_2",
+      "trace_id": "trace_v2_semantic_contradiction",
+      "parent_span_id": "span_trace_v2_semantic_contradiction_1",
+      "name": "writer",
+      "span_type": "agent",
+      "iteration_index": 0,
+      "start_time": "2026-10-19T10:30:01+00:00",
+      "end_time": null,
+      "latency_ms": 300.0,
+      "status": "SUCCESS",
+      "error": null,
+      "input": "{\"research_findings\": \"Clinical study NCT-0391 failed to meet its primary safety endpoints in adult patients.\", \"source_count\": 2, \"entity_count\": 2}",
+      "output": "{\"written_report\": \"Clinical study NCT-0391 successfully met its primary safety endpoints in adult patients.\", \"source_count\": 2, \"entity_count\": 2}",
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "attributes": {
+        "step": 2,
+        "prompt": "Execute writer step 2 for run trace_v2_semantic_contradiction",
+        "system_prompt": "",
+        "model": "",
+        "handoff": {
+          "input_state": {
+            "research_findings": "Clinical study NCT-0391 failed to meet its primary safety endpoints in adult patients.",
+            "source_count": 2,
+            "entity_count": 2
+          },
+          "filtered_state": {
+            "written_report": "Clinical study NCT-0391 successfully met its primary safety endpoints in adult patients.",
+            "source_count": 2,
+            "entity_count": 2
+          },
+          "output_state": {
+            "written_report": "Clinical study NCT-0391 successfully met its primary safety endpoints in adult patients.",
+            "source_count": 2,
+            "entity_count": 2
+          }
+        },
+        "expected_output": null
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "span_id": "span_trace_v2_semantic_contradiction_3",
+      "trace_id": "trace_v2_semantic_contradiction",
+      "parent_span_id": "span_trace_v2_semantic_contradiction_2",
+      "name": "verifier",
+      "span_type": "agent",
+      "iteration_index": 0,
+      "start_time": "2026-10-19T10:30:02+00:00",
+      "end_time": null,
+      "latency_ms": 300.0,
+      "status": "SUCCESS",
+      "error": null,
+      "input": "{\"written_report\": \"Clinical study NCT-0391 successfully met its primary safety endpoints in adult patients.\", \"source_count\": 2, \"entity_count\": 2}",
+      "output": "{\"verified\": false, \"approved\": false, \"verification_result\": \"REJECTED: Finding directly contradicts upstream findings.\"}",
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "attributes": {
+        "step": 3,
+        "prompt": "Execute verifier step 3 for run trace_v2_semantic_contradiction",
+        "system_prompt": "",
+        "model": "",
+        "handoff": {
+          "input_state": {
+            "written_report": "Clinical study NCT-0391 successfully met its primary safety endpoints in adult patients.",
+            "source_count": 2,
+            "entity_count": 2
+          },
+          "filtered_state": {
+            "verified": false,
+            "approved": false,
+            "verification_result": "REJECTED: Finding directly contradicts upstream findings."
+          },
+          "output_state": {
+            "verified": false,
+            "approved": false,
+            "verification_result": "REJECTED: Finding directly contradicts upstream findings."
+          }
+        },
+        "expected_output": null
+      }
+    }
+  ],
+  "total_latency_ms": 850.0,
+  "total_tokens": 790,
+  "status": "SUCCESS",
+  "expected_output": null,
+  "trace_path": null
+}
