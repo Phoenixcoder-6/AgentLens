@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from api.router import health_router, router
+from api.router import health_router, otlp_router, router
 
 fastapi_app = FastAPI(
     title="AgentLens API",
@@ -23,6 +23,7 @@ fastapi_app = FastAPI(
 # Mount routers
 fastapi_app.include_router(router, prefix="/api")
 fastapi_app.include_router(health_router)
+fastapi_app.include_router(otlp_router)
 
 # Alias for uvicorn entry-point
 app = fastapi_app

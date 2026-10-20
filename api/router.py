@@ -31,8 +31,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Body, Depends, Header, HTTPException
+from pydantic import BaseModel, Field
 
 # ── Project root on path ──────────────────────────────────────────────────────
 _ROOT = Path(__file__).resolve().parent.parent
@@ -119,6 +119,12 @@ class HealthResponse(BaseModel):
     uptime_seconds: float
     db_status: str = "ok"  # "ok" | "error" (Day 29 backward compat)
     version: str = "1.0.0"
+
+
+class OTLPResponse(BaseModel):
+    partialSuccess: dict[str, Any] = Field(default_factory=dict)
+    traces_ingested: int = 0
+    run_ids: list[str] = Field(default_factory=list)
 
 
 # ── Startup time for uptime calculation ───────────────────────────────────────
@@ -311,3 +317,78 @@ def health_check() -> HealthResponse:
         db_status=db_status,
         version="1.0.0",
     )
+
+
+# ── OTLP Ingestion Handler (Day 60) ──────────────────────────────────────────
+
+
+def _process_otlp_ingestion(
+    payload: dict[str, Any],
+    evaluate: bool = False,
+) -> OTLPResponse:
+    """Core logic to normalize and persist an OpenTelemetry / OpenInference trace payload."""
+    if not payload or ("resourceSpans" not in payload and "spans" not in payload):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid OTLP trace payload: missing resourceSpans or spans",
+        )
+
+    from normalizer.normalizer import Normalizer
+    from normalizer.otlp_normalizer import OTLPNormalizer
+    from storage.writer import StorageWriter
+
+    normalizer = OTLPNormalizer()
+    run_traces = normalizer.normalize_otlp_payload(payload)
+
+    if not run_traces:
+        raise HTTPException(
+            status_code=400,
+            detail="No valid traces could be reconstructed from OTLP payload",
+        )
+
+    db = _state.get_db()
+    writer = StorageWriter(db)
+    legacy_normalizer = Normalizer()
+
+    saved_run_ids: list[str] = []
+    for rt in run_traces:
+        norm_run = legacy_normalizer.normalize_run(rt)
+        writer.write_run(norm_run, trace_json=rt.model_dump_json(indent=2))
+        saved_run_ids.append(rt.run_id)
+
+        if evaluate:
+            try:
+                _state.run_full_analysis(rt.run_id)
+            except Exception:
+                pass
+
+    return OTLPResponse(
+        partialSuccess={},
+        traces_ingested=len(saved_run_ids),
+        run_ids=saved_run_ids,
+    )
+
+
+# OTLP Router mounted at root level (/v1/traces and /traces)
+otlp_router = APIRouter(dependencies=[Depends(verify_api_key)])
+
+
+@otlp_router.post("/v1/traces", response_model=OTLPResponse)
+@otlp_router.post("/traces", response_model=OTLPResponse)
+def ingest_otlp_traces_root(
+    payload: dict[str, Any] = Body(...),
+    evaluate: bool = False,
+) -> OTLPResponse:
+    """Standard OpenTelemetry HTTP traces ingestion endpoint."""
+    return _process_otlp_ingestion(payload, evaluate=evaluate)
+
+
+# Also register on the /api router for clients configured with /api prefix (/api/v1/traces)
+@router.post("/v1/traces", response_model=OTLPResponse)
+@router.post("/traces", response_model=OTLPResponse)
+def ingest_otlp_traces_api(
+    payload: dict[str, Any] = Body(...),
+    evaluate: bool = False,
+) -> OTLPResponse:
+    """Namespaced /api/v1/traces endpoint."""
+    return _process_otlp_ingestion(payload, evaluate=evaluate)
