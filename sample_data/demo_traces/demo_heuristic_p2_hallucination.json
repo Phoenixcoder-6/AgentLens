@@ -188,6 +188,7 @@
     "primary_agent": "writer",
     "grounded": false,
     "rules_fired": [
+      "contradiction_v1",
       "hallucination_v1",
       "information_loss_v1",
       "verifier_passthrough_v1"

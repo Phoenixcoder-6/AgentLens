@@ -44,6 +44,7 @@ from storage.db import DatabaseManager
 
 from .context_manager import TraceRunContext
 from .decorator import trace_agent
+from .integrations.langchain import AgentLensCallbackHandler
 
 __version__ = "2.0.0"
 
@@ -159,6 +160,7 @@ __all__ = [
     "init",
     "trace_run",
     "trace_agent",
+    "AgentLensCallbackHandler",
     "get_current_trace",
     "evaluate_run",
     "RunTrace",
