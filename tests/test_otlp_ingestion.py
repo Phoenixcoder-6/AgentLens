@@ -36,6 +36,7 @@ def client(tmp_path: Path):
     agentlens.init(db_path=test_db)
     # Ensure the dashboard state singleton uses the test DB too
     import dashboard.state as _ds
+
     _ds._db = None  # Force re-initialization on next get_db() call
     with TestClient(fastapi_app, raise_server_exceptions=False) as c:
         yield c
