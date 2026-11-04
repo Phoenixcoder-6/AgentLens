@@ -37,9 +37,15 @@ from schema.span import TraceSpan
 class CausalNodeState(StrEnum):
     """Causal classification of an execution node in a multi-agent workflow."""
 
-    ROOT_CAUSE_ORIGIN = "root_cause_origin"  # First node where an invariant broke or fault originated
-    CASCADING_FAILURE = "cascading_failure"  # Downstream node failing as consequence of upstream corrupted state
-    PASSTHROUGH_ESCAPED = "passthrough_escaped"  # Quality-control / verifier node that failed to intercept the error
+    ROOT_CAUSE_ORIGIN = (
+        "root_cause_origin"  # First node where an invariant broke or fault originated
+    )
+    CASCADING_FAILURE = (
+        "cascading_failure"  # Downstream node failing as consequence of upstream corrupted state
+    )
+    PASSTHROUGH_ESCAPED = (
+        "passthrough_escaped"  # Quality-control / verifier node that failed to intercept the error
+    )
     HEALTHY = "healthy"  # Unaffected execution node running normally
 
 
@@ -49,7 +55,9 @@ class CausalNode(BaseModel):
     node_id: str = Field(description="Unique identifier for the node (span_id or step_id)")
     name: str = Field(description="Agent or span name (e.g. 'researcher', 'writer')")
     step_index: int | None = Field(default=None, description="Step index if mapped to linear step")
-    span_id: str | None = Field(default=None, description="OpenInference span ID if mapped to DAG span")
+    span_id: str | None = Field(
+        default=None, description="OpenInference span ID if mapped to DAG span"
+    )
     parent_id: str | None = Field(default=None, description="Immediate parent node ID in the graph")
     state: CausalNodeState = Field(
         default=CausalNodeState.HEALTHY,
@@ -111,21 +119,33 @@ class CausalGraph(BaseModel):
     """Directed graph capturing fault propagation and causal relationships across agents."""
 
     run_id: str = Field(description="Trace / run identifier")
-    nodes: dict[str, CausalNode] = Field(default_factory=dict, description="Lookup of all nodes by node_id")
+    nodes: dict[str, CausalNode] = Field(
+        default_factory=dict, description="Lookup of all nodes by node_id"
+    )
     edges: list[list[str]] = Field(
         default_factory=list,
         description="Directed execution/dataflow edges [[from_node_id, to_node_id], ...]",
     )
-    root_causes: list[str] = Field(default_factory=list, description="Node IDs classified as ROOT_CAUSE_ORIGIN")
-    cascades: list[str] = Field(default_factory=list, description="Node IDs classified as CASCADING_FAILURE")
-    passthroughs: list[str] = Field(default_factory=list, description="Node IDs classified as PASSTHROUGH_ESCAPED")
+    root_causes: list[str] = Field(
+        default_factory=list, description="Node IDs classified as ROOT_CAUSE_ORIGIN"
+    )
+    cascades: list[str] = Field(
+        default_factory=list, description="Node IDs classified as CASCADING_FAILURE"
+    )
+    passthroughs: list[str] = Field(
+        default_factory=list, description="Node IDs classified as PASSTHROUGH_ESCAPED"
+    )
     healthy: list[str] = Field(default_factory=list, description="Node IDs classified as HEALTHY")
-    causal_chains: list[CausalChain] = Field(default_factory=list, description="Identified causal propagation paths")
+    causal_chains: list[CausalChain] = Field(
+        default_factory=list, description="Identified causal propagation paths"
+    )
     primary_root_cause_node: str | None = Field(
         default=None,
         description="Node ID of the primary root cause origin",
     )
-    summary: str = Field(default="", description="High-level narrative summary of the causal diagnosis")
+    summary: str = Field(
+        default="", description="High-level narrative summary of the causal diagnosis"
+    )
 
     def get_root_cause(self) -> CausalNode | None:
         """Return the primary root cause node if one exists."""
@@ -278,7 +298,11 @@ class CausalGraphEngine:
         for rid in root_cause_nodes:
             r_node = nodes[rid]
             r_node.state = CausalNodeState.ROOT_CAUSE_ORIGIN
-            cat = r_node.rule_matches[0].category if r_node.rule_matches else FailureCategory.EXECUTION
+            cat = (
+                r_node.rule_matches[0].category
+                if r_node.rule_matches
+                else FailureCategory.EXECUTION
+            )
             if analysis_bundle and r_node.name == analysis_bundle.primary_agent:
                 cat = analysis_bundle.primary_cause
             r_node.failure_category = cat
@@ -330,7 +354,9 @@ class CausalGraphEngine:
                 node.explanation = "Healthy node: unaffected by upstream causal faults."
 
         primary_root = root_cause_nodes[0] if root_cause_nodes else None
-        root_agent = nodes[primary_root].name if primary_root and primary_root in nodes else "Unknown"
+        root_agent = (
+            nodes[primary_root].name if primary_root and primary_root in nodes else "Unknown"
+        )
 
         summary = (
             f"Fault propagation analyzed: Primary root cause identified at '{root_agent}' "

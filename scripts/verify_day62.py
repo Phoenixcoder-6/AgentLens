@@ -30,10 +30,8 @@ if str(REPO_ROOT) not in sys.path:
 
 import agentlens
 from analyzers.causal import (
-    CausalChain,
     CausalGraph,
     CausalGraphEngine,
-    CausalNode,
     CausalNodeState,
 )
 from schema.models import (
@@ -97,7 +95,9 @@ def run_checks() -> bool:
         dumped = graph.model_dump_json()
         assert CausalGraph.model_validate_json(dumped).run_id == "v62_check1"
 
-        print("[PASS] Check 1: Causal Graph Engine Construction & Data Structures (CausalGraphEngine)")
+        print(
+            "[PASS] Check 1: Causal Graph Engine Construction & Data Structures (CausalGraphEngine)"
+        )
     except Exception as exc:
         print(f"[FAIL] Check 1: Engine construction error: {exc}")
         all_passed = False
@@ -210,7 +210,9 @@ def run_checks() -> bool:
         assert len(graph.causal_chains) >= 1
         assert graph.causal_chains[0].escaped_node_id == "step_3"
 
-        print("[PASS] Check 4: Escaped Quality-Control Verifier Detection (PASSTHROUGH_ESCAPED at verifier)")
+        print(
+            "[PASS] Check 4: Escaped Quality-Control Verifier Detection (PASSTHROUGH_ESCAPED at verifier)"
+        )
     except Exception as exc:
         print(f"[FAIL] Check 4: Escaped verifier detection error: {exc}")
         all_passed = False
@@ -268,7 +270,9 @@ def run_checks() -> bool:
         assert graph.nodes["s_branch_b"].state == CausalNodeState.HEALTHY
         assert len(graph.nodes["s_branch_b"].tainted_by) == 0
 
-        print("[PASS] Check 5: Parallel Fork & Independent Branch Isolation (HEALTHY branch_b untouched)")
+        print(
+            "[PASS] Check 5: Parallel Fork & Independent Branch Isolation (HEALTHY branch_b untouched)"
+        )
     except Exception as exc:
         print(f"[FAIL] Check 5: Parallel branch isolation error: {exc}")
         all_passed = False
@@ -317,7 +321,9 @@ def run_checks() -> bool:
         assert "s_iter_1" in graph.cascades
         assert graph.nodes["s_iter_1"].state == CausalNodeState.CASCADING_FAILURE
 
-        print("[PASS] Check 6: Cyclic Reflection Loop Fault Propagation (iteration 0 -> iteration 1 cascade)")
+        print(
+            "[PASS] Check 6: Cyclic Reflection Loop Fault Propagation (iteration 0 -> iteration 1 cascade)"
+        )
     except Exception as exc:
         print(f"[FAIL] Check 6: Cyclic reflection cascade error: {exc}")
         all_passed = False
