@@ -47,7 +47,7 @@ class TestDay44PackagingAndEntryPoints:
 
         project = data["project"]
         assert project["name"] == "agentlens"
-        assert project["version"] == "1.0.0"
+        assert project["version"] in ("1.0.0", "2.0.0")
 
         scripts = project.get("scripts", {})
         assert scripts.get("agentlens") == "app.main:main"

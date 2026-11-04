@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentlens"
-version = "1.0.0"
+version = "2.0.0"
 description = "Multi-Agent Failure Attribution, Trace Diffing & Explainability Platform"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -35,6 +35,36 @@ dev = [
     "mypy>=1.10.0",
     "pre-commit>=3.7.0",
     "types-PyYAML>=6.0.0",
+]
+langchain = [
+    "langchain>=0.3.0",
+    "langgraph>=0.2.0",
+    "langchain-groq>=0.2.0",
+]
+crewai = [
+    "crewai>=0.28.0",
+]
+autogen = [
+    "pyautogen>=0.2.0",
+]
+otlp = [
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+]
+semantic = [
+    "sentence-transformers>=3.0.0",
+    "transformers>=4.40.0",
+]
+all = [
+    "langchain>=0.3.0",
+    "langgraph>=0.2.0",
+    "langchain-groq>=0.2.0",
+    "crewai>=0.28.0",
+    "pyautogen>=0.2.0",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "sentence-transformers>=3.0.0",
+    "transformers>=4.40.0",
 ]
 
 [project.scripts]
@@ -140,7 +170,7 @@ addopts = [
 ]
 
 [tool.coverage.run]
-source = ["analyzers", "storage", "normalizer", "capture"]
+source = ["agentlens", "analyzers", "storage", "normalizer", "capture", "diff_engine", "schema", "api"]
 omit = ["tests/*", "scripts/*", "_patch_*.py", "check_*.py", ".venv/*"]
 
 [tool.coverage.report]
