@@ -24,19 +24,19 @@ import sys
 import tempfile
 import tomllib
 from pathlib import Path
-from typing import Any
-from uuid import uuid4
+from typing import Any, TypedDict
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from fastapi.testclient import TestClient
+from langgraph.graph import END, START, StateGraph
 
 import agentlens
+from agentlens.integrations.langchain import AgentLensCallbackHandler
 from api.main import fastapi_app
 from schema.models import StepStatus
-from storage.db import DatabaseManager
 
 
 def run_checks() -> bool:
@@ -102,10 +102,6 @@ def run_checks() -> bool:
     # Check 2: LangGraph & LangChain Zero-Code Auto-Instrumentation
     # ─────────────────────────────────────────────────────────────────────────
     try:
-        from typing import TypedDict
-        from langgraph.graph import END, START, StateGraph
-        from agentlens.integrations.langchain import AgentLensCallbackHandler
-
         class MiniState(TypedDict, total=False):
             msg: str
             done: bool
