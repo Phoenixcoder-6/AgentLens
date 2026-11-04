@@ -28,6 +28,13 @@ from pathlib import Path
 from typing import Any
 
 from analyzers.arbiter import Arbiter
+from analyzers.causal import (
+    CausalChain,
+    CausalGraph,
+    CausalGraphEngine,
+    CausalNode,
+    CausalNodeState,
+)
 from analyzers.detection.rule_engine import RuleEngine
 from capture.session import CaptureSession
 from schema.models import (
@@ -177,4 +184,9 @@ __all__ = [
     "PriorityLevel",
     "StepStatus",
     "TokenUsage",
+    "CausalNodeState",
+    "CausalNode",
+    "CausalChain",
+    "CausalGraph",
+    "CausalGraphEngine",
 ]

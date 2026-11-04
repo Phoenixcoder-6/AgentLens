@@ -184,10 +184,11 @@
     "partner_run_id": "demo_diff_pair_baseline_a",
     "verdict": "FAIL",
     "priority_level": "P2",
-    "primary_cause": "workflow",
+    "primary_cause": "reasoning",
     "primary_agent": "writer",
     "grounded": false,
     "rules_fired": [
+      "contradiction_v1",
       "information_loss_v1"
     ]
   }
