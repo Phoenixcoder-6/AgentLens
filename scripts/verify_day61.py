@@ -102,6 +102,7 @@ def run_checks() -> bool:
     # Check 2: LangGraph & LangChain Zero-Code Auto-Instrumentation
     # ─────────────────────────────────────────────────────────────────────────
     try:
+
         class MiniState(TypedDict, total=False):
             msg: str
             done: bool
