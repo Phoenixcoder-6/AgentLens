@@ -417,7 +417,80 @@ class EvidenceRecord(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Model 7: AnalysisBundle
+# Model 7: BlastRadiusReport
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class BlastRadiusReport(BaseModel):
+    """
+    Quantified blast radius report measuring computational and financial waste.
+    Calculated by BlastRadiusCalculator (Phase D Day 63).
+    """
+
+    schema_version: str = Field(default=SCHEMA_VERSION)
+    run_id: str = Field(description="Run ID of the evaluated trace")
+    root_cause_agent: str | None = Field(
+        default=None,
+        description="Agent name responsible for originating the failure",
+    )
+    root_cause_node_id: str | None = Field(
+        default=None,
+        description="Node identifier where the fault originated",
+    )
+    tainted_steps_ratio: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of total workflow steps executed with corrupted state (0.0 to 1.0)",
+    )
+    total_steps: int = Field(default=0, description="Total steps or spans in the workflow")
+    tainted_steps_count: int = Field(default=0, description="Count of tainted steps/spans executed")
+    wasted_tokens: TokenUsage = Field(
+        default_factory=TokenUsage,
+        description="Tokens consumed by downstream tainted steps",
+    )
+    wasted_cost_usd: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Estimated USD financial waste from running tainted operations",
+    )
+    wasted_latency_ms: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Wall-clock milliseconds spent computing tainted steps",
+    )
+    impacted_agents: list[str] = Field(
+        default_factory=list,
+        description="Names of downstream victim agents tainted by the failure",
+    )
+    pricing_model: str = Field(
+        default="default",
+        description="Pricing model or preset used to calculate financial impact",
+    )
+    summary: str = Field(
+        default="",
+        description="Human-readable summary of the computational and financial impact",
+    )
+
+    def format_summary(self) -> str:
+        """Return formatted multi-line summary of the blast radius."""
+        if self.tainted_steps_count == 0:
+            return f"Run {self.run_id}: Clean execution. Zero computational waste ($0.00 USD, 0 tokens)."
+
+        return (
+            f"Blast Radius Impact (Run: {self.run_id}):\n"
+            f"  - Root Cause Agent    : {self.root_cause_agent or 'Unknown'}\n"
+            f"  - Tainted Steps Ratio : {self.tainted_steps_count}/{self.total_steps} ({self.tainted_steps_ratio:.1%})\n"
+            f"  - Wasted Cost (USD)   : ${self.wasted_cost_usd:.6f}\n"
+            f"  - Wasted Tokens       : {self.wasted_tokens.total:,} "
+            f"(Prompt: {self.wasted_tokens.prompt:,}, Completion: {self.wasted_tokens.completion:,})\n"
+            f"  - Wasted Latency      : {self.wasted_latency_ms:,.1f} ms\n"
+            f"  - Impacted Agents     : {', '.join(self.impacted_agents) if self.impacted_agents else 'None'}"
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Model 8: AnalysisBundle
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -456,6 +529,12 @@ class AnalysisBundle(BaseModel):
     # Attribution
     primary_agent: str | None = Field(
         default=None, description="Which agent is most responsible for the primary cause"
+    )
+
+    # Causal & Blast Radius Impact (Phase D, Days 62–63)
+    blast_radius: BlastRadiusReport | None = Field(
+        default=None,
+        description="Quantified computational & financial waste from the root cause failure",
     )
 
     # LLM Explainer output (populated after explanation step)

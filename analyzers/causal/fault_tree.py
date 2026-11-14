@@ -92,6 +92,8 @@ class CausalNode(BaseModel):
         description="Execution status of the node",
     )
     latency_ms: float = Field(default=0.0, description="Latency of this node in milliseconds")
+    tokens_prompt: int = Field(default=0, description="Prompt tokens consumed by this node")
+    tokens_completion: int = Field(default=0, description="Completion tokens consumed by this node")
     tokens_total: int = Field(default=0, description="Total tokens consumed by this node")
 
 
@@ -398,7 +400,9 @@ class CausalGraphEngine:
                 parent_id=span.parent_span_id,
                 status=span.status,
                 latency_ms=span.latency_ms,
-                tokens_total=span.tokens.total,
+                tokens_prompt=span.tokens.prompt if span.tokens else 0,
+                tokens_completion=span.tokens.completion if span.tokens else 0,
+                tokens_total=span.tokens.total if span.tokens else 0,
             )
             nodes[span.span_id] = node
 
@@ -445,7 +449,9 @@ class CausalGraphEngine:
                 step_index=s.step,
                 status=s.status,
                 latency_ms=s.latency_ms,
-                tokens_total=s.tokens.total,
+                tokens_prompt=s.tokens.prompt if s.tokens else 0,
+                tokens_completion=s.tokens.completion if s.tokens else 0,
+                tokens_total=s.tokens.total if s.tokens else 0,
             )
             nodes[node_id] = node
 

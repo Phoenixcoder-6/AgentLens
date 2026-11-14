@@ -6,6 +6,11 @@ Day 62: Deterministic causal graph modeling and fault propagation.
 
 from __future__ import annotations
 
+from .blast_radius import (
+    BlastRadiusCalculator,
+    BlastRadiusReport,
+    TokenPricing,
+)
 from .fault_tree import (
     CausalChain,
     CausalGraph,
@@ -20,4 +25,7 @@ __all__ = [
     "CausalChain",
     "CausalGraph",
     "CausalGraphEngine",
+    "BlastRadiusCalculator",
+    "BlastRadiusReport",
+    "TokenPricing",
 ]

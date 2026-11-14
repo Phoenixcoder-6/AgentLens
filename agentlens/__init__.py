@@ -29,11 +29,14 @@ from typing import Any
 
 from analyzers.arbiter import Arbiter
 from analyzers.causal import (
+    BlastRadiusCalculator,
+    BlastRadiusReport,
     CausalChain,
     CausalGraph,
     CausalGraphEngine,
     CausalNode,
     CausalNodeState,
+    TokenPricing,
 )
 from analyzers.detection.rule_engine import RuleEngine
 from capture.session import CaptureSession
@@ -189,4 +192,7 @@ __all__ = [
     "CausalChain",
     "CausalGraph",
     "CausalGraphEngine",
+    "BlastRadiusCalculator",
+    "BlastRadiusReport",
+    "TokenPricing",
 ]

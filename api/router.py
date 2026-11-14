@@ -88,6 +88,7 @@ class VerdictResponse(BaseModel):
     grounded: bool
     confidence: float | None
     verdict_reason: str | None
+    blast_radius: dict[str, Any] | None = None
 
 
 class AnalysisJobResponse(BaseModel):
@@ -208,6 +209,10 @@ def get_verdict(run_id: str) -> VerdictResponse:
     if cached.loss_result:
         conf = cached.loss_result.confidence
 
+    blast_radius_dict = bundle.blast_radius.model_dump() if bundle.blast_radius else None
+    if not blast_radius_dict:
+        blast_radius_dict = _state.get_db().get_blast_radius(run_id)
+
     return VerdictResponse(
         run_id=run_id,
         priority_level=bundle.priority_level.value,
@@ -216,6 +221,7 @@ def get_verdict(run_id: str) -> VerdictResponse:
         grounded=bundle.grounded,
         confidence=conf,
         verdict_reason=bundle.summary,
+        blast_radius=blast_radius_dict,
     )
 
 

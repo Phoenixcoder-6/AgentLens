@@ -539,6 +539,19 @@ def run_full_analysis(run_id: str, db: DatabaseManager | None = None) -> Analysi
 
         state.bundle = Arbiter().run(run_id=run_id, evidence=all_ev)
 
+        # Day 63: Compute & persist Error Blast Radius & Financial Impact
+        try:
+            from analyzers.causal.blast_radius import BlastRadiusCalculator
+
+            blast_report = BlastRadiusCalculator().calculate(
+                run,
+                analysis_bundle=state.bundle,
+            )
+            state.bundle.blast_radius = blast_report
+            db.save_blast_radius(blast_report)
+        except Exception:
+            pass
+
     except Exception as exc:
         state.error = str(exc)
 

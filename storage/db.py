@@ -27,6 +27,7 @@ import threading
 import time
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from typing import Any
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -585,6 +586,88 @@ class DatabaseManager:
         else:
             with self.connection() as c:
                 _exec(c)
+
+    def save_blast_radius(
+        self,
+        report: Any,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        """
+        Persist a BlastRadiusReport into the analysis table and individual metrics into metrics table.
+        """
+        report_dict = report.model_dump() if hasattr(report, "model_dump") else dict(report)
+        run_id = report_dict.get("run_id", "")
+        ts = report_dict.get("timestamp", datetime.now(UTC).isoformat())
+        if hasattr(ts, "isoformat"):
+            ts = ts.isoformat()
+        schema_ver = report_dict.get("schema_version", "1.0")
+
+        self.insert_analysis(
+            run_id=run_id,
+            analyzer="blast_radius",
+            category="causal",
+            verdict="calculated",
+            confidence=1.0,
+            details=report_dict,
+            timestamp=str(ts),
+            schema_version=schema_ver,
+            conn=conn,
+        )
+
+        wasted_tokens = report_dict.get("wasted_tokens", {})
+        total_tokens = (
+            wasted_tokens.get("total", 0)
+            if isinstance(wasted_tokens, dict)
+            else getattr(wasted_tokens, "total", 0)
+        )
+        cost_usd = float(report_dict.get("wasted_cost_usd", 0.0))
+        latency_ms = float(report_dict.get("wasted_latency_ms", 0.0))
+        ratio = float(report_dict.get("tainted_steps_ratio", 0.0))
+
+        self.insert_metric(
+            run_id, "wasted_cost_usd", cost_usd, str(ts), schema_ver, metric_unit="USD", conn=conn
+        )
+        self.insert_metric(
+            run_id,
+            "wasted_tokens_total",
+            float(total_tokens),
+            str(ts),
+            schema_ver,
+            metric_unit="tokens",
+            conn=conn,
+        )
+        self.insert_metric(
+            run_id,
+            "wasted_latency_ms",
+            latency_ms,
+            str(ts),
+            schema_ver,
+            metric_unit="ms",
+            conn=conn,
+        )
+        self.insert_metric(
+            run_id,
+            "tainted_steps_ratio",
+            ratio,
+            str(ts),
+            schema_ver,
+            metric_unit="ratio",
+            conn=conn,
+        )
+
+    def get_blast_radius(self, run_id: str) -> dict[str, Any] | None:
+        """Fetch the most recent blast radius analysis record for a run."""
+        with self.connection() as conn:
+            row = conn.execute(
+                "SELECT details_json FROM analysis WHERE run_id = ? AND analyzer = 'blast_radius' ORDER BY id DESC LIMIT 1",
+                (run_id,),
+            ).fetchone()
+        if not row or not row["details_json"]:
+            return None
+        try:
+            return json.loads(row["details_json"])
+        except Exception:
+            return None
 
     # ── Metrics ───────────────────────────────────────────────────────────────
 
