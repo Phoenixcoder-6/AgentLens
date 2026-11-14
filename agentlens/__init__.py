@@ -45,6 +45,7 @@ from analyzers.remediation import (
     RemediationPatch,
 )
 from capture.session import CaptureSession
+from dashboard.dag_renderer import DAGRenderer
 from schema.models import (
     AgentStep,
     AnalysisBundle,
@@ -203,4 +204,5 @@ __all__ = [
     "ConstraintTemplate",
     "PromptFixer",
     "RemediationPatch",
+    "DAGRenderer",
 ]

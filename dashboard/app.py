@@ -20,6 +20,7 @@ if str(_ROOT) not in sys.path:
 from nicegui import app, run, ui  # noqa: E402
 
 import dashboard.state as state  # noqa: E402
+from dashboard.dag_renderer import DAGRenderer  # noqa: E402
 from dashboard.theme import (  # noqa: E402
     AMBER,
     BG,
@@ -540,6 +541,23 @@ def _inline_verdict_panel(bundle, loss, run_id: str):
                 f'padding:4px 10px;border:1px solid {CYAN}44;border-radius:6px;">\u2726 Explain</a>'
             )
 
+        # Day 65: Interactive Visual DAG in Run Explorer inline expansion
+        try:
+            causal_graph = state.get_causal_graph(run_id)
+            if causal_graph and causal_graph.nodes:
+                with ui.element("div").style(
+                    f"width:100%;margin-top:16px;border-top:1px solid {BORDER};padding-top:14px;"
+                ):
+                    ui.html(
+                        '<div class="al-section" style="margin-bottom:8px;">Causal Fault Propagation DAG</div>'
+                    )
+                    ui.html(DAGRenderer().get_legend_html())
+                    ui.mermaid(DAGRenderer().render_mermaid(causal_graph, orientation="LR")).style(
+                        "width:100%;max-width:100%;overflow-x:auto;"
+                    )
+        except Exception:
+            pass
+
 
 def _inline_analyze_panel(
     run_id: str,
@@ -659,6 +677,27 @@ def trace_page(run_id: str):
             if blamed_agent
             else ""
         )
+        # Day 65: Interactive Visual DAG
+        try:
+            causal_graph = state.get_causal_graph(run_id)
+            if causal_graph and causal_graph.nodes:
+                with ui.element("div").style(
+                    f"background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:16px 20px;margin-bottom:20px;"
+                ):
+                    with ui.element("div").style(
+                        "display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;"
+                    ):
+                        ui.html('<div class="al-section">Interactive Causal Fault DAG</div>')
+                        ui.html(
+                            f'<span style="font-size:11px;color:{TEXT_MUTED};">{len(causal_graph.nodes)} execution nodes</span>'
+                        )
+                    ui.html(DAGRenderer().get_legend_html())
+                    ui.mermaid(DAGRenderer().render_mermaid(causal_graph, orientation="LR")).style(
+                        "width:100%;max-width:100%;overflow-x:auto;"
+                    )
+        except Exception:
+            pass
+
         ui.html(
             f'<div class="al-section" style="margin-bottom:16px;">'
             f"Step-by-step pipeline execution{blamed_suffix}"
@@ -1967,6 +2006,52 @@ def _render_explanation(bundle, analysis):
               <div style="font-size:14px;line-height:1.65;color:{TEXT};">{bundle.suggested_fix}</div>
             </div>
             """)
+
+    # Day 65: Interactive Causal Fault DAG
+    try:
+        causal_graph = state.get_causal_graph(bundle.run_id)
+        if causal_graph and causal_graph.nodes:
+            with ui.element("div").style(
+                f"background:{CARD};border:1px solid {BORDER};border-radius:10px;padding:16px 20px;margin-bottom:16px;"
+            ):
+                ui.html(
+                    '<div class="al-section" style="margin-bottom:12px;">Causal Fault Propagation DAG</div>'
+                )
+                ui.html(DAGRenderer().get_legend_html())
+                ui.mermaid(DAGRenderer().render_mermaid(causal_graph, orientation="LR")).style(
+                    "width:100%;max-width:100%;overflow-x:auto;"
+                )
+    except Exception:
+        pass
+
+    # Day 65: Error Blast Radius & Financial Impact Widget
+    if bundle.blast_radius:
+        ui.html(DAGRenderer().get_blast_radius_html(bundle.blast_radius))
+
+    # Day 65: Automated Prompt Remediation Auto-Diff Panel with One-Click Copy
+    if bundle.remediation_patch:
+        patch = bundle.remediation_patch
+        with ui.element("div"):
+            ui.html(DAGRenderer().get_remediation_panel_html(patch))
+            with ui.element("div").style(
+                "display:flex;justify-content:flex-end;margin-top:-8px;margin-bottom:16px;"
+            ):
+
+                async def copy_patch_fix(fix_text=patch.recommended_constraint):
+                    import json as _j
+
+                    await ui.run_javascript(f"navigator.clipboard.writeText({_j.dumps(fix_text)})")
+                    ui.notify(
+                        "✓ Copied Prompt Fix to clipboard",
+                        type="positive",
+                        position="top",
+                        timeout=2000,
+                    )
+
+                ui.button("📋 Copy Prompt Fix", on_click=copy_patch_fix).props("flat dense").style(
+                    f"background:{PURPLE}22;color:{PURPLE};border:1px solid {PURPLE}66;"
+                    "border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;"
+                )
 
     # ── Fired rules ───────────────────────────────────────────────────────────
     if bundle.rule_matches:

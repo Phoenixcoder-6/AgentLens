@@ -943,3 +943,21 @@ def verdict_for_bundle(bundle: AnalysisBundle | None) -> str:
     if lr and lr.loss_result:
         return lr.loss_result.verdict
     return "WARNING"
+
+
+def get_causal_graph(run_id: str, db=None):
+    """Return the CausalGraph for a run_id, computing it from trace_json if available."""
+    from analyzers.causal.fault_tree import CausalGraphEngine
+    from schema.models import RunTrace
+
+    db = db or get_db()
+    row = db.get_run(run_id)
+    if not row or not row.get("trace_json"):
+        return None
+    try:
+        run_obj = RunTrace(**json.loads(row["trace_json"]))
+        cached = _analysis_cache.get(run_id)
+        bundle = cached.bundle if cached else None
+        return CausalGraphEngine().build_graph(run_obj, analysis_bundle=bundle)
+    except Exception:
+        return None
