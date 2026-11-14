@@ -669,6 +669,48 @@ class DatabaseManager:
         except Exception:
             return None
 
+    def save_remediation_patch(
+        self,
+        patch: Any,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        """
+        Persist a RemediationPatch into the analysis table (Day 64).
+        """
+        patch_dict = patch.model_dump() if hasattr(patch, "model_dump") else dict(patch)
+        run_id = patch_dict.get("run_id", "")
+        ts = patch_dict.get("timestamp", datetime.now(UTC).isoformat())
+        if hasattr(ts, "isoformat"):
+            ts = ts.isoformat()
+        schema_ver = patch_dict.get("schema_version", "1.0")
+        conf = float(patch_dict.get("confidence", 0.9))
+
+        self.insert_analysis(
+            run_id=run_id,
+            analyzer="prompt_fixer",
+            category="remediation",
+            verdict="patch_generated",
+            confidence=conf,
+            details=patch_dict,
+            timestamp=str(ts),
+            schema_version=schema_ver,
+            conn=conn,
+        )
+
+    def get_remediation_patch(self, run_id: str) -> dict[str, Any] | None:
+        """Fetch the most recent prompt remediation patch record for a run."""
+        with self.connection() as conn:
+            row = conn.execute(
+                "SELECT details_json FROM analysis WHERE run_id = ? AND analyzer = 'prompt_fixer' ORDER BY id DESC LIMIT 1",
+                (run_id,),
+            ).fetchone()
+        if not row or not row["details_json"]:
+            return None
+        try:
+            return json.loads(row["details_json"])
+        except Exception:
+            return None
+
     # ── Metrics ───────────────────────────────────────────────────────────────
 
     def insert_metric(

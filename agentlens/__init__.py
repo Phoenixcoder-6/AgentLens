@@ -39,6 +39,11 @@ from analyzers.causal import (
     TokenPricing,
 )
 from analyzers.detection.rule_engine import RuleEngine
+from analyzers.remediation import (
+    ConstraintTemplate,
+    PromptFixer,
+    RemediationPatch,
+)
 from capture.session import CaptureSession
 from schema.models import (
     AgentStep,
@@ -195,4 +200,7 @@ __all__ = [
     "BlastRadiusCalculator",
     "BlastRadiusReport",
     "TokenPricing",
+    "ConstraintTemplate",
+    "PromptFixer",
+    "RemediationPatch",
 ]

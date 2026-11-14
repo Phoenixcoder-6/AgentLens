@@ -89,6 +89,7 @@ class VerdictResponse(BaseModel):
     confidence: float | None
     verdict_reason: str | None
     blast_radius: dict[str, Any] | None = None
+    remediation_patch: dict[str, Any] | None = None
 
 
 class AnalysisJobResponse(BaseModel):
@@ -213,6 +214,10 @@ def get_verdict(run_id: str) -> VerdictResponse:
     if not blast_radius_dict:
         blast_radius_dict = _state.get_db().get_blast_radius(run_id)
 
+    remediation_dict = bundle.remediation_patch.model_dump() if bundle.remediation_patch else None
+    if not remediation_dict:
+        remediation_dict = _state.get_db().get_remediation_patch(run_id)
+
     return VerdictResponse(
         run_id=run_id,
         priority_level=bundle.priority_level.value,
@@ -222,6 +227,7 @@ def get_verdict(run_id: str) -> VerdictResponse:
         confidence=conf,
         verdict_reason=bundle.summary,
         blast_radius=blast_radius_dict,
+        remediation_patch=remediation_dict,
     )
 
 

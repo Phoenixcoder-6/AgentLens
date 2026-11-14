@@ -552,6 +552,21 @@ def run_full_analysis(run_id: str, db: DatabaseManager | None = None) -> Analysi
         except Exception:
             pass
 
+        # Day 64: Compute & persist Automated Prompt Remediation Patch
+        try:
+            from analyzers.remediation.prompt_fixer import PromptFixer
+
+            fixer = PromptFixer(db=db)
+            patch = fixer.generate_patch(
+                run,
+                analysis_bundle=state.bundle,
+            )
+            if patch:
+                state.bundle.remediation_patch = patch
+                db.save_remediation_patch(patch)
+        except Exception:
+            pass
+
     except Exception as exc:
         state.error = str(exc)
 
