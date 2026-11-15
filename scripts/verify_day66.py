@@ -277,7 +277,6 @@ def run_checks() -> bool:
             priority_level=PriorityLevel.P2,
             primary_cause=FailureCategory.EXECUTION,
             primary_agent="researcher",
-            root_cause_step=1,
             rule_matches=[match],
             grounded=False,
         )
@@ -332,7 +331,6 @@ def run_checks() -> bool:
             priority_level=PriorityLevel.P2,
             primary_cause=FailureCategory.REASONING,
             primary_agent="writer",
-            root_cause_step=2,
             rule_matches=[match],
             grounded=False,
         )
@@ -388,7 +386,6 @@ def run_checks() -> bool:
             priority_level=PriorityLevel.P2,
             primary_cause=FailureCategory.EXECUTION,
             primary_agent="researcher",
-            root_cause_step=1,
             rule_matches=[match_dag],
             grounded=False,
         )
@@ -397,6 +394,7 @@ def run_checks() -> bool:
             run_trace=trace_dag, causal_graph=graph_dag, analysis_bundle=bundle_dag
         )
         patch_dag = PromptFixer().generate_patch(trace_dag, bundle_dag)
+        assert patch_dag is not None
 
         # Render LR Mermaid flowchart
         mermaid_lr = renderer.render_mermaid(graph_dag, orientation="LR")

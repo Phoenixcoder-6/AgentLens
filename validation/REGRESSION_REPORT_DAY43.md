@@ -1,6 +1,6 @@
 # AgentLens Automated Regression Report (Day 43)
 
-**Generated At:** `2026-11-15T15:58:20.909923+00:00`  
+**Generated At:** `2026-11-15T16:36:32.699055+00:00`  
 **Overall CI Gate Status:** **`PASS (0 Regressions)`**  
 **Day 35 Baseline Accuracy:** `16/20 (80.0%)`  
 **Day 43 Post-Hardening Accuracy:** `16/20 (80.0%)` (Threshold `>= 75.0%`)  
