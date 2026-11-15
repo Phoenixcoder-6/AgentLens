@@ -203,11 +203,19 @@ class SQLiteConnectionPool:
             while not self._pool.empty():
                 try:
                     conn = self._pool.get_nowait()
+                except queue.Empty:
+                    break
+
+                try:
                     conn.execute("SELECT 1;")
                     return conn
-                except (queue.Empty, sqlite3.ProgrammingError, sqlite3.OperationalError):
+                except (sqlite3.ProgrammingError, sqlite3.OperationalError):
                     if conn in self._all_connections:
                         self._all_connections.discard(conn)
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
                     continue
 
             if len(self._all_connections) < self.max_connections:
@@ -215,14 +223,37 @@ class SQLiteConnectionPool:
                 self._all_connections.add(conn)
                 return conn
 
-        try:
-            conn = self._pool.get(timeout=self.timeout)
-            conn.execute("SELECT 1;")
-            return conn
-        except queue.Empty:
-            raise sqlite3.OperationalError(
-                f"Timed out after {self.timeout}s waiting for a pooled SQLite connection"
-            ) from None
+        deadline = time.time() + self.timeout
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                raise sqlite3.OperationalError(
+                    f"Timed out after {self.timeout}s waiting for a pooled SQLite connection"
+                )
+            try:
+                conn = self._pool.get(timeout=max(0.001, remaining))
+            except queue.Empty:
+                raise sqlite3.OperationalError(
+                    f"Timed out after {self.timeout}s waiting for a pooled SQLite connection"
+                ) from None
+
+            try:
+                conn.execute("SELECT 1;")
+                return conn
+            except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+                with self._lock:
+                    if conn in self._all_connections:
+                        self._all_connections.discard(conn)
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                with self._lock:
+                    if len(self._all_connections) < self.max_connections:
+                        new_conn = self._create_connection()
+                        self._all_connections.add(new_conn)
+                        return new_conn
+                continue
 
     def release(self, conn: sqlite3.Connection, discard: bool = False) -> None:
         with self._lock:

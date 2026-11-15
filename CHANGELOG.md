@@ -5,6 +5,43 @@ The project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [2.0.0] - 2026-11-15 (Day 66 Release — Enterprise Release Complete)
+
+Major milestone release delivering the complete 20-day AgentLens v2.0 development roadmap (Phases A through D, Days 47–66). Transforms AgentLens from a deterministic failure detector into an enterprise causal attribution, blast radius accounting, and automated prompt remediation platform.
+
+### Added
+- **Phase D: Causal Attribution & Prompt Auto-Diff (Days 62–66):**
+  - **Causal Fault Tree Engine (`analyzers/causal/fault_tree.py`):** Models failure propagation across multi-agent execution graphs, categorizing every node into `ROOT_CAUSE_ORIGIN` (first invariant breach), `CASCADING_FAILURE` (downstream tainted execution), or `PASSTHROUGH_ESCAPED` (verifier/guardrail rubber-stamping).
+  - **Blast Radius & Financial Waste Calculator (`analyzers/causal/blast_radius.py`):** Computes computational and financial waste caused by root failures, tracking Tainted Steps Ratio, Wasted Tokens, Wasted USD ($0.0051 on benchmark), and Wasted Latency.
+  - **Automated Prompt Auto-Diff Engine (`analyzers/remediation/prompt_fixer.py`):** Generates targeted prompt patches (`SOURCE_PRESERVATION`, `ENTITY_FIDELITY`, `CONTRADICTION_GUARD`, `SCHEMA_CONFORMANCE`, `TOOL_DEFENSE`) with confidence ratings, regression risk scoring, and unified diff recommendations.
+  - **Interactive Visual DAG Dashboard (`dashboard/dag_renderer.py`):** Renders interactive DAGs and Mermaid flowcharts in the NiceGUI dashboard, color-coding nodes by causal classification (🔴 Root Cause, 🟠 Cascade, 🟡 Passthrough, 🟢 Healthy) with integrated Blast Radius metrics and a one-click prompt fix modal.
+  - **Extended 30-Trace Regression Suite (`scripts/run_v2_regression.py`):** 30-trace enterprise corpus combining 20 frozen baseline traces, 5 Phase B multi-agent traces, and 5 enterprise demo traces; achieved **86.7%** exact attribution accuracy (26/30, exceeding $\ge 85\%$ threshold) and **100.0%** binary failure detection (30/30).
+  - **Release Gate Test Suite (`tests/test_v2_regression_gate.py`):** 8 comprehensive release-gate tests enforcing regression metric persistence, report schemas, and causal/remediation pipeline integration with **94%** test coverage on v2 core modules.
+
+- **Phase C: Developer Experience & Framework Integrations (Days 57–61):**
+  - **Drop-in Framework Auto-Tracers (`agentlens/tracers/`):** Zero-code instrumentation hooks for LangGraph (`AgentLensLangGraphTracer`), CrewAI (`AgentLensCrewAITracer`), AutoGen (`AgentLensAutoGenTracer`), and LangChain callbacks.
+  - **Public Python SDK (`agentlens/`):** Fluent top-level imports (`agentlens.analyze()`, `agentlens.causal_graph()`, `agentlens.blast_radius()`, `agentlens.remediate()`).
+  - **Unified CLI:** Enhanced `agentlens` CLI supporting `agentlens analyze`, `agentlens causal`, `agentlens blast-radius`, `agentlens patch`, and `agentlens diff`.
+  - **Synthetic Fault Injection Engine:** Configurable synthetic generator injecting tool timeouts, context truncations, hallucinated assertions, and verifier bypasses.
+
+- **Phase B: Universal DAGs & Semantic NLI (Days 52–56):**
+  - **Universal DAG Engine (`analyzers/detection/topology.py`):** Dynamic multi-agent topology validator supporting arbitrary non-linear DAGs, fan-out/fan-in parallel branches, and iterative reflection loops.
+  - **Cross-Agent Semantic Contradiction Engine:** NLI-based premise validation detecting subtle semantic drift between upstream agent findings and downstream agent synthesis.
+  - **Granular Token & Cost Allocation:** Per-agent step-level token accounting with real-time budget threshold monitoring and Slack alerting.
+
+- **Phase A: Stabilization & High-Throughput Telemetry (Days 47–51):**
+  - **ContextVar Concurrency Isolation (`capture/context.py`):** Zero trace cross-talk across 50+ concurrent async tasks and multi-threaded agent executions.
+  - **Non-Blocking Telemetry Ring Buffer (`capture/queue.py`):** Bounded ring buffer with background daemon flushing (`TraceIngestionWorker`), reducing `@trace_step` overhead to $\le 0.5\text{ms}$.
+  - **SQLite WAL & Connection Pooling (`storage/db.py`):** Configured `PRAGMA journal_mode=WAL`, `busy_timeout=10000`, and thread-safe connection pool eliminating locked database errors.
+  - **Pluggable Storage Adapters (`storage/base_adapter.py`):** Polymorphic storage layer supporting SQLite and PostgreSQL backend switching via `AGENTLENS_DB_URL`.
+
+### Changed
+- Refactored `analyzers/detection/workflow_validator.py` to resolve required agents and handoff edges from the configured pipeline topology, supporting custom non-linear topologies.
+- Expanded public API exports in `agentlens/__init__.py` to include `CausalGraphEngine`, `CausalGraph`, `CausalNode`, `BlastRadiusCalculator`, `BlastRadiusReport`, `PromptFixer`, `RemediationPatch`, and `DAGRenderer`.
+- Updated test suite to 210 passing tests across 11 test modules.
+
+---
+
 ## [1.0.0] - 2026-10-10 (Day 44 / Day 46 Release)
 
 ### Added
