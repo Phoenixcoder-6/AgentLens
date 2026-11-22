@@ -8,6 +8,7 @@ synchronously — no async test runner needed.
 from __future__ import annotations
 
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -144,3 +145,40 @@ class TestMetricsEndpoint:
             assert "agent" in ag
             assert "avg_latency_ms" in ag
             assert "run_count" in ag
+
+
+class TestConcurrentAPIEndpoints:
+    """Validate API behavior under concurrent multi-threaded request bursts (Day 51)."""
+
+    def test_concurrent_health_requests(self, client):
+        """Verify 25 simultaneous /health requests return 200 without race conditions."""
+
+        def fetch_health(_: int):
+            resp = client.get("/health")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["status"] in ("ok", "degraded")
+            return resp.status_code
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            statuses = list(pool.map(fetch_health, range(25)))
+
+        assert len(statuses) == 25
+        assert all(s == 200 for s in statuses)
+
+    def test_concurrent_runs_list_and_metrics(self, client):
+        """Verify concurrent simultaneous reads on runs and metrics return cleanly."""
+
+        def query_endpoint(worker_id: int):
+            if worker_id % 2 == 0:
+                resp = client.get("/api/runs?limit=10")
+            else:
+                resp = client.get("/api/metrics")
+            assert resp.status_code == 200
+            return resp.status_code
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            statuses = list(pool.map(query_endpoint, range(20)))
+
+        assert len(statuses) == 20
+        assert all(s == 200 for s in statuses)

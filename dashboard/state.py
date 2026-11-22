@@ -539,6 +539,34 @@ def run_full_analysis(run_id: str, db: DatabaseManager | None = None) -> Analysi
 
         state.bundle = Arbiter().run(run_id=run_id, evidence=all_ev)
 
+        # Day 63: Compute & persist Error Blast Radius & Financial Impact
+        try:
+            from analyzers.causal.blast_radius import BlastRadiusCalculator
+
+            blast_report = BlastRadiusCalculator().calculate(
+                run,
+                analysis_bundle=state.bundle,
+            )
+            state.bundle.blast_radius = blast_report
+            db.save_blast_radius(blast_report)
+        except Exception:
+            pass
+
+        # Day 64: Compute & persist Automated Prompt Remediation Patch
+        try:
+            from analyzers.remediation.prompt_fixer import PromptFixer
+
+            fixer = PromptFixer(db=db)
+            patch = fixer.generate_patch(
+                run,
+                analysis_bundle=state.bundle,
+            )
+            if patch:
+                state.bundle.remediation_patch = patch
+                db.save_remediation_patch(patch)
+        except Exception:
+            pass
+
     except Exception as exc:
         state.error = str(exc)
 
@@ -915,3 +943,21 @@ def verdict_for_bundle(bundle: AnalysisBundle | None) -> str:
     if lr and lr.loss_result:
         return lr.loss_result.verdict
     return "WARNING"
+
+
+def get_causal_graph(run_id: str, db=None):
+    """Return the CausalGraph for a run_id, computing it from trace_json if available."""
+    from analyzers.causal.fault_tree import CausalGraphEngine
+    from schema.models import RunTrace
+
+    db = db or get_db()
+    row = db.get_run(run_id)
+    if not row or not row.get("trace_json"):
+        return None
+    try:
+        run_obj = RunTrace(**json.loads(row["trace_json"]))
+        cached = _analysis_cache.get(run_id)
+        bundle = cached.bundle if cached else None
+        return CausalGraphEngine().build_graph(run_obj, analysis_bundle=bundle)
+    except Exception:
+        return None

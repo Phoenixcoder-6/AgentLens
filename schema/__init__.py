@@ -30,11 +30,18 @@ from schema.models import (
     TokenUsage,
     WorkflowState,
 )
+from schema.span import (
+    SpanType,
+    TraceSpan,
+    spans_to_steps,
+    steps_to_spans,
+)
 
 __all__ = [
     "SCHEMA_VERSION",
     "StepStatus",
     "NodeType",
+    "SpanType",
     "FailureCategory",
     "PriorityLevel",
     "EvidenceSource",
@@ -45,7 +52,10 @@ __all__ = [
     "WorkflowState",
     "AgentStep",
     "RunTrace",
+    "TraceSpan",
     "RuleMatch",
     "EvidenceRecord",
     "AnalysisBundle",
+    "steps_to_spans",
+    "spans_to_steps",
 ]

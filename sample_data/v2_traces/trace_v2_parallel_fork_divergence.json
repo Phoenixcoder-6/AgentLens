@@ -1,0 +1,402 @@
+{
+  "schema_version": "1.0",
+  "run_id": "trace_v2_parallel_fork_divergence",
+  "workflow": "parallel_analyst_pipeline",
+  "timestamp": "2026-10-19T10:10:00+00:00",
+  "steps": [
+    {
+      "schema_version": "1.0",
+      "run_id": "trace_v2_parallel_fork_divergence",
+      "step": 1,
+      "agent": "coordinator",
+      "node_type": "llm",
+      "input": "{\"task\": \"Analyze Clean Energy Sector Q3\"}",
+      "output": "{\"plan\": \"Fork parallel analysis: Market Analyst & Financial Analyst\"}",
+      "expected_output": null,
+      "prompt": "Execute coordinator step 1 for run trace_v2_parallel_fork_divergence",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 300.0,
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "task": "Analyze Clean Energy Sector Q3"
+        },
+        "filtered_state": {
+          "plan": "Fork parallel analysis: Market Analyst & Financial Analyst"
+        },
+        "output_state": {
+          "plan": "Fork parallel analysis: Market Analyst & Financial Analyst"
+        }
+      },
+      "parent_step": null,
+      "child_step": null,
+      "iteration_index": 0,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-19T10:10:00+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "trace_v2_parallel_fork_divergence",
+      "step": 2,
+      "agent": "market_analyst",
+      "node_type": "llm",
+      "input": "{\"plan\": \"Fork parallel analysis: Market Analyst & Financial Analyst\"}",
+      "output": "{\"market_analysis\": \"EV adoption grew 28% in EU with Tesla, BYD, and Volkswagen leading.\", \"source_count\": 4, \"entity_count\": 5}",
+      "expected_output": null,
+      "prompt": "Execute market_analyst step 2 for run trace_v2_parallel_fork_divergence",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 300.0,
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "plan": "Fork parallel analysis: Market Analyst & Financial Analyst"
+        },
+        "filtered_state": {
+          "market_analysis": "EV adoption grew 28% in EU with Tesla, BYD, and Volkswagen leading.",
+          "source_count": 4,
+          "entity_count": 5
+        },
+        "output_state": {
+          "market_analysis": "EV adoption grew 28% in EU with Tesla, BYD, and Volkswagen leading.",
+          "source_count": 4,
+          "entity_count": 5
+        }
+      },
+      "parent_step": "1",
+      "child_step": null,
+      "iteration_index": 0,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-19T10:10:01+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "trace_v2_parallel_fork_divergence",
+      "step": 3,
+      "agent": "financial_analyst",
+      "node_type": "llm",
+      "input": "{\"plan\": \"Fork parallel analysis: Market Analyst & Financial Analyst\"}",
+      "output": "{\"financial_analysis\": \"Data fetch error; failed to retrieve balance sheet metrics.\", \"source_count\": 0, \"entity_count\": 0}",
+      "expected_output": null,
+      "prompt": "Execute financial_analyst step 3 for run trace_v2_parallel_fork_divergence",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 300.0,
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "tool_calls": [
+        {
+          "name": "fetch_financials",
+          "error": "API rate limit 429"
+        }
+      ],
+      "handoff": {
+        "input_state": {
+          "plan": "Fork parallel analysis: Market Analyst & Financial Analyst"
+        },
+        "filtered_state": {
+          "financial_analysis": "Data fetch error; failed to retrieve balance sheet metrics.",
+          "source_count": 0,
+          "entity_count": 0
+        },
+        "output_state": {
+          "financial_analysis": "Data fetch error; failed to retrieve balance sheet metrics.",
+          "source_count": 0,
+          "entity_count": 0
+        }
+      },
+      "parent_step": "1",
+      "child_step": null,
+      "iteration_index": 0,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-19T10:10:01+00:00"
+    },
+    {
+      "schema_version": "1.0",
+      "run_id": "trace_v2_parallel_fork_divergence",
+      "step": 4,
+      "agent": "synthesizer",
+      "node_type": "llm",
+      "input": "{\"market_analysis\": \"EV adoption grew 28% in EU with Tesla, BYD, and Volkswagen leading.\", \"source_count\": 0, \"entity_count\": 0, \"financial_analysis\": \"Data fetch error; failed to retrieve balance sheet metrics.\"}",
+      "output": "{\"final_report\": \"Summary based only on market adoption due to missing financial statements.\", \"source_count\": 4, \"entity_count\": 5}",
+      "expected_output": null,
+      "prompt": "Execute synthesizer step 4 for run trace_v2_parallel_fork_divergence",
+      "system_prompt": "",
+      "model": "",
+      "generation_params": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_tokens": 2048,
+        "seed": null
+      },
+      "latency_ms": 300.0,
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "tool_calls": [],
+      "handoff": {
+        "input_state": {
+          "market_analysis": "EV adoption grew 28% in EU with Tesla, BYD, and Volkswagen leading.",
+          "source_count": 0,
+          "entity_count": 0,
+          "financial_analysis": "Data fetch error; failed to retrieve balance sheet metrics."
+        },
+        "filtered_state": {
+          "final_report": "Summary based only on market adoption due to missing financial statements.",
+          "source_count": 4,
+          "entity_count": 5
+        },
+        "output_state": {
+          "final_report": "Summary based only on market adoption due to missing financial statements.",
+          "source_count": 4,
+          "entity_count": 5
+        }
+      },
+      "parent_step": "2,3",
+      "child_step": null,
+      "iteration_index": 0,
+      "status": "SUCCESS",
+      "error": null,
+      "timestamp": "2026-10-19T10:10:02+00:00"
+    }
+  ],
+  "spans": [
+    {
+      "schema_version": "1.0",
+      "span_id": "span_trace_v2_parallel_fork_divergence_1",
+      "trace_id": "trace_v2_parallel_fork_divergence",
+      "parent_span_id": null,
+      "name": "coordinator",
+      "span_type": "agent",
+      "iteration_index": 0,
+      "start_time": "2026-10-19T10:10:00+00:00",
+      "end_time": null,
+      "latency_ms": 300.0,
+      "status": "SUCCESS",
+      "error": null,
+      "input": "{\"task\": \"Analyze Clean Energy Sector Q3\"}",
+      "output": "{\"plan\": \"Fork parallel analysis: Market Analyst & Financial Analyst\"}",
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "attributes": {
+        "step": 1,
+        "prompt": "Execute coordinator step 1 for run trace_v2_parallel_fork_divergence",
+        "system_prompt": "",
+        "model": "",
+        "handoff": {
+          "input_state": {
+            "task": "Analyze Clean Energy Sector Q3"
+          },
+          "filtered_state": {
+            "plan": "Fork parallel analysis: Market Analyst & Financial Analyst"
+          },
+          "output_state": {
+            "plan": "Fork parallel analysis: Market Analyst & Financial Analyst"
+          }
+        },
+        "expected_output": null
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "span_id": "span_trace_v2_parallel_fork_divergence_2",
+      "trace_id": "trace_v2_parallel_fork_divergence",
+      "parent_span_id": "span_trace_v2_parallel_fork_divergence_1",
+      "name": "market_analyst",
+      "span_type": "agent",
+      "iteration_index": 0,
+      "start_time": "2026-10-19T10:10:01+00:00",
+      "end_time": null,
+      "latency_ms": 300.0,
+      "status": "SUCCESS",
+      "error": null,
+      "input": "{\"plan\": \"Fork parallel analysis: Market Analyst & Financial Analyst\"}",
+      "output": "{\"market_analysis\": \"EV adoption grew 28% in EU with Tesla, BYD, and Volkswagen leading.\", \"source_count\": 4, \"entity_count\": 5}",
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "attributes": {
+        "step": 2,
+        "prompt": "Execute market_analyst step 2 for run trace_v2_parallel_fork_divergence",
+        "system_prompt": "",
+        "model": "",
+        "handoff": {
+          "input_state": {
+            "plan": "Fork parallel analysis: Market Analyst & Financial Analyst"
+          },
+          "filtered_state": {
+            "market_analysis": "EV adoption grew 28% in EU with Tesla, BYD, and Volkswagen leading.",
+            "source_count": 4,
+            "entity_count": 5
+          },
+          "output_state": {
+            "market_analysis": "EV adoption grew 28% in EU with Tesla, BYD, and Volkswagen leading.",
+            "source_count": 4,
+            "entity_count": 5
+          }
+        },
+        "expected_output": null
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "span_id": "span_trace_v2_parallel_fork_divergence_3",
+      "trace_id": "trace_v2_parallel_fork_divergence",
+      "parent_span_id": "span_trace_v2_parallel_fork_divergence_1",
+      "name": "financial_analyst",
+      "span_type": "agent",
+      "iteration_index": 0,
+      "start_time": "2026-10-19T10:10:01+00:00",
+      "end_time": null,
+      "latency_ms": 300.0,
+      "status": "SUCCESS",
+      "error": null,
+      "input": "{\"plan\": \"Fork parallel analysis: Market Analyst & Financial Analyst\"}",
+      "output": "{\"financial_analysis\": \"Data fetch error; failed to retrieve balance sheet metrics.\", \"source_count\": 0, \"entity_count\": 0}",
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "attributes": {
+        "step": 3,
+        "prompt": "Execute financial_analyst step 3 for run trace_v2_parallel_fork_divergence",
+        "system_prompt": "",
+        "model": "",
+        "handoff": {
+          "input_state": {
+            "plan": "Fork parallel analysis: Market Analyst & Financial Analyst"
+          },
+          "filtered_state": {
+            "financial_analysis": "Data fetch error; failed to retrieve balance sheet metrics.",
+            "source_count": 0,
+            "entity_count": 0
+          },
+          "output_state": {
+            "financial_analysis": "Data fetch error; failed to retrieve balance sheet metrics.",
+            "source_count": 0,
+            "entity_count": 0
+          }
+        },
+        "expected_output": null
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "span_id": "span_trace_v2_parallel_fork_divergence_3_t1",
+      "trace_id": "trace_v2_parallel_fork_divergence",
+      "parent_span_id": "span_trace_v2_parallel_fork_divergence_3",
+      "name": "fetch_financials",
+      "span_type": "tool",
+      "iteration_index": 0,
+      "start_time": "2026-10-19T10:10:01+00:00",
+      "end_time": null,
+      "latency_ms": 0.0,
+      "status": "FAILURE",
+      "error": "API rate limit 429",
+      "input": "",
+      "output": "",
+      "tokens": {
+        "prompt": 0,
+        "completion": 0,
+        "total": 0
+      },
+      "attributes": {
+        "tool_index": 1
+      }
+    },
+    {
+      "schema_version": "1.0",
+      "span_id": "span_trace_v2_parallel_fork_divergence_4",
+      "trace_id": "trace_v2_parallel_fork_divergence",
+      "parent_span_id": "span_trace_v2_parallel_fork_divergence_3",
+      "name": "synthesizer",
+      "span_type": "agent",
+      "iteration_index": 0,
+      "start_time": "2026-10-19T10:10:02+00:00",
+      "end_time": null,
+      "latency_ms": 300.0,
+      "status": "SUCCESS",
+      "error": null,
+      "input": "{\"market_analysis\": \"EV adoption grew 28% in EU with Tesla, BYD, and Volkswagen leading.\", \"source_count\": 0, \"entity_count\": 0, \"financial_analysis\": \"Data fetch error; failed to retrieve balance sheet metrics.\"}",
+      "output": "{\"final_report\": \"Summary based only on market adoption due to missing financial statements.\", \"source_count\": 4, \"entity_count\": 5}",
+      "tokens": {
+        "prompt": 150,
+        "completion": 120,
+        "total": 270
+      },
+      "attributes": {
+        "step": 4,
+        "prompt": "Execute synthesizer step 4 for run trace_v2_parallel_fork_divergence",
+        "system_prompt": "",
+        "model": "",
+        "handoff": {
+          "input_state": {
+            "market_analysis": "EV adoption grew 28% in EU with Tesla, BYD, and Volkswagen leading.",
+            "source_count": 0,
+            "entity_count": 0,
+            "financial_analysis": "Data fetch error; failed to retrieve balance sheet metrics."
+          },
+          "filtered_state": {
+            "final_report": "Summary based only on market adoption due to missing financial statements.",
+            "source_count": 4,
+            "entity_count": 5
+          },
+          "output_state": {
+            "final_report": "Summary based only on market adoption due to missing financial statements.",
+            "source_count": 4,
+            "entity_count": 5
+          }
+        },
+        "expected_output": null
+      }
+    }
+  ],
+  "total_latency_ms": 980.0,
+  "total_tokens": 950,
+  "status": "SUCCESS",
+  "expected_output": null,
+  "trace_path": null
+}

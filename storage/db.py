@@ -20,9 +20,14 @@ from __future__ import annotations
 
 import json
 import os
+import queue
+import random
 import sqlite3
-from collections.abc import Generator
+import threading
+import time
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from typing import Any
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -146,25 +151,178 @@ _ALL_DDL = [
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SQLite Connection Pool & Concurrency Management (Day 49)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class SQLiteConnectionPool:
+    """
+    Thread-safe connection pool for SQLite with WAL mode, busy timeout,
+    and synchronous PRAGMA settings.
+    """
+
+    def __init__(
+        self,
+        db_path: str,
+        max_connections: int = 10,
+        timeout: float = 10.0,
+    ) -> None:
+        self.db_path = db_path
+        # In-memory SQLite databases cannot be shared across distinct connection handles
+        # unless using shared-cache URI mode. For :memory:, cap at 1 connection to prevent split DBs.
+        is_memory = db_path == ":memory:" or "mode=memory" in db_path
+        self.max_connections = 1 if is_memory else max(1, max_connections)
+        self.timeout = timeout
+        self._pool: queue.Queue[sqlite3.Connection] = queue.Queue(maxsize=self.max_connections)
+        self._lock = threading.RLock()
+        self._all_connections: set[sqlite3.Connection] = set()
+        self._closed = False
+
+    def _create_connection(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(
+            self.db_path,
+            timeout=self.timeout,
+            check_same_thread=False,
+        )
+        conn.row_factory = sqlite3.Row
+        # Pragmas for high concurrency & durability (Day 49)
+        conn.execute("PRAGMA foreign_keys = ON;")
+        conn.execute(f"PRAGMA busy_timeout = {int(self.timeout * 1000)};")
+        conn.execute("PRAGMA synchronous = NORMAL;")
+        if self.db_path != ":memory:" and not self.db_path.startswith("file::memory:"):
+            try:
+                conn.execute("PRAGMA journal_mode = WAL;")
+            except Exception:
+                pass
+        return conn
+
+    def acquire(self) -> sqlite3.Connection:
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("Connection pool is closed")
+            while not self._pool.empty():
+                try:
+                    conn = self._pool.get_nowait()
+                except queue.Empty:
+                    break
+
+                try:
+                    conn.execute("SELECT 1;")
+                    return conn
+                except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+                    if conn in self._all_connections:
+                        self._all_connections.discard(conn)
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                    continue
+
+            if len(self._all_connections) < self.max_connections:
+                conn = self._create_connection()
+                self._all_connections.add(conn)
+                return conn
+
+        deadline = time.time() + self.timeout
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                raise sqlite3.OperationalError(
+                    f"Timed out after {self.timeout}s waiting for a pooled SQLite connection"
+                )
+            try:
+                conn = self._pool.get(timeout=max(0.001, remaining))
+            except queue.Empty:
+                raise sqlite3.OperationalError(
+                    f"Timed out after {self.timeout}s waiting for a pooled SQLite connection"
+                ) from None
+
+            try:
+                conn.execute("SELECT 1;")
+                return conn
+            except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+                with self._lock:
+                    if conn in self._all_connections:
+                        self._all_connections.discard(conn)
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                with self._lock:
+                    if len(self._all_connections) < self.max_connections:
+                        new_conn = self._create_connection()
+                        self._all_connections.add(new_conn)
+                        return new_conn
+                continue
+
+    def release(self, conn: sqlite3.Connection, discard: bool = False) -> None:
+        with self._lock:
+            if self._closed or discard:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                self._all_connections.discard(conn)
+                return
+
+            try:
+                self._pool.put_nowait(conn)
+            except queue.Full:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                self._all_connections.discard(conn)
+
+    def close_all(self) -> None:
+        with self._lock:
+            self._closed = True
+            while not self._pool.empty():
+                try:
+                    conn = self._pool.get_nowait()
+                    conn.close()
+                except Exception:
+                    pass
+            for conn in list(self._all_connections):
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self._all_connections.clear()
+
+    def stats(self) -> dict[str, int]:
+        with self._lock:
+            return {
+                "max_connections": self.max_connections,
+                "active_connections": len(self._all_connections),
+                "available": self._pool.qsize(),
+            }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # DatabaseManager
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 class DatabaseManager:
     """
-    Manages the SQLite connection and all CRUD operations.
+    Manages the SQLite connection pool and all CRUD operations.
 
     Usage:
         db = DatabaseManager()           # uses default path
         db = DatabaseManager("custom.db")
 
-        with db.connection() as conn:    # context manager for safe connections
+        with db.connection() as conn:    # context manager for pooled connections
             ...
 
         db.initialize()                  # create tables if not exist
     """
 
-    def __init__(self, db_path: str | os.PathLike[str] | None = None) -> None:
+    def __init__(
+        self,
+        db_path: str | os.PathLike[str] | None = None,
+        pool_size: int | None = None,
+    ) -> None:
         if db_path is not None:
             resolved_path = os.fspath(db_path)
         elif DEFAULT_DB_PATH != "data/agentlens.db":
@@ -184,23 +342,88 @@ class DatabaseManager:
             exist_ok=True,
         )
 
+        resolved_pool_size = pool_size
+        if resolved_pool_size is None:
+            try:
+                from config.config_loader import get
+
+                resolved_pool_size = int(get("storage", "pool_size", 10) or 10)
+            except Exception:
+                resolved_pool_size = 10
+
+        self.pool = SQLiteConnectionPool(
+            self.db_path,
+            max_connections=resolved_pool_size,
+            timeout=10.0,
+        )
+
     @contextmanager
     def connection(self) -> Generator[sqlite3.Connection, None, None]:
-        """Context manager that yields a connection and commits/rolls back."""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.row_factory = sqlite3.Row
+        """Context manager that yields a pooled connection and commits/rolls back."""
+        conn = self.pool.acquire()
+        discard = False
         try:
             yield conn
             conn.commit()
         except Exception:
-            conn.rollback()
+            try:
+                conn.rollback()
+            except Exception:
+                discard = True
             raise
         finally:
-            conn.close()
+            self.pool.release(conn, discard=discard)
+
+    def close(self) -> None:
+        """Close all connections in the pool."""
+        self.pool.close_all()
+
+    def get_adapter(self) -> Any:
+        """Return a SQLiteStorageAdapter wrapping this DatabaseManager instance."""
+        from storage.sqlite_adapter import SQLiteStorageAdapter
+
+        return SQLiteStorageAdapter(db=self)
+
+    def execute_with_retry(
+        self,
+        func: Callable[[sqlite3.Connection], Any],
+        max_retries: int = 5,
+        base_delay: float = 0.05,
+    ) -> Any:
+        """
+        Execute a database transaction with exponential backoff on database lock contention.
+        """
+        attempt = 0
+        while True:
+            try:
+                with self.connection() as conn:
+                    return func(conn)
+            except sqlite3.OperationalError as exc:
+                if "locked" in str(exc).lower() or "busy" in str(exc).lower():
+                    attempt += 1
+                    if attempt >= max_retries:
+                        raise
+                    delay = base_delay * (2 ** (attempt - 1)) + random.uniform(0.005, 0.02)
+                    time.sleep(delay)
+                else:
+                    raise
+
+    def get_pragmas(self) -> dict[str, Any]:
+        """Return active SQLite PRAGMA configuration values."""
+        with self.connection() as conn:
+            journal = conn.execute("PRAGMA journal_mode;").fetchone()[0]
+            sync = conn.execute("PRAGMA synchronous;").fetchone()[0]
+            busy = conn.execute("PRAGMA busy_timeout;").fetchone()[0]
+            fk = conn.execute("PRAGMA foreign_keys;").fetchone()[0]
+            return {
+                "journal_mode": str(journal).lower(),
+                "synchronous": sync,
+                "busy_timeout": busy,
+                "foreign_keys": fk,
+            }
 
     def initialize(self) -> None:
-        """Create all four tables if they do not already exist."""
+        """Create all tables and indices if they do not already exist."""
         with self.connection() as conn:
             for ddl in _ALL_DDL:
                 conn.execute(ddl)
@@ -225,10 +448,12 @@ class DatabaseManager:
         trace_path: str | None = None,
         trace_json: str | None = None,
         expected_output: str | None = None,
+        conn: sqlite3.Connection | None = None,
     ) -> None:
         """Insert or replace a run record."""
-        with self.connection() as conn:
-            conn.execute(
+
+        def _exec(c: sqlite3.Connection) -> None:
+            c.execute(
                 """
                 INSERT OR REPLACE INTO runs
                     (run_id, workflow, timestamp, status,
@@ -249,6 +474,12 @@ class DatabaseManager:
                     expected_output,
                 ),
             )
+
+        if conn is not None:
+            _exec(conn)
+        else:
+            with self.connection() as c:
+                _exec(c)
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         """Fetch a run row by run_id. Returns None if not found."""
@@ -299,10 +530,12 @@ class DatabaseManager:
         timestamp: str,
         schema_version: str,
         error: str | None = None,
+        conn: sqlite3.Connection | None = None,
     ) -> None:
         """Insert or replace a step record."""
-        with self.connection() as conn:
-            conn.execute(
+
+        def _exec(c: sqlite3.Connection) -> None:
+            c.execute(
                 """
                 INSERT OR REPLACE INTO steps
                     (run_id, step, agent, status, latency_ms,
@@ -326,6 +559,12 @@ class DatabaseManager:
                 ),
             )
 
+        if conn is not None:
+            _exec(conn)
+        else:
+            with self.connection() as c:
+                _exec(c)
+
     def get_steps_for_run(self, run_id: str) -> list[dict[str, Any]]:
         """Fetch all steps for a run, ordered by step number."""
         with self.connection() as conn:
@@ -348,10 +587,12 @@ class DatabaseManager:
         verdict: str | None = None,
         confidence: float = 0.0,
         details: dict | None = None,
+        conn: sqlite3.Connection | None = None,
     ) -> None:
         """Insert an analysis result row."""
-        with self.connection() as conn:
-            conn.execute(
+
+        def _exec(c: sqlite3.Connection) -> None:
+            c.execute(
                 """
                 INSERT INTO analysis
                     (run_id, step, analyzer, category, verdict,
@@ -371,6 +612,136 @@ class DatabaseManager:
                 ),
             )
 
+        if conn is not None:
+            _exec(conn)
+        else:
+            with self.connection() as c:
+                _exec(c)
+
+    def save_blast_radius(
+        self,
+        report: Any,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        """
+        Persist a BlastRadiusReport into the analysis table and individual metrics into metrics table.
+        """
+        report_dict = report.model_dump() if hasattr(report, "model_dump") else dict(report)
+        run_id = report_dict.get("run_id", "")
+        ts = report_dict.get("timestamp", datetime.now(UTC).isoformat())
+        if hasattr(ts, "isoformat"):
+            ts = ts.isoformat()
+        schema_ver = report_dict.get("schema_version", "1.0")
+
+        self.insert_analysis(
+            run_id=run_id,
+            analyzer="blast_radius",
+            category="causal",
+            verdict="calculated",
+            confidence=1.0,
+            details=report_dict,
+            timestamp=str(ts),
+            schema_version=schema_ver,
+            conn=conn,
+        )
+
+        wasted_tokens = report_dict.get("wasted_tokens", {})
+        total_tokens = (
+            wasted_tokens.get("total", 0)
+            if isinstance(wasted_tokens, dict)
+            else getattr(wasted_tokens, "total", 0)
+        )
+        cost_usd = float(report_dict.get("wasted_cost_usd", 0.0))
+        latency_ms = float(report_dict.get("wasted_latency_ms", 0.0))
+        ratio = float(report_dict.get("tainted_steps_ratio", 0.0))
+
+        self.insert_metric(
+            run_id, "wasted_cost_usd", cost_usd, str(ts), schema_ver, metric_unit="USD", conn=conn
+        )
+        self.insert_metric(
+            run_id,
+            "wasted_tokens_total",
+            float(total_tokens),
+            str(ts),
+            schema_ver,
+            metric_unit="tokens",
+            conn=conn,
+        )
+        self.insert_metric(
+            run_id,
+            "wasted_latency_ms",
+            latency_ms,
+            str(ts),
+            schema_ver,
+            metric_unit="ms",
+            conn=conn,
+        )
+        self.insert_metric(
+            run_id,
+            "tainted_steps_ratio",
+            ratio,
+            str(ts),
+            schema_ver,
+            metric_unit="ratio",
+            conn=conn,
+        )
+
+    def get_blast_radius(self, run_id: str) -> dict[str, Any] | None:
+        """Fetch the most recent blast radius analysis record for a run."""
+        with self.connection() as conn:
+            row = conn.execute(
+                "SELECT details_json FROM analysis WHERE run_id = ? AND analyzer = 'blast_radius' ORDER BY id DESC LIMIT 1",
+                (run_id,),
+            ).fetchone()
+        if not row or not row["details_json"]:
+            return None
+        try:
+            return json.loads(row["details_json"])
+        except Exception:
+            return None
+
+    def save_remediation_patch(
+        self,
+        patch: Any,
+        conn: sqlite3.Connection | None = None,
+    ) -> None:
+        """
+        Persist a RemediationPatch into the analysis table (Day 64).
+        """
+        patch_dict = patch.model_dump() if hasattr(patch, "model_dump") else dict(patch)
+        run_id = patch_dict.get("run_id", "")
+        ts = patch_dict.get("timestamp", datetime.now(UTC).isoformat())
+        if hasattr(ts, "isoformat"):
+            ts = ts.isoformat()
+        schema_ver = patch_dict.get("schema_version", "1.0")
+        conf = float(patch_dict.get("confidence", 0.9))
+
+        self.insert_analysis(
+            run_id=run_id,
+            analyzer="prompt_fixer",
+            category="remediation",
+            verdict="patch_generated",
+            confidence=conf,
+            details=patch_dict,
+            timestamp=str(ts),
+            schema_version=schema_ver,
+            conn=conn,
+        )
+
+    def get_remediation_patch(self, run_id: str) -> dict[str, Any] | None:
+        """Fetch the most recent prompt remediation patch record for a run."""
+        with self.connection() as conn:
+            row = conn.execute(
+                "SELECT details_json FROM analysis WHERE run_id = ? AND analyzer = 'prompt_fixer' ORDER BY id DESC LIMIT 1",
+                (run_id,),
+            ).fetchone()
+        if not row or not row["details_json"]:
+            return None
+        try:
+            return json.loads(row["details_json"])
+        except Exception:
+            return None
+
     # ── Metrics ───────────────────────────────────────────────────────────────
 
     def insert_metric(
@@ -383,10 +754,12 @@ class DatabaseManager:
         step: int | None = None,
         agent: str | None = None,
         metric_unit: str = "",
+        conn: sqlite3.Connection | None = None,
     ) -> None:
         """Insert a named metric row."""
-        with self.connection() as conn:
-            conn.execute(
+
+        def _exec(c: sqlite3.Connection) -> None:
+            c.execute(
                 """
                 INSERT INTO metrics
                     (run_id, step, agent, metric_name, metric_value,
@@ -404,6 +777,12 @@ class DatabaseManager:
                     schema_version,
                 ),
             )
+
+        if conn is not None:
+            _exec(conn)
+        else:
+            with self.connection() as c:
+                _exec(c)
 
     def get_metrics_for_run(self, run_id: str) -> list[dict[str, Any]]:
         """Fetch all metrics for a run."""
@@ -464,7 +843,12 @@ class DatabaseManager:
 
     # -- Rule matches (Day 32) -------------------------------------------------
 
-    def insert_rule_matches(self, run_id: str, matches: list[Any]) -> int:
+    def insert_rule_matches(
+        self,
+        run_id: str,
+        matches: list[Any],
+        conn: sqlite3.Connection | None = None,
+    ) -> int:
         """
         Replace all stored rule matches for a run (idempotent on re-analysis).
 
@@ -478,10 +862,10 @@ class DatabaseManager:
             v = m.get(key, default) if isinstance(m, dict) else getattr(m, key, default)
             return getattr(v, "value", v)  # unwrap enums
 
-        with self.connection() as conn:
-            conn.execute("DELETE FROM rule_matches WHERE run_id = ?", (run_id,))
+        def _exec(c: sqlite3.Connection) -> None:
+            c.execute("DELETE FROM rule_matches WHERE run_id = ?", (run_id,))
             for m in matches:
-                conn.execute(
+                c.execute(
                     """
                     INSERT INTO rule_matches
                         (run_id, rule_id, rule_version, category, severity,
@@ -500,6 +884,13 @@ class DatabaseManager:
                         now,
                     ),
                 )
+
+        if conn is not None:
+            _exec(conn)
+        else:
+            with self.connection() as c:
+                _exec(c)
+
         return len(matches)
 
     def get_rule_stats(self) -> list[dict[str, Any]]:

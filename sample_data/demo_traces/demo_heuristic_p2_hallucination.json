@@ -52,6 +52,7 @@
       },
       "parent_step": null,
       "child_step": null,
+      "iteration_index": 0,
       "status": "SUCCESS",
       "error": null,
       "timestamp": "2026-10-09T12:10:00+00:00"
@@ -103,6 +104,7 @@
       },
       "parent_step": null,
       "child_step": null,
+      "iteration_index": 0,
       "status": "SUCCESS",
       "error": null,
       "timestamp": "2026-10-09T12:10:01+00:00"
@@ -162,11 +164,13 @@
       },
       "parent_step": null,
       "child_step": null,
+      "iteration_index": 0,
       "status": "SUCCESS",
       "error": null,
       "timestamp": "2026-10-09T12:10:02+00:00"
     }
   ],
+  "spans": [],
   "total_latency_ms": 1050.0,
   "total_tokens": 1020,
   "status": "SUCCESS",
@@ -184,6 +188,7 @@
     "primary_agent": "writer",
     "grounded": false,
     "rules_fired": [
+      "contradiction_v1",
       "hallucination_v1",
       "information_loss_v1",
       "verifier_passthrough_v1"

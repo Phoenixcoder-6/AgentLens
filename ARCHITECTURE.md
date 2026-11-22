@@ -1,19 +1,23 @@
-# AgentLens Architecture & Technical Specification (v1.0.0)
+# AgentLens Architecture & Technical Specification (v2.0.0)
 
-This document details the internal architecture, design guarantees, data flow, storage schema, and extensibility patterns of AgentLens.
+This document details the internal architecture, design guarantees, data flow, storage schema, and extensibility patterns of AgentLens v2.0 Enterprise.
 
 ---
 
 ## 1. System Design Principles
 
-AgentLens is built around three core architectural tenets:
+AgentLens is built around five core architectural tenets:
 
 1. **Deterministic Attribution Over Probabilistic Guessing:**  
    LLM-based judges produce non-deterministic results that shift with temperature, model updates, and prompt phrasing. AgentLens resolves failure causes using deterministic, rule-based heuristics and a mathematically predictable priority order. The LLM is used strictly downstream to *explain* the deterministic finding.
 2. **Fail-Safe Capture:**  
-   Observability must never crash the workload it monitors. The `@trace_step` decorator and `CaptureSession` capture state, latency, and errors inside protective try-catch boundaries. If storage, serialization, or disk writes fail, the host pipeline executes unimpeded.
+   Observability must never crash the workload it monitors. The `@trace_step` decorator and `CaptureSession` capture state, latency, and errors inside protective try-catch boundaries with non-blocking async ring buffers. If storage, serialization, or disk writes fail, the host pipeline executes unimpeded.
 3. **Strict Priority Hierarchy ($P_1 \to P_5$):**  
    When multiple errors co-occur (e.g., an upstream hallucination followed by downstream verifier rubber-stamping), the Arbiter applies a strict priority ordering to isolate the primary root cause without human ambiguity.
+4. **Causal Graph Propagation & Separation of Blame:**  
+   Failures in multi-agent networks cascade. AgentLens isolates the exact `ROOT_CAUSE_ORIGIN` node, maps downstream `CASCADING_FAILURE` spans, and flags quality-control nodes that permitted corrupt state to escape (`PASSTHROUGH_ESCAPED`).
+5. **Actionable Remediation & Waste Accounting:**  
+   Detecting an error is insufficient. AgentLens computes the financial blast radius (wasted tokens, latency, USD spend) and automatically synthesizes prompt patches and auto-diffs to prevent regression.
 
 ---
 
@@ -21,36 +25,36 @@ AgentLens is built around three core architectural tenets:
 
 ```mermaid
 flowchart TD
-    subgraph S_HOST["1. Host Execution & Fail-Safe Capture"]
-        NODE["Multi-Agent Node<br/><i>LangGraph / Custom Function</i>"]
+    subgraph S_HOST["1. Host Execution & Fail-Safe Telemetry"]
+        NODE["Multi-Agent Node<br/><i>LangGraph / CrewAI / Custom</i>"]
         DECOR["@trace_step Decorator<br/><i>Fail-Safe Boundary</i>"]
-        HC["HandoffCapture<br/><i>Captures input, filtered & output states</i>"]
+        RING["Ring Buffer Queue<br/><i>Non-blocking Async Ingestion</i>"]
+        CTX["ContextVar Engine<br/><i>Concurrency Isolation</i>"]
         PII["PII Scrubber<br/><i>Regex Redaction Engine</i>"]
-        CS["CaptureSession<br/><i>Session State & Token Staging</i>"]
 
         NODE --> DECOR
-        DECOR --> HC
-        HC --> PII
-        PII --> CS
+        DECOR --> CTX
+        CTX --> PII
+        PII --> RING
     end
 
-    subgraph S_STORE["2. Normalization & Persistence"]
-        NORM["Normalizer<br/><i>SchemaValidator (SCHEMA_VERSION = 1.0)</i>"]
-        SQL[("SQLite Database<br/><i>runs · steps · analysis · rule_matches</i>")]
+    subgraph S_STORE["2. Normalization & Pluggable Storage"]
+        NORM["Normalizer<br/><i>SchemaValidator (v2.0.0)</i>"]
+        SQL[("SQLite WAL / PostgreSQL<br/><i>Connection Pool & Retries</i>")]
         FS[("Raw Trace Store<br/><i>data/traces/{run_id}.json</i>")]
 
-        CS --> NORM
+        RING --> NORM
         NORM --> SQL
         NORM --> FS
     end
 
-    subgraph S_ENGINES["3. Six Parallel Detection Analyzers"]
+    subgraph S_ENGINES["3. Multi-Tier Detection Analyzers"]
         direction TB
-        GT["GroundTruthValidator [P1]<br/><i>Sequence similarity vs expected_output</i>"]
-        RE["RuleEngine [P2]<br/><i>tool_failure_v1 · hallucination_v1</i>"]
-        CV["ConsistencyValidator [P2]<br/><i>verifier_passthrough_v1</i>"]
-        WV["WorkflowValidator [P3]<br/><i>skipped_step_v1</i>"]
-        IL["InformationLossRule [P3]<br/><i>source & entity delta tracking</i>"]
+        GT["GroundTruthValidator [P1]<br/><i>Factual contradiction vs expected</i>"]
+        RE["RuleEngine [P2]<br/><i>tool_failure · hallucination · reasoning</i>"]
+        CV["ConsistencyValidator [P2]<br/><i>verifier_passthrough</i>"]
+        WV["WorkflowValidator [P3]<br/><i>Universal DAG topology & skipped steps</i>"]
+        IL["InformationLossRule [P3]<br/><i>Entity & citation delta tracking</i>"]
         SD["StatisticalDetector [P4]<br/><i>Latency & Token Z-Score Outliers</i>"]
 
         SQL --> GT
@@ -64,7 +68,7 @@ flowchart TD
     subgraph S_ARBITER["4. Deterministic Arbiter"]
         RANK["5-Tier Priority Resolver<br/><i>P1 &gt; P2 &gt; P3 &gt; P4 &gt; P5</i>"]
         TIE["Ascending rule_id Tie-Breaker<br/><i>Guarantees 100% Determinism</i>"]
-        BUNDLE["AnalysisBundle<br/><i>verdict · primary_cause · primary_agent · grounded</i>"]
+        BUNDLE["AnalysisBundle<br/><i>verdict · primary_cause · primary_agent</i>"]
 
         GT -->|"EvidenceRecord"| RANK
         RE -->|"EvidenceRecord"| RANK
@@ -77,15 +81,27 @@ flowchart TD
         TIE --> BUNDLE
     end
 
-    subgraph S_SURFACE["5. Storage, Alerting & UI Presentation"]
+    subgraph S_CAUSAL["5. Phase D Causal & Remediation Subsystem"]
+        CFT["CausalGraphEngine<br/><i>Fault Tree & Blame Classification</i>"]
+        BR["BlastRadiusCalculator<br/><i>Wasted Tokens, USD & Latency</i>"]
+        FIX["PromptFixer<br/><i>Auto-Diff Prompt Patch Generator</i>"]
+
+        BUNDLE --> CFT
+        CFT --> BR
+        CFT --> FIX
+    end
+
+    subgraph S_SURFACE["6. Storage, Alerting & UI Presentation"]
         EXPLAIN["LLM Explainer<br/><i>Natural language synthesis</i>"]
         ALERT["Alerter<br/><i>Slack webhook alerts for P1/P2</i>"]
-        DASH["NiceGUI Dashboard<br/><i>6 Views: Runs, Timeline, Evidence, Diff, Metrics, Rules</i>"]
-        API["FastAPI REST Service<br/><i>/health · /api/runs · /api/metrics</i>"]
+        DASH["Interactive DAG Dashboard<br/><i>NiceGUI v2 + Mermaid Color-Coded Graphs</i>"]
+        API["FastAPI REST Service<br/><i>/health · /api/runs · /api/causal</i>"]
 
+        CFT --> DASH
+        BR --> DASH
+        FIX --> DASH
         BUNDLE --> EXPLAIN
         BUNDLE --> ALERT
-        BUNDLE --> DASH
         BUNDLE --> API
     end
 
@@ -93,18 +109,69 @@ flowchart TD
     classDef storeStyle fill:#f0fdf4,stroke:#15803d,stroke-width:2px,color:#14532d;
     classDef engineStyle fill:#fffbeb,stroke:#b45309,stroke-width:2px,color:#78350f;
     classDef arbiterStyle fill:#faf5ff,stroke:#6b21a8,stroke-width:2px,color:#3b0764;
+    classDef causalStyle fill:#fdf4ff,stroke:#a21caf,stroke-width:2px,color:#701a75;
     classDef surfaceStyle fill:#fff1f2,stroke:#be123c,stroke-width:2px,color:#881337;
 
-    class NODE,DECOR,HC,PII,CS hostStyle;
+    class NODE,DECOR,RING,CTX,PII hostStyle;
     class NORM,SQL,FS storeStyle;
     class GT,RE,CV,WV,IL,SD engineStyle;
     class RANK,TIE,BUNDLE arbiterStyle;
+    class CFT,BR,FIX causalStyle;
     class EXPLAIN,ALERT,DASH,API surfaceStyle;
 ```
 
 ---
 
-## 3. The 5-Tier Priority Resolution Hierarchy
+## 3. Causal Fault Propagation Graph Engine
+
+The **Causal Fault Tree Engine** (`analyzers/causal/fault_tree.py`) constructs a directed execution graph of agent steps and classifies each node into one of four deterministic states:
+
+- **🔴 `ROOT_CAUSE_ORIGIN`:** The first point of failure in the multi-agent graph where an invariant (contract, tool, hallucination, ground truth) was violated.
+- **🟠 `CASCADING_FAILURE`:** A downstream agent node that failed as a direct consequence of corrupted inputs received from an upstream failure.
+- **🟡 `PASSTHROUGH_ESCAPED`:** A quality-control or verifier node that received a corrupted payload from an upstream node and failed to intercept or flag it, rubber-stamping bad output.
+- **🟢 `HEALTHY`:** An agent node that executed cleanly within contractual bounds.
+
+```
+[Researcher (ROOT_CAUSE)] ──(corrupt data)──> [Writer (CASCADE)] ──(corrupt report)──> [Verifier (PASSTHROUGH)]
+```
+
+---
+
+## 4. Blast Radius & Financial Impact Calculator
+
+The **Blast Radius Calculator** (`analyzers/causal/blast_radius.py`) quantifies the collateral damage caused by the primary root cause:
+
+1. **Tainted Steps Ratio:**
+   $$\text{Tainted Steps Ratio} = \frac{N_{\text{tainted}}}{N_{\text{total}}}$$
+2. **Wasted Token Count:** Sum of prompt and completion tokens consumed by all steps executed *after* the root cause origin.
+3. **Wasted Cost (USD):** Granular dollar calculation across token models (defaulting to standard blended pricing, e.g., \$0.0051 on benchmark runs).
+4. **Wasted Latency (ms):** Sum of wall-clock milliseconds consumed by tainted downstream execution.
+
+---
+
+## 5. Automated Prompt Auto-Diff Remediation Engine
+
+The **Prompt Auto-Diff Engine** (`analyzers/remediation/prompt_fixer.py`) inspects failing nodes and the arbiter's primary root cause to generate deterministic, targeted prompt modifications:
+
+- **`SOURCE_PRESERVATION`:** Fired on information loss; instructs the agent to retain all primary citations and numeric data.
+- **`ENTITY_FIDELITY`:** Fired on reasoning/hallucination matches; injects strict fact-checking constraints against input premises.
+- **`CONTRADICTION_GUARD`:** Prevents contradictory assertions across collaborative agent handoffs.
+- **`SCHEMA_CONFORMANCE`:** Fired on workflow state drops; enforces JSON state schema keys.
+- **`TOOL_DEFENSE`:** Injects parameter validation guards for tools prone to parameter errors.
+
+The engine produces unified diff patches:
+```diff
+--- SYSTEM PROMPT (agent=writer:original)
++++ SYSTEM PROMPT (agent=writer:remediated)
+@@ -1,3 +1,5 @@
+ You are a senior financial writer.
+ Synthesize the research input into an executive briefing.
++CRITICAL CONSTRAINT: You must preserve all source citations, entity names, and numeric data exactly as provided in the research input without omission or substitution.
+```
+
+---
+
+## 6. The 5-Tier Priority Resolution Hierarchy
 
 The Arbiter resolves all collected `EvidenceRecord` items into a single final `AnalysisBundle` according to this strict ladder:
 

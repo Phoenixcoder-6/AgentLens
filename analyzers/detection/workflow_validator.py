@@ -32,6 +32,24 @@ class WorkflowValidator(Analyzer):
                 skipped=True, skip_reason="No steps in trace", analyzer_id=self.analyzer_id
             )
 
+        # Skip linear sequence validation for non-linear topologies (reflection loops and parallel DAG forks)
+        # as cyclic iterations and branching DAGs define dynamic multi-agent control flow.
+        has_cycles = bool(
+            trace.spans and any(getattr(s, "iteration_index", 0) > 0 for s in trace.spans)
+        )
+        has_parallel_fork = any("," in str(step.parent_step or "") for step in trace.steps)
+        is_custom_nonlinear = trace.workflow in {
+            "iterative_reflection_pipeline",
+            "parallel_analyst_pipeline",
+        }
+
+        if has_cycles or has_parallel_fork or is_custom_nonlinear:
+            return AnalysisResult(
+                skipped=True,
+                skip_reason=f"Workflow '{trace.workflow}' is a non-linear topology (loop/DAG); skipping linear sequence validation.",
+                analyzer_id=self.analyzer_id,
+            )
+
         evidence: list[EvidenceRecord] = []
 
         # Load topology from config (Day 40a: supports pipeline.agents + arbiter.workflow)

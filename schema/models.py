@@ -248,12 +248,15 @@ class AgentStep(BaseModel):
     # Handoff — captures state transformation (not just input/output)
     handoff: HandoffState = Field(default_factory=HandoffState)
 
-    # Graph relationships
+    # Graph relationships & Reflection loops
     parent_step: str | None = Field(
         default=None, description="Step ID of the agent that produced input to this step"
     )
     child_step: str | None = Field(
         default=None, description="Step ID of the agent that will receive this step's output"
+    )
+    iteration_index: int = Field(
+        default=0, description="0-indexed loop iteration index for reflection cycles"
     )
 
     # Status
@@ -296,8 +299,14 @@ class RunTrace(BaseModel):
         default_factory=lambda: datetime.now(UTC), description="When this run started"
     )
 
-    # All steps in this run, in order
+    # All steps in this run, in order (legacy linear representation)
     steps: list[AgentStep] = Field(default_factory=list)
+
+    # Hierarchical OpenInference span DAG representation (v2.0)
+    spans: list[TraceSpan] = Field(
+        default_factory=list,
+        description="Hierarchical OpenInference span DAG representation",
+    )
 
     # Aggregate metrics (computed after capture)
     total_latency_ms: float = Field(default=0.0)
@@ -315,6 +324,22 @@ class RunTrace(BaseModel):
     trace_path: str | None = Field(
         default=None, description="Relative path to the full JSON trace blob in data/traces/"
     )
+
+    def ensure_spans(self) -> list[TraceSpan]:
+        """Ensure `self.spans` is populated from `self.steps` if currently empty."""
+        if not self.spans and self.steps:
+            from schema.span import steps_to_spans
+
+            self.spans = steps_to_spans(self.steps, self.run_id)
+        return self.spans
+
+    def ensure_steps(self) -> list[AgentStep]:
+        """Ensure `self.steps` is populated from `self.spans` if currently empty."""
+        if not self.steps and self.spans:
+            from schema.span import spans_to_steps
+
+            self.steps = spans_to_steps(self.spans, self.run_id)
+        return self.steps
 
     @field_serializer("timestamp")
     def serialize_timestamp(self, v: datetime) -> str:
@@ -392,7 +417,164 @@ class EvidenceRecord(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Model 7: AnalysisBundle
+# Model 7: BlastRadiusReport
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class BlastRadiusReport(BaseModel):
+    """
+    Quantified blast radius report measuring computational and financial waste.
+    Calculated by BlastRadiusCalculator (Phase D Day 63).
+    """
+
+    schema_version: str = Field(default=SCHEMA_VERSION)
+    run_id: str = Field(description="Run ID of the evaluated trace")
+    root_cause_agent: str | None = Field(
+        default=None,
+        description="Agent name responsible for originating the failure",
+    )
+    root_cause_node_id: str | None = Field(
+        default=None,
+        description="Node identifier where the fault originated",
+    )
+    tainted_steps_ratio: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of total workflow steps executed with corrupted state (0.0 to 1.0)",
+    )
+    total_steps: int = Field(default=0, description="Total steps or spans in the workflow")
+    tainted_steps_count: int = Field(default=0, description="Count of tainted steps/spans executed")
+    wasted_tokens: TokenUsage = Field(
+        default_factory=TokenUsage,
+        description="Tokens consumed by downstream tainted steps",
+    )
+    wasted_cost_usd: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Estimated USD financial waste from running tainted operations",
+    )
+    wasted_latency_ms: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Wall-clock milliseconds spent computing tainted steps",
+    )
+    impacted_agents: list[str] = Field(
+        default_factory=list,
+        description="Names of downstream victim agents tainted by the failure",
+    )
+    pricing_model: str = Field(
+        default="default",
+        description="Pricing model or preset used to calculate financial impact",
+    )
+    summary: str = Field(
+        default="",
+        description="Human-readable summary of the computational and financial impact",
+    )
+
+    def format_summary(self) -> str:
+        """Return formatted multi-line summary of the blast radius."""
+        if self.tainted_steps_count == 0:
+            return f"Run {self.run_id}: Clean execution. Zero computational waste ($0.00 USD, 0 tokens)."
+
+        return (
+            f"Blast Radius Impact (Run: {self.run_id}):\n"
+            f"  - Root Cause Agent    : {self.root_cause_agent or 'Unknown'}\n"
+            f"  - Tainted Steps Ratio : {self.tainted_steps_count}/{self.total_steps} ({self.tainted_steps_ratio:.1%})\n"
+            f"  - Wasted Cost (USD)   : ${self.wasted_cost_usd:.6f}\n"
+            f"  - Wasted Tokens       : {self.wasted_tokens.total:,} "
+            f"(Prompt: {self.wasted_tokens.prompt:,}, Completion: {self.wasted_tokens.completion:,})\n"
+            f"  - Wasted Latency      : {self.wasted_latency_ms:,.1f} ms\n"
+            f"  - Impacted Agents     : {', '.join(self.impacted_agents) if self.impacted_agents else 'None'}"
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Model 8: RemediationPatch
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class RemediationPatch(BaseModel):
+    """
+    Automated prompt remediation recommendation generated by PromptFixer (Day 64).
+    Contains targeted constraint injections and a GitHub-style unified diff.
+    """
+
+    schema_version: str = Field(default=SCHEMA_VERSION)
+    run_id: str = Field(description="Run ID of the evaluated trace")
+    agent: str = Field(description="Target agent requiring prompt modification")
+    rule_id: str | None = Field(
+        default=None,
+        description="Fired rule ID that triggered this remediation (e.g. 'R-IL-001')",
+    )
+    category: FailureCategory = Field(
+        default=FailureCategory.UNKNOWN,
+        description="Failure category requiring remediation",
+    )
+    constraint_type: str = Field(
+        default="GENERIC_GUARD",
+        description="Type of constraint (e.g. SOURCE_PRESERVATION, ENTITY_FIDELITY)",
+    )
+    target_prompt_type: str = Field(
+        default="system",
+        description="Which prompt tier to modify ('system' or 'user')",
+    )
+    original_prompt_snippet: str = Field(
+        default="",
+        description="Original prompt baseline before remediation",
+    )
+    recommended_constraint: str = Field(
+        default="",
+        description="Specific constraint text to add to the agent prompt",
+    )
+    diff_patch: str = Field(
+        default="",
+        description="Unified GitHub-diff formatted prompt patch",
+    )
+    confidence: float = Field(
+        default=0.9,
+        ge=0.0,
+        le=1.0,
+        description="Confidence that this patch resolves the failure mode",
+    )
+    regression_risk: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Estimated risk that this constraint affects clean execution",
+    )
+    explanation: str = Field(
+        default="",
+        description="Human-readable rationale for why this patch prevents the error",
+    )
+    historical_reference_run_id: str | None = Field(
+        default=None,
+        description="Optional clean historical run ID used as baseline comparator",
+    )
+    applied: bool = Field(
+        default=False,
+        description="Whether this remediation patch has been applied to configuration",
+    )
+
+    def format_diff(self) -> str:
+        """Return formatted unified diff string."""
+        return self.diff_patch
+
+    def format_summary(self) -> str:
+        """Return human-readable summary of the remediation patch."""
+        rule_str = f" | Rule: {self.rule_id}" if self.rule_id else ""
+        return (
+            f"Remediation Patch (Agent: {self.agent}{rule_str}):\n"
+            f"  - Constraint Type  : {self.constraint_type}\n"
+            f"  - Target Prompt    : {self.target_prompt_type.upper()}\n"
+            f"  - Confidence       : {self.confidence:.0%}\n"
+            f"  - Regression Risk  : {self.regression_risk:.0%}\n"
+            f"  - Recommended Fix  :\n    {self.recommended_constraint}"
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Model 9: AnalysisBundle
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -433,6 +615,18 @@ class AnalysisBundle(BaseModel):
         default=None, description="Which agent is most responsible for the primary cause"
     )
 
+    # Causal & Blast Radius Impact (Phase D, Days 62–63)
+    blast_radius: BlastRadiusReport | None = Field(
+        default=None,
+        description="Quantified computational & financial waste from the root cause failure",
+    )
+
+    # Automated Prompt Remediation (Phase D, Day 64)
+    remediation_patch: RemediationPatch | None = Field(
+        default=None,
+        description="Automated prompt auto-diff and self-healing recommendation",
+    )
+
     # LLM Explainer output (populated after explanation step)
     summary: str | None = Field(
         default=None, description="LLM-generated root cause summary (filled by explanation layer)"
@@ -448,3 +642,9 @@ class AnalysisBundle(BaseModel):
         return v.isoformat()
 
     model_config = {}
+
+
+# Resolve circular type references for RunTrace.spans
+from schema.span import TraceSpan  # noqa: E402
+
+RunTrace.model_rebuild()

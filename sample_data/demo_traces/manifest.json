@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-09T19:19:52.517905+00:00",
+  "generated_at": "2026-11-15T15:59:46.189934+00:00",
   "schema_version": "1.0",
   "total_traces": 6,
   "categories": {
@@ -58,6 +58,7 @@
       "rules_fired": [
         "gt_mismatch_v1",
         "hallucination_v1",
+        "hallucination_v2",
         "information_loss_v1",
         "verifier_passthrough_v1"
       ]
@@ -76,6 +77,7 @@
       "primary_agent": "writer",
       "grounded": false,
       "rules_fired": [
+        "contradiction_v1",
         "hallucination_v1",
         "information_loss_v1",
         "verifier_passthrough_v1"

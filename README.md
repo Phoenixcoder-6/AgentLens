@@ -1,69 +1,54 @@
-# AgentLens v1.0.0
+# AgentLens v2.0 Enterprise
 
 [![AgentLens CI](https://github.com/Phoenixcoder-6/AgentLens/actions/workflows/ci.yml/badge.svg)](https://github.com/Phoenixcoder-6/AgentLens/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Coverage >= 75%](https://img.shields.io/badge/coverage-%3E%3D%2075%25-brightgreen.svg)](https://github.com/Phoenixcoder-6/AgentLens)
-[![Version: 1.0.0](https://img.shields.io/badge/version-1.0.0-purple.svg)](CHANGELOG.md)
+[![Coverage >= 80%](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](https://github.com/Phoenixcoder-6/AgentLens)
+[![Version: 2.0.0](https://img.shields.io/badge/version-2.0.0-purple.svg)](CHANGELOG.md)
 
-**Multi-Agent Failure Attribution, Trace Diffing & Explainability Platform**
+**Multi-Agent Causal Failure Attribution, Error Blast Radius, Trace Diffing & Automated Prompt Remediation**
 
-AgentLens answers a single question with mathematical precision:  
-*Why did a multi-agent workflow fail, and which agent was responsible?*
+AgentLens answers two critical questions with mathematical precision:  
+1. *Why did a multi-agent workflow fail, and which agent was the true root cause vs. a downstream cascade?*  
+2. *What did the failure cost (in wasted tokens, latency, and dollars), and what exact prompt patch will fix it?*
 
 > **Core Philosophy:**  
 > The LLM never decides what happened — it only explains what deterministic analysis has already proven.
 
 ---
 
-## 1. Why AgentLens?
+## 1. Why AgentLens v2.0 Enterprise?
 
 When complex LLM agent swarms fail (hallucinating facts, dropping instructions, crashing tools, or rubber-stamping bad output), debugging with standard logs or APMs is overwhelming:
 - Traditional tracing tools (Datadog, OpenTelemetry) record *latencies* and *spans*, but understand nothing about *agent semantics*, *handoff contracts*, or *reasoning integrity*.
 - LLM-as-a-judge approaches are probabilistic, non-deterministic, and frequently hallucinate their own blame attributions.
 
-**AgentLens introduces Deterministic Multi-Tier Failure Attribution:**
-1. **Deterministic Rule Engine (P1–P3):** Isolates the exact faulty agent using verifiable rules (tool failures, information loss/gain, step omission, verifier passthrough).
-2. **Deterministic 5-Tier Arbiter:** Guarantees that the exact same evidence always yields the exact same verdict ($P_1 \to P_5$).
-3. **Graph-Aligned Trace Diffing:** Aligns multi-agent execution traces step-by-step to pinpoint the exact moment two runs diverged.
-4. **Grounded vs. Heuristic Separation:** Clearly flags whether a failure was proven against external ground-truth ($P_1$) or detected via behavioral heuristics ($P_2–P_4$).
+**AgentLens introduces Deterministic Multi-Tier Failure Attribution & Causal Remediation:**
+1. **Causal Fault Tree Engine:** Maps error propagation across downstream spans, separating `ROOT_CAUSE_ORIGIN` from `CASCADING_FAILURE` and quality-control `PASSTHROUGH_ESCAPED` nodes.
+2. **Error Blast Radius & Financial Waste Calculator:** Quantifies tainted steps ratio, downstream wasted tokens, wasted compute latency, and monetary USD loss.
+3. **Automated Prompt Auto-Diff Engine:** Synthesizes targeted system prompt patches and GitHub-style unified diffs to remediate root causes without human guesswork.
+4. **Interactive Visual DAG Dashboard:** Color-codes execution graphs in real time (🔴 Root Cause, 🟠 Cascade, 🟡 Passthrough, 🟢 Healthy) with one-click patch application.
+5. **Drop-in Framework Auto-Tracers:** Seamless zero-code hooks for LangGraph, CrewAI, AutoGen, and LangChain.
+6. **Deterministic 5-Tier Arbiter:** Guarantees that the exact same evidence always yields the exact same verdict ($P_1 \to P_5$).
 
 ---
 
-### 2. Architecture: Evolution from Legacy Prototype to v1.0.0 Production
+### 2. Architecture: Evolution to v2.0 Enterprise
 
-AgentLens evolved from a simple linear capture script with manual error guessing into a production-grade, fail-safe observability and deterministic failure attribution platform.
-
-### Phase 1: Legacy Early Architecture (v0.1 Prototype)
-In the initial prototype, tracing was synchronous and unshielded. Detection relied on basic post-hoc parsing with unranked, conflicting heuristic outputs and no tie-break determinism:
+AgentLens evolved through three major generational milestones:
 
 ```mermaid
-flowchart TD
-    subgraph S1["1. Pipeline Execution"]
-        A1["Researcher Agent"] --> A2["Writer Agent"]
-        A2 --> A3["Verifier Agent"]
-    end
+flowchart LR
+    P1["v0.1 Prototype<br/><i>Unshielded Logging<br/>Ad-Hoc LLM Judge</i>"] --> P2["v1.0.0 Production Core<br/><i>Fail-Safe Capture Envelope<br/>Deterministic 5-Tier Arbiter<br/>Alembic SQLite Storage</i>"]
+    P2 --> P3["v2.0.0 Enterprise<br/><i>Causal Fault Tree Engine<br/>Error Blast Radius & Costing<br/>Prompt Auto-Diff Remediation<br/>Interactive Visual DAG Dashboard</i>"]
 
-    subgraph S2["2. Raw Capture (Unshielded)"]
-        A1 -.->|"Synchronous hooks\n(Crash risk)"| B1["Raw Logs & Console Print"]
-        A2 -.-> B1
-        A3 -.-> B1
-        B1 --> B2[("Unindexed Flat JSON")]
-    end
+    classDef proto fill:#fee2e2,stroke:#ef4444,stroke-width:1px,color:#991b1b;
+    classDef v1 fill:#fef3c7,stroke:#f59e0b,stroke-width:2px,color:#92400e;
+    classDef v2 fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#166534;
 
-    subgraph S3["3. Ad-Hoc Heuristics"]
-        B2 --> C1["Manual String Inspection"]
-        B2 --> C2["Unranked Heuristics\n(Conflicting outputs)"]
-        C1 --> D1["LLM-as-a-Judge Prompt\n(Probabilistic & Non-deterministic)"]
-        C2 --> D1
-    end
-
-    subgraph S4["4. Output"]
-        D1 --> E1["Terminal Output / Basic Script"]
-    end
-
-    classDef legacy fill:#ffebee,stroke:#c62828,stroke-width:1px,color:#b71c1c;
-    class A1,A2,A3,B1,B2,C1,C2,D1,E1 legacy;
+    class P1 proto;
+    class P2 v1;
+    class P3 v2;
 ```
 
 ---
@@ -203,23 +188,65 @@ Liveness/readiness is monitored via `GET http://localhost:8080/health`.
 
 ---
 
-## 4. Benchmark Accuracy & Validation
+## 4. Benchmark Accuracy & Regression Gates
 
-AgentLens is evaluated on a frozen 20-trace benchmark (`sample_data/labels.json`) covering clean runs, tool crashes, reasoning hallucinations, skipped nodes, and verifier bypasses:
+AgentLens is continuously certified against both the frozen 20-trace baseline benchmark (`sample_data/labels.json`) and the extended 30-trace enterprise regression suite (`scripts/run_v2_regression.py`):
 
-| Metric | Target | Verified Actual | Status |
-|---|---|---|---|
-| **Binary PASS / FAIL Detection** | $\ge 90\%$ | **100.0%** (20/20) | **PASS** |
-| **Exact Category & Agent Attribution** | $\ge 75\%$ | **80.0%** (16/20) | **PASS** |
-| **Test Suite Code Coverage Gate** | $\ge 75\%$ | **93.0%** | **PASS** |
-| **Type Checking (`mypy`)** | Strict PEP 561 | **0 issues** (46 source files) | **PASS** |
-| **Formatting & Linting (`ruff`)** | Clean | **0 issues** | **PASS** |
+| Evaluation Gate | Metric | Target | Verified Actual | Status |
+|---|---|---|---|---|
+| **v2.0 Extended 30-Trace Suite** | **Exact Attribution Accuracy** | $\ge 85.0\%$ | **86.7%** (26/30) | **PASS** |
+| **v2.0 Extended 30-Trace Suite** | **Binary Failure Detection** | $100.0\%$ | **100.0%** (30/30) | **PASS** |
+| **Day 43 Frozen Baseline** | **Attribution Preservation** | $\ge 80.0\%$ | **80.0%** (16/20, 0 regressions) | **PASS** |
+| **Full Unit & Integration Suite** | **Test Pass Rate** | $100.0\%$ | **210 / 210 passing** | **PASS** |
+| **Test Coverage Gate** | **Code Coverage (`--cov`)** | $\ge 80.0\%$ | **94.0%** (v2 core modules) | **PASS** |
+| **Type Checking (`mypy`)** | **Strict PEP 561** | Clean | **0 issues** across all files | **PASS** |
+| **Code Formatting & Lint (`ruff`)** | **Zero Defects** | Clean | **0 issues** | **PASS** |
 
 Continuous regression testing is enforced on every PR to `main` via [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 
-## 5. REST API
+## 5. Python SDK & CLI Quickstart
+
+### Python SDK
+```python
+import agentlens
+
+# 1. Run causal fault tree analysis on a trace
+graph = agentlens.CausalGraphEngine().build_graph(run_trace)
+print(f"Root Cause Agent: {graph.nodes[graph.root_causes[0]].name}")
+print(f"Cascading Failures: {len(graph.cascades)}")
+print(f"Passthrough Escapes: {len(graph.passthroughs)}")
+
+# 2. Compute error blast radius & dollar waste
+blast_radius = agentlens.BlastRadiusCalculator().calculate(run_trace, causal_graph=graph)
+print(f"Wasted Cost: ${blast_radius.wasted_cost_usd:.4f}")
+print(f"Wasted Tokens: {blast_radius.wasted_tokens}")
+
+# 3. Generate automated prompt remediation patch & diff
+patch = agentlens.PromptFixer().generate_patch(run_trace, analysis_bundle=bundle)
+if patch:
+    print(patch.unified_diff)
+```
+
+### CLI
+```bash
+# Run causal attribution analysis
+agentlens causal run_failed_01
+
+# Calculate financial blast radius
+agentlens blast-radius run_failed_01
+
+# Generate recommended prompt fix diff
+agentlens patch run_failed_01
+
+# Launch visual DAG dashboard
+agentlens-dashboard
+```
+
+---
+
+## 6. REST API
 
 AgentLens includes a built-in FastAPI REST service mounted at `/api` and `/health`:
 
@@ -236,16 +263,17 @@ Interactive Swagger documentation is available at `http://localhost:8080/docs`.
 
 ---
 
-## 6. Project Documentation Index
+## 7. Project Documentation Index
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Deep dive into the 5-tier Arbiter, component data flow, storage schema, and how to write custom rules.
-- **[RULES.md](RULES.md)**: Exhaustive catalog of all built-in deterministic detection rules (P1–P4).
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Deep dive into the v2.0 Causal Engine, Blast Radius Calculator, Prompt Auto-Diff, Arbiter, and Pluggable Storage.
+- **[docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md)**: Multi-phase v2.0 roadmap, specifications, and architecture decisions.
+- **[RULES.md](RULES.md)**: Exhaustive catalog of built-in deterministic detection rules (P1–P4).
 - **[LIMITATIONS.md](LIMITATIONS.md)**: Benchmark error analysis, scope boundaries, and dual-fault tie-break dynamics.
 - **[CONTRIBUTING.md](CONTRIBUTING.md)**: Developer setup, test guidelines, pre-commit hooks, and PR workflow.
-- **[CHANGELOG.md](CHANGELOG.md)**: Complete release history from v0.1.0 to v1.0.0.
+- **[CHANGELOG.md](CHANGELOG.md)**: Complete release history from v0.1.0 to v2.0.0.
 
 ---
 
-## 7. License
+## 8. License
 
 AgentLens is open-source software licensed under the [MIT License](LICENSE).

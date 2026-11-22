@@ -16,6 +16,7 @@ from diff_engine import (
     SemanticSimilarityEngine,
     SimilarityReport,
     StepSimilarityScore,
+    align_spans,
     align_traces,
     score_similarity,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "AlignmentStatus",
     "GraphAlignmentResult",
     "align_traces",
+    "align_spans",
     "SemanticSimilarityEngine",
     "SimilarityReport",
     "StepSimilarityScore",

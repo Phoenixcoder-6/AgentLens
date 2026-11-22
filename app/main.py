@@ -85,7 +85,7 @@ def print_results(state: dict, topic: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run the AgentLens reference pipeline (Researcher → Writer → Verifier)"
+        description="Run the AgentLens reference pipeline (Researcher -> Writer -> Verifier)"
     )
     parser.add_argument(
         "--topic",
@@ -96,7 +96,7 @@ def main() -> None:
     args = parser.parse_args()
 
     print(f"\nStarting pipeline for topic: '{args.topic}'")
-    print("Running agents: Researcher → Writer → Verifier ...\n")
+    print("Running agents: Researcher -> Writer -> Verifier ...\n")
 
     try:
         CaptureSession.start_trace(workflow="research_report_pipeline")

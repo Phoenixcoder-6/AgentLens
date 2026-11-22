@@ -24,8 +24,11 @@ llm:
 # ─────────────────────────────────────────────
 storage:
   db_path: "data/agentlens.db"             # SQLite database path
+  db_url: ""                               # Database URL (e.g. postgresql://... or sqlite:///...)
   traces_dir: "data/traces"                # JSON blob storage for full trace payloads
   schema_version: "1.0"                    # Stamped on every normalized record
+  pool_size: 10                            # Thread-safe connection pool size (Day 49)
+  busy_timeout_ms: 10000                   # SQLite lock contention busy timeout in ms (Day 49)
 
 # ─────────────────────────────────────────────
 # Evidence Extraction
@@ -70,6 +73,13 @@ arbiter:
   reasoning:
     researcher_min_sources: 1              # Minimum required sources for researcher_quality_v1
     hallucination_entity_gain_threshold: 0 # Allowed entity count increase from researcher to writer
+    hallucination_v2_enabled: true         # Enable Day 54 semantic entity set overlap detector
+    hallucination_invented_threshold: 1    # Minimum invented entities to fire hallucination_v2
+    contradiction_v1_enabled: true         # Enable Day 55 local NLI semantic contradiction detector
+    contradiction_threshold: 0.70          # P(Contradiction) threshold to fire contradiction_v1
+    entailment_threshold: 0.75             # P(Entailment) threshold for faithful synthesis
+    nli_mode: "auto"                       # "auto" | "transformers" | "fallback"
+    nli_model: "cross-encoder/nli-deberta-v3-small"
   information_loss:
     severe_threshold: 3                    # |delta| >= 3 → HIGH severity (FAIL on drops)
     moderate_threshold: 1                  # |delta| >= 1 → MEDIUM severity (WARNING)
@@ -166,6 +176,10 @@ alerting:
 # ─────────────────────────────────────────────
 capture:
   fail_safe: true                         # Capture/storage errors must never crash agent execution
+  async_logging: true                     # Non-blocking async queue for background persistence (Day 48)
+  queue_max_size: 5000                    # Maximum bounded capacity for in-memory ring buffer
+  batch_flush_interval_sec: 0.1          # Maximum interval (100ms) before flushing queued traces
+  batch_flush_size: 50                    # Flush immediately when queue reaches N items
   retention_days: 90                      # Delete traces older than N days via scripts/cleanup_old_traces.py
   pii_scrubbing:
     enabled: false                       # Enable before running on user data (opt-in)

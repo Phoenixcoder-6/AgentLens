@@ -116,9 +116,9 @@ class TestReplayLiveModeMocked:
         fake_state = {
             "topic": "New live topic",
             "research_findings": "SOURCES:\n- S1\nENTITIES:\n- E1\nKEY FINDINGS:\nFacts",
-            "source_count": 5,
-            "entity_count": 6,
-            "written_report": "Report text",
+            "source_count": 8,
+            "entity_count": 10,
+            "written_report": "the and of",  # all stopwords -> no entities
             "verification_result": "APPROVED",
             "verified": True,
             "revision_notes": "",

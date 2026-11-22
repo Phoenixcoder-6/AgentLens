@@ -12,6 +12,12 @@ import pytest
 # Ensure project root is on sys.path for all tests
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+# Day 48: v1.0 tests assert that trace files / DB rows exist immediately after
+# CaptureSession.end_trace(), so the suite defaults to synchronous persistence.
+# Async-ingestion tests (tests/test_queue_telemetry.py) opt in explicitly via
+# capture.queue.set_async_logging_enabled(True), which overrides this env var.
+os.environ.setdefault("AGENTLENS_ASYNC_LOGGING", "false")
+
 
 @pytest.fixture
 def sample_handoff_state():

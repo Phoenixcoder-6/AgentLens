@@ -1,0 +1,61 @@
+{
+  "generated_at": "2026-10-18T20:19:57.499669+00:00",
+  "total_traces": 5,
+  "traces": [
+    {
+      "run_id": "trace_v2_loop_reflection_pass",
+      "category": "loop_reflection",
+      "description": "Cyclic self-correction loop resolving to PASS on iteration 2 (P5)",
+      "file": "trace_v2_loop_reflection_pass.json",
+      "steps_count": 4,
+      "spans_count": 4,
+      "expected_verdict": "PASS",
+      "expected_priority": "P5",
+      "primary_agent": null
+    },
+    {
+      "run_id": "trace_v2_parallel_fork_divergence",
+      "category": "parallel_fork",
+      "description": "Parallel analyst fork where financial analyst encounters tool crash (P2)",
+      "file": "trace_v2_parallel_fork_divergence.json",
+      "steps_count": 4,
+      "spans_count": 5,
+      "expected_verdict": "FAIL",
+      "expected_priority": "P2",
+      "primary_agent": "financial_analyst"
+    },
+    {
+      "run_id": "trace_v2_entity_substitution_swap",
+      "category": "entity_substitution",
+      "description": "Entity substitution swap (3 tech -> 3 pharma) caught by hallucination_v2 (P2)",
+      "file": "trace_v2_entity_substitution_swap.json",
+      "steps_count": 3,
+      "spans_count": 3,
+      "expected_verdict": "FAIL",
+      "expected_priority": "P2",
+      "primary_agent": "writer"
+    },
+    {
+      "run_id": "trace_v2_semantic_contradiction",
+      "category": "semantic_contradiction",
+      "description": "Semantic contradiction (failed -> met) caught by contradiction_v1 (P2)",
+      "file": "trace_v2_semantic_contradiction.json",
+      "steps_count": 3,
+      "spans_count": 3,
+      "expected_verdict": "FAIL",
+      "expected_priority": "P2",
+      "primary_agent": "writer"
+    },
+    {
+      "run_id": "trace_v2_loop_deadlock_unresolved",
+      "category": "loop_deadlock",
+      "description": "Non-converging reflection loop caught by researcher_quality_v1 (P2)",
+      "file": "trace_v2_loop_deadlock_unresolved.json",
+      "steps_count": 6,
+      "spans_count": 6,
+      "expected_verdict": "FAIL",
+      "expected_priority": "P2",
+      "primary_agent": "researcher"
+    }
+  ]
+}
