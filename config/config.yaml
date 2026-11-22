@@ -180,6 +180,10 @@ capture:
   queue_max_size: 5000                    # Maximum bounded capacity for in-memory ring buffer
   batch_flush_interval_sec: 0.1          # Maximum interval (100ms) before flushing queued traces
   batch_flush_size: 50                    # Flush immediately when queue reaches N items
+  wal_enabled: true                       # Crash-proof disk Write-Ahead Logging (Day 67)
+  spool_dir: "data/spool"                 # Spool directory for WAL and overflow journals (Day 67)
+  overflow_spill_enabled: true            # Spill excess traces to disk on queue saturation (Day 67)
+  high_watermark: 0.85                    # Queue capacity fraction before backpressure fires (Day 67)
   retention_days: 90                      # Delete traces older than N days via scripts/cleanup_old_traces.py
   pii_scrubbing:
     enabled: false                       # Enable before running on user data (opt-in)

@@ -331,6 +331,14 @@ def health_check() -> HealthResponse:
     )
 
 
+@router.get("/queue/status")
+def get_queue_status() -> dict[str, Any]:
+    """Return runtime statistics, backpressure metrics, and WAL status of the ingestion queue."""
+    from capture.queue import get_global_queue
+
+    return get_global_queue().stats()
+
+
 # ── OTLP Ingestion Handler (Day 60) ──────────────────────────────────────────
 
 
@@ -339,6 +347,20 @@ def _process_otlp_ingestion(
     evaluate: bool = False,
 ) -> OTLPResponse:
     """Core logic to normalize and persist an OpenTelemetry / OpenInference trace payload."""
+    # Backpressure check (Day 67)
+    from capture.queue import get_global_queue
+
+    ingest_q = get_global_queue()
+    if ingest_q.is_saturated():
+        raise HTTPException(
+            status_code=429,
+            detail="AgentLens ingestion queue is saturated; backpressure applied.",
+            headers={
+                "Retry-After": "5",
+                "X-AgentLens-Queue-Status": "saturated",
+            },
+        )
+
     if not payload or ("resourceSpans" not in payload and "spans" not in payload):
         raise HTTPException(
             status_code=400,
