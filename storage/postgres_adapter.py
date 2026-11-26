@@ -1,22 +1,25 @@
 """
 storage/postgres_adapter.py — PostgreSQL Storage Adapter Implementation
 ========================================================================
-AgentLens v2.0 (Day 50): Production-ready PostgreSQL storage adapter
+AgentLens v2.1 (Day 68): Production-grade, fail-loud PostgreSQL storage adapter
 driven by AGENTLENS_DB_URL=postgresql://...
 
 Features:
     - URL/DSN parsing supporting credentials, host, port, dbname, and query parameters.
     - Full PostgreSQL DDL with JSONB, TIMESTAMPTZ, BIGSERIAL, and index creation.
-    - PostgreSQL upsert syntax (ON CONFLICT (run_id) DO UPDATE).
-    - Driver handling: Supports psycopg2 or psycopg3 when installed.
-    - Deterministic in-memory mock engine when driver or live PostgreSQL cluster
-      is absent, allowing offline unit testing and verification.
+    - Fail-loud architecture: Eliminates silent mock fallback on connection failures.
+    - Exponential backoff retry with jitter on transient network/cluster disconnects.
+    - Custom diagnostic exceptions: PostgresDriverMissingError and PostgresConnectionError.
+    - Live query execution for PostgreSQL when driver and cluster are present.
+    - Deterministic in-memory mock engine when explicitly requested via mock_mode=True.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import random
+import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, unquote, urlparse
@@ -28,6 +31,42 @@ if TYPE_CHECKING:
     from normalizer.normalizer import NormalizedRun
 
 logger = logging.getLogger(__name__)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PostgreSQL Storage Exceptions (Day 68 Fail-Loud Architecture)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class PostgresStorageError(Exception):
+    """Base exception for PostgreSQL storage adapter failures."""
+
+
+class PostgresDriverMissingError(PostgresStorageError):
+    """Raised when neither psycopg2 nor psycopg is installed and mock_mode is False."""
+
+
+class PostgresConnectionError(PostgresStorageError):
+    """Raised when live PostgreSQL connection fails after exhausting retries."""
+
+    def __init__(
+        self,
+        message: str,
+        host: str,
+        port: int,
+        database: str,
+        user: str | None = None,
+        attempts: int = 1,
+        original_exception: Exception | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.host = host
+        self.port = port
+        self.database = database
+        self.user = user
+        self.attempts = attempts
+        self.original_exception = original_exception
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PostgreSQL DDL Statements
@@ -156,19 +195,30 @@ class PostgreSQLStorageAdapter(BaseStorageAdapter):
     Configured via a standard PostgreSQL connection URI:
         postgresql://[user[:password]@][netloc][:port][/dbname][?param1=value1&...]
 
-    Examples:
-        adapter = PostgreSQLStorageAdapter("postgresql://user:pass@localhost:5432/agentlens")
-        adapter.initialize()
+    Fail-Loud Architecture (Day 68):
+        - When mock_mode=False (default), missing drivers or unreachable databases
+          raise explicit, structured exceptions rather than silently falling back
+          to in-memory mock storage.
+        - Network transient failures retry with exponential backoff and randomized jitter.
     """
 
     def __init__(
         self,
         connection_url: str,
         mock_mode: bool = False,
+        max_retries: int = 3,
+        retry_delay: float = 0.2,
+        backoff_factor: float = 2.0,
+        jitter: bool = True,
         **kwargs: Any,
     ) -> None:
         self.connection_url = connection_url
         self.mock_mode = mock_mode
+        self.max_retries = max(1, max_retries)
+        self.retry_delay = max(0.01, retry_delay)
+        self.backoff_factor = max(1.0, backoff_factor)
+        self.jitter = jitter
+
         self._parsed_url = self._parse_connection_url(connection_url)
         self._mock_store = _MockPostgresStore()
         self._live_conn: Any = None
@@ -176,11 +226,7 @@ class PostgreSQLStorageAdapter(BaseStorageAdapter):
 
         if not self.mock_mode:
             self._driver = self._detect_driver()
-            if self._driver is None:
-                logger.info(
-                    "No PostgreSQL driver (psycopg2/psycopg) installed; operating in mock mode."
-                )
-                self.mock_mode = True
+            # In Day 68 fail-loud architecture, we NEVER silently flip self.mock_mode = True.
 
     @staticmethod
     def _parse_connection_url(url: str) -> dict[str, Any]:
@@ -244,12 +290,106 @@ class PostgreSQLStorageAdapter(BaseStorageAdapter):
             pass
         return None
 
+    def _raw_connect(self) -> Any:
+        """Establish a single live PostgreSQL connection using the detected driver."""
+        if self._driver == "psycopg2":
+            import psycopg2
+
+            return psycopg2.connect(
+                dbname=self._parsed_url["database"],
+                user=self._parsed_url["user"],
+                password=self._parsed_url["password"],
+                host=self._parsed_url["host"],
+                port=self._parsed_url["port"],
+                sslmode=self._parsed_url.get("sslmode", "prefer"),
+            )
+        elif self._driver == "psycopg":
+            import psycopg
+
+            return psycopg.connect(
+                dbname=self._parsed_url["database"],
+                user=self._parsed_url["user"],
+                password=self._parsed_url["password"],
+                host=self._parsed_url["host"],
+                port=self._parsed_url["port"],
+                sslmode=self._parsed_url.get("sslmode", "prefer"),
+            )
+        raise PostgresDriverMissingError(
+            "No PostgreSQL driver installed (neither psycopg2 nor psycopg found). "
+            f"Cannot connect to PostgreSQL at {self._parsed_url['host']}:{self._parsed_url['port']}. "
+            "Please install psycopg2-binary or psycopg, or explicitly pass mock_mode=True for offline testing."
+        )
+
+    def _connect_with_retry(self) -> Any:
+        """
+        Connect to PostgreSQL with structured retry backoff and randomized jitter.
+        Fails loud if driver is missing or all attempts are exhausted.
+        """
+        if self._driver is None:
+            raise PostgresDriverMissingError(
+                "No PostgreSQL driver installed (neither psycopg2 nor psycopg found). "
+                f"Cannot connect to PostgreSQL at {self._parsed_url['host']}:{self._parsed_url['port']}. "
+                "Please install psycopg2-binary or psycopg, or explicitly pass mock_mode=True for offline testing."
+            )
+
+        host = self._parsed_url["host"]
+        port = self._parsed_url["port"]
+        database = self._parsed_url["database"]
+        user = self._parsed_url.get("user")
+
+        last_exc: Exception | None = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                conn = self._raw_connect()
+                logger.info(
+                    "[PostgreSQLStorageAdapter] Connected to %s:%d/%s (attempt %d/%d).",
+                    host,
+                    port,
+                    database,
+                    attempt,
+                    self.max_retries,
+                )
+                return conn
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "[PostgreSQLStorageAdapter] Connection attempt %d/%d to %s:%d/%s failed: %s",
+                    attempt,
+                    self.max_retries,
+                    host,
+                    port,
+                    database,
+                    exc,
+                )
+                if attempt < self.max_retries:
+                    delay = self.retry_delay * (self.backoff_factor ** (attempt - 1))
+                    if self.jitter:
+                        delay += random.uniform(0.01, max(0.02, 0.1 * delay))
+                    time.sleep(delay)
+
+        # Fail-loud: Never fall back to mock store in production!
+        err_msg = (
+            f"Failed to connect to PostgreSQL at {host}:{port}/{database} after "
+            f"{self.max_retries} attempts: {last_exc}"
+        )
+        logger.error("[PostgreSQLStorageAdapter] %s", err_msg)
+        raise PostgresConnectionError(
+            err_msg,
+            host=host,
+            port=port,
+            database=database,
+            user=user,
+            attempts=self.max_retries,
+            original_exception=last_exc,
+        ) from last_exc
+
     def get_connection_info(self, mask_password: bool = True) -> dict[str, Any]:
         """Return parsed connection parameters."""
         info = dict(self._parsed_url)
         if mask_password and info.get("password"):
             info["password"] = "******"
         info["driver"] = self._driver if not self.mock_mode else "mock"
+        info["mock_mode"] = self.mock_mode
         return info
 
     def get_ddl(self) -> list[str]:
@@ -262,29 +402,46 @@ class PostgreSQLStorageAdapter(BaseStorageAdapter):
             self._mock_store.initialized = True
             return
 
-        # Live PostgreSQL initialization
+        conn = self._connect_with_retry()
         try:
-            if self._driver == "psycopg2":
-                import psycopg2
-
-                conn = psycopg2.connect(
-                    dbname=self._parsed_url["database"],
-                    user=self._parsed_url["user"],
-                    password=self._parsed_url["password"],
-                    host=self._parsed_url["host"],
-                    port=self._parsed_url["port"],
-                )
-                with conn.cursor() as cur:
-                    for ddl in PG_ALL_DDL:
-                        cur.execute(ddl)
-                conn.commit()
-                conn.close()
+            with conn.cursor() as cur:
+                for ddl in PG_ALL_DDL:
+                    cur.execute(ddl)
+            conn.commit()
+            self._live_conn = conn
         except Exception as exc:
-            logger.warning(
-                "Failed to connect to live PostgreSQL (%s); switching to mock mode.", exc
-            )
-            self.mock_mode = True
-            self._mock_store.initialized = True
+            try:
+                conn.close()
+            except Exception:
+                pass
+            raise PostgresConnectionError(
+                f"Failed to initialize PostgreSQL schema at {self._parsed_url['host']}: {exc}",
+                host=self._parsed_url["host"],
+                port=self._parsed_url["port"],
+                database=self._parsed_url["database"],
+                user=self._parsed_url["user"],
+                original_exception=exc,
+            ) from exc
+
+    def is_healthy(self) -> bool:
+        """Check if storage connection is healthy and responsive."""
+        if self.mock_mode:
+            return self._mock_store.initialized
+        try:
+            return self.ping()
+        except Exception:
+            return False
+
+    def ping(self) -> bool:
+        """Verify database connectivity by executing 'SELECT 1;'."""
+        if self.mock_mode:
+            return True
+        if self._live_conn is None:
+            self._live_conn = self._connect_with_retry()
+        with self._live_conn.cursor() as cur:
+            cur.execute("SELECT 1;")
+            cur.fetchone()
+        return True
 
     def close(self) -> None:
         """Close connections."""
@@ -368,13 +525,129 @@ class PostgreSQLStorageAdapter(BaseStorageAdapter):
                 )
             return
 
-        raise NotImplementedError("Live PostgreSQL write requires an active cluster connection.")
+        if self._live_conn is None:
+            self._live_conn = self._connect_with_retry()
+
+        with self._live_conn.cursor() as cur:
+            # 1. Upsert runs
+            upsert_run_sql = """
+            INSERT INTO runs (run_id, workflow, timestamp, status, total_latency_ms, total_tokens, schema_version, trace_path, trace_json, expected_output)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (run_id) DO UPDATE SET
+                workflow = EXCLUDED.workflow,
+                timestamp = EXCLUDED.timestamp,
+                status = EXCLUDED.status,
+                total_latency_ms = EXCLUDED.total_latency_ms,
+                total_tokens = EXCLUDED.total_tokens,
+                schema_version = EXCLUDED.schema_version,
+                trace_path = EXCLUDED.trace_path,
+                trace_json = EXCLUDED.trace_json,
+                expected_output = EXCLUDED.expected_output;
+            """
+            cur.execute(
+                upsert_run_sql,
+                (
+                    run.run_id,
+                    run.workflow,
+                    ts,
+                    status_str,
+                    run.total_latency_ms,
+                    run.total_tokens,
+                    SCHEMA_VERSION,
+                    trace_path,
+                    trace_json,
+                    run.expected_output,
+                ),
+            )
+
+            # 2. Upsert steps
+            upsert_step_sql = """
+            INSERT INTO steps (run_id, step, agent, status, latency_ms, tokens_prompt, tokens_completion, tokens_total, diff_summary, error, timestamp, schema_version)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (run_id, step) DO UPDATE SET
+                agent = EXCLUDED.agent,
+                status = EXCLUDED.status,
+                latency_ms = EXCLUDED.latency_ms,
+                tokens_prompt = EXCLUDED.tokens_prompt,
+                tokens_completion = EXCLUDED.tokens_completion,
+                tokens_total = EXCLUDED.tokens_total,
+                diff_summary = EXCLUDED.diff_summary,
+                error = EXCLUDED.error,
+                timestamp = EXCLUDED.timestamp,
+                schema_version = EXCLUDED.schema_version;
+            """
+            for step in run.steps:
+                step_status = (
+                    step.status.value if hasattr(step.status, "value") else str(step.status)
+                )
+                step_ts = _iso(step.timestamp)
+                cur.execute(
+                    upsert_step_sql,
+                    (
+                        run.run_id,
+                        step.step,
+                        step.agent,
+                        step_status,
+                        step.latency_ms,
+                        step.tokens.prompt,
+                        step.tokens.completion,
+                        step.tokens.total,
+                        step.diff_summary or "",
+                        step.error,
+                        step_ts,
+                        SCHEMA_VERSION,
+                    ),
+                )
+
+                # Metrics
+                insert_metric_sql = """
+                INSERT INTO metrics (run_id, step, agent, metric_name, metric_value, metric_unit, timestamp, schema_version)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
+                """
+                cur.execute(
+                    insert_metric_sql,
+                    (
+                        run.run_id,
+                        step.step,
+                        step.agent,
+                        "latency_ms",
+                        step.latency_ms,
+                        "ms",
+                        step_ts,
+                        SCHEMA_VERSION,
+                    ),
+                )
+                cur.execute(
+                    insert_metric_sql,
+                    (
+                        run.run_id,
+                        step.step,
+                        step.agent,
+                        "tokens_total",
+                        float(step.tokens.total),
+                        "tokens",
+                        step_ts,
+                        SCHEMA_VERSION,
+                    ),
+                )
+
+        self._live_conn.commit()
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         """Fetch a single run by run_id."""
         if self.mock_mode:
             return self._mock_store.runs.get(run_id)
-        raise NotImplementedError("Live PostgreSQL read requires an active cluster connection.")
+
+        if self._live_conn is None:
+            self._live_conn = self._connect_with_retry()
+
+        with self._live_conn.cursor() as cur:
+            cur.execute("SELECT * FROM runs WHERE run_id = %s;", (run_id,))
+            row = cur.fetchone()
+            if row is None:
+                return None
+            colnames = [desc[0] for desc in cur.description]
+            return dict(zip(colnames, row, strict=False))
 
     def list_runs(
         self,
@@ -391,7 +664,31 @@ class PostgreSQLStorageAdapter(BaseStorageAdapter):
                 results = [r for r in results if r["workflow"] == workflow_filter]
             results.sort(key=lambda r: r["timestamp"], reverse=True)
             return results[:limit]
-        raise NotImplementedError("Live PostgreSQL query requires an active cluster connection.")
+
+        if self._live_conn is None:
+            self._live_conn = self._connect_with_retry()
+
+        query = (
+            "SELECT run_id, workflow, timestamp, status, total_latency_ms, total_tokens FROM runs"
+        )
+        params: list[Any] = []
+        filters: list[str] = []
+        if status_filter:
+            filters.append("status = %s")
+            params.append(status_filter)
+        if workflow_filter:
+            filters.append("workflow = %s")
+            params.append(workflow_filter)
+        if filters:
+            query += " WHERE " + " AND ".join(filters)
+        query += " ORDER BY timestamp DESC LIMIT %s;"
+        params.append(limit)
+
+        with self._live_conn.cursor() as cur:
+            cur.execute(query, tuple(params))
+            rows = cur.fetchall()
+            colnames = [desc[0] for desc in cur.description]
+            return [dict(zip(colnames, r, strict=False)) for r in rows]
 
     def save_analysis(
         self,
@@ -421,7 +718,30 @@ class PostgreSQLStorageAdapter(BaseStorageAdapter):
                 }
             )
             return
-        raise NotImplementedError("Live PostgreSQL write requires an active cluster connection.")
+
+        if self._live_conn is None:
+            self._live_conn = self._connect_with_retry()
+
+        sql = """
+        INSERT INTO analysis (run_id, step, analyzer, category, verdict, confidence, details_json, timestamp, schema_version)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+        """
+        with self._live_conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                    run_id,
+                    step,
+                    analyzer,
+                    category,
+                    verdict,
+                    confidence,
+                    json.dumps(details or {}),
+                    timestamp,
+                    schema_version,
+                ),
+            )
+        self._live_conn.commit()
 
     def query_metrics(
         self,
@@ -434,7 +754,22 @@ class PostgreSQLStorageAdapter(BaseStorageAdapter):
             if metric_name:
                 res = [m for m in res if m["metric_name"] == metric_name]
             return res
-        raise NotImplementedError("Live PostgreSQL query requires an active cluster connection.")
+
+        if self._live_conn is None:
+            self._live_conn = self._connect_with_retry()
+
+        query = "SELECT * FROM metrics WHERE run_id = %s"
+        params: list[Any] = [run_id]
+        if metric_name:
+            query += " AND metric_name = %s"
+            params.append(metric_name)
+        query += " ORDER BY step ASC, metric_name ASC;"
+
+        with self._live_conn.cursor() as cur:
+            cur.execute(query, tuple(params))
+            rows = cur.fetchall()
+            colnames = [desc[0] for desc in cur.description]
+            return [dict(zip(colnames, r, strict=False)) for r in rows]
 
     def get_steps(self, run_id: str) -> list[dict[str, Any]]:
         """Fetch all steps for a run ordered by step index."""
@@ -442,15 +777,23 @@ class PostgreSQLStorageAdapter(BaseStorageAdapter):
             res = [s for s in self._mock_store.steps if s["run_id"] == run_id]
             res.sort(key=lambda s: s["step"])
             return res
-        raise NotImplementedError("Live PostgreSQL query requires an active cluster connection.")
+
+        if self._live_conn is None:
+            self._live_conn = self._connect_with_retry()
+
+        with self._live_conn.cursor() as cur:
+            cur.execute("SELECT * FROM steps WHERE run_id = %s ORDER BY step ASC;", (run_id,))
+            rows = cur.fetchall()
+            colnames = [desc[0] for desc in cur.description]
+            return [dict(zip(colnames, r, strict=False)) for r in rows]
 
     def save_rule_matches(self, run_id: str, matches: list[Any]) -> int:
         """Persist rule matches for a run."""
+        now = datetime.now(UTC).isoformat()
         if self.mock_mode:
             self._mock_store.rule_matches = [
                 m for m in self._mock_store.rule_matches if m.get("run_id") != run_id
             ]
-            now = datetime.now(UTC).isoformat()
             for m in matches:
                 v = m if isinstance(m, dict) else vars(m)
                 self._mock_store.rule_matches.append(
@@ -467,13 +810,48 @@ class PostgreSQLStorageAdapter(BaseStorageAdapter):
                     }
                 )
             return len(matches)
-        raise NotImplementedError("Live PostgreSQL write requires an active cluster connection.")
+
+        if self._live_conn is None:
+            self._live_conn = self._connect_with_retry()
+
+        with self._live_conn.cursor() as cur:
+            cur.execute("DELETE FROM rule_matches WHERE run_id = %s;", (run_id,))
+            insert_sql = """
+            INSERT INTO rule_matches (run_id, rule_id, rule_version, category, severity, agent, step, description, matched_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+            """
+            for m in matches:
+                v = m if isinstance(m, dict) else vars(m)
+                cur.execute(
+                    insert_sql,
+                    (
+                        run_id,
+                        str(v.get("rule_id", "unknown")),
+                        str(v.get("rule_version", "1.0.0")),
+                        v.get("category"),
+                        v.get("severity"),
+                        v.get("agent"),
+                        v.get("step"),
+                        v.get("description"),
+                        now,
+                    ),
+                )
+        self._live_conn.commit()
+        return len(matches)
 
     def get_rule_matches(self, run_id: str) -> list[dict[str, Any]]:
         """Fetch all stored rule matches for a run."""
         if self.mock_mode:
             return [m for m in self._mock_store.rule_matches if m["run_id"] == run_id]
-        raise NotImplementedError("Live PostgreSQL query requires an active cluster connection.")
+
+        if self._live_conn is None:
+            self._live_conn = self._connect_with_retry()
+
+        with self._live_conn.cursor() as cur:
+            cur.execute("SELECT * FROM rule_matches WHERE run_id = %s;", (run_id,))
+            rows = cur.fetchall()
+            colnames = [desc[0] for desc in cur.description]
+            return [dict(zip(colnames, r, strict=False)) for r in rows]
 
     def delete_runs_older_than(self, cutoff_iso: str, dry_run: bool = False) -> list[str]:
         """Delete runs older than cutoff_iso."""
@@ -499,7 +877,17 @@ class PostgreSQLStorageAdapter(BaseStorageAdapter):
                         rm for rm in self._mock_store.rule_matches if rm["run_id"] != rid
                     ]
             return affected
-        raise NotImplementedError("Live PostgreSQL delete requires an active cluster connection.")
+
+        if self._live_conn is None:
+            self._live_conn = self._connect_with_retry()
+
+        with self._live_conn.cursor() as cur:
+            cur.execute("SELECT run_id FROM runs WHERE timestamp < %s;", (cutoff_iso,))
+            affected = [r[0] for r in cur.fetchall()]
+            if not dry_run and affected:
+                cur.execute("DELETE FROM runs WHERE timestamp < %s;", (cutoff_iso,))
+                self._live_conn.commit()
+            return affected
 
     def table_counts(self) -> dict[str, int]:
         """Return row counts for all tables."""
@@ -511,7 +899,17 @@ class PostgreSQLStorageAdapter(BaseStorageAdapter):
                 "metrics": len(self._mock_store.metrics),
                 "rule_matches": len(self._mock_store.rule_matches),
             }
-        raise NotImplementedError("Live PostgreSQL query requires an active cluster connection.")
+
+        if self._live_conn is None:
+            self._live_conn = self._connect_with_retry()
+
+        counts = {}
+        with self._live_conn.cursor() as cur:
+            for tbl in ("runs", "steps", "analysis", "metrics", "rule_matches"):
+                cur.execute(f"SELECT COUNT(*) FROM {tbl};")  # noqa: S608
+                row = cur.fetchone()
+                counts[tbl] = row[0] if row else 0
+        return counts
 
 
 def _iso(value: Any) -> str:

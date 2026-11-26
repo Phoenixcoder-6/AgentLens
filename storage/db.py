@@ -139,6 +139,15 @@ _CREATE_RULE_MATCHES_IDX = [
     "CREATE INDEX IF NOT EXISTS idx_rule_matches_run_id ON rule_matches(run_id);",
 ]
 
+_CREATE_SECONDARY_INDICES = [
+    "CREATE INDEX IF NOT EXISTS idx_analysis_run_step ON analysis(run_id, step);",
+    "CREATE INDEX IF NOT EXISTS idx_analysis_run_id ON analysis(run_id);",
+    "CREATE INDEX IF NOT EXISTS idx_metrics_run_step ON metrics(run_id, step);",
+    "CREATE INDEX IF NOT EXISTS idx_metrics_run_name ON metrics(run_id, metric_name);",
+    "CREATE INDEX IF NOT EXISTS idx_runs_timestamp ON runs(timestamp DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_steps_run_status ON steps(run_id, status);",
+]
+
 _ALL_DDL = [
     _CREATE_RUNS,
     _CREATE_STEPS,
@@ -147,6 +156,7 @@ _ALL_DDL = [
     _CREATE_LLM_CACHE,
     _CREATE_RULE_MATCHES,
     *_CREATE_RULE_MATCHES_IDX,
+    *_CREATE_SECONDARY_INDICES,
 ]
 
 
@@ -433,6 +443,12 @@ class DatabaseManager:
                 conn.execute("ALTER TABLE runs ADD COLUMN expected_output TEXT")
             except sqlite3.OperationalError:
                 pass  # Column already exists
+
+            # Run ANALYZE for cost-based query planner statistics (Day 68)
+            try:
+                conn.execute("ANALYZE;")
+            except sqlite3.OperationalError:
+                pass
 
     # ── Runs ──────────────────────────────────────────────────────────────────
 
