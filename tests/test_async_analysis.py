@@ -43,6 +43,23 @@ def clean_job_manager():
     manager.clear()
 
 
+@pytest.fixture(autouse=True)
+def mock_evidence_extractor(monkeypatch):
+    """Bypass remote LLM extraction calls to prevent connection timeouts in CI."""
+    from analyzers.evidence_extraction.extractor import EvidenceExtractor, ExtractedEvidence
+
+    def fake_extract(self, raw_output: str, agent: str = "") -> ExtractedEvidence:
+        claim = raw_output[:80] if raw_output else "sample claim"
+        return ExtractedEvidence(
+            claims=[claim],
+            source_count=1,
+            entity_count=1,
+            token_cost=50,
+        )
+
+    monkeypatch.setattr(EvidenceExtractor, "extract", fake_extract)
+
+
 @pytest.fixture
 def client(tmp_path: Path, monkeypatch) -> TestClient:
     """Create a FastAPI test client backed by a temporary test database."""
@@ -132,7 +149,7 @@ def test_job_lifecycle_transitions(client: TestClient):
     job_id = resp.json()["job_id"]
 
     manager = get_job_manager()
-    job = manager.wait_for_job(job_id, timeout=8.0)
+    job = manager.wait_for_job(job_id, timeout=25.0)
 
     assert job is not None
     assert job.status == JobStatus.COMPLETED
@@ -150,7 +167,7 @@ def test_job_polling_result_structure(client: TestClient):
     job_id = resp.json()["job_id"]
 
     manager = get_job_manager()
-    job = manager.wait_for_job(job_id, timeout=8.0)
+    job = manager.wait_for_job(job_id, timeout=25.0)
     assert job is not None and job.status == JobStatus.COMPLETED
 
     poll_resp = client.get(f"/api/jobs/{job_id}")
@@ -269,7 +286,7 @@ def test_webhook_dispatch_on_complete(client: TestClient):
     job_id = resp.json()["job_id"]
 
     manager = get_job_manager()
-    job = manager.wait_for_job(job_id, timeout=8.0)
+    job = manager.wait_for_job(job_id, timeout=25.0)
     assert job is not None and job.status == JobStatus.COMPLETED
 
     server_thread.join(timeout=3.0)
