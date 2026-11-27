@@ -205,3 +205,13 @@ capture:
         regex: '\b(?:\d{4}[-\s]?){3}\d{4}\b'
         replacement: "[REDACTED_CREDIT_CARD]"
 
+# ─────────────────────────────────────────────
+# Analysis Worker Pool (Day 69)
+# ─────────────────────────────────────────────
+analysis_worker:
+  enabled: true                           # Enable background worker pool for analysis jobs
+  max_workers: 4                          # Number of concurrent analysis threads
+  job_ttl_hours: 24                       # Job result retention in memory
+  webhook_timeout_sec: 5.0                # Webhook dispatch timeout in seconds
+
+

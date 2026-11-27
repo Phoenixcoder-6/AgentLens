@@ -109,12 +109,20 @@ class TestVerdictEndpoint:
 
 class TestAnalyzeEndpoint:
     def test_nonexistent_run_returns_error_payload(self, client):
-        resp = client.post("/api/analyze/nonexistent-run-id")
-        # Should return 200 with status=error (not 404) since we surface errors as payload
+        resp = client.post("/api/analyze/nonexistent-run-id?sync=true")
+        # Should return 200 with status=error in sync mode since we surface errors as payload
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "error"
         assert body["run_id"] == "nonexistent-run-id"
+
+    def test_analyze_async_default_returns_202(self, client):
+        resp = client.post("/api/analyze/test-async-run-01")
+        assert resp.status_code == 202
+        body = resp.json()
+        assert body["status"] == "queued"
+        assert "job_id" in body
+        assert "poll_url" in body
 
     def test_analyze_existing_run_if_any(self, client):
         """If a run exists, trigger analysis and verify response shape."""
@@ -122,7 +130,7 @@ class TestAnalyzeEndpoint:
         if not runs:
             pytest.skip("No runs in DB")
         run_id = runs[0]["run_id"]
-        resp = client.post(f"/api/analyze/{run_id}")
+        resp = client.post(f"/api/analyze/{run_id}?sync=true")
         assert resp.status_code == 200
         body = resp.json()
         assert "status" in body

@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 # ── Project root on path ──────────────────────────────────────────────────────
@@ -40,6 +40,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import dashboard.state as _state  # noqa: E402
+from analyzers.worker import get_job_manager  # noqa: E402
 
 # ── Optional auth ─────────────────────────────────────────────────────────────
 
@@ -94,10 +95,42 @@ class VerdictResponse(BaseModel):
 
 class AnalysisJobResponse(BaseModel):
     run_id: str
-    status: str  # "complete" | "error"
-    priority_level: str | None
-    primary_agent: str | None
-    error: str | None
+    status: str  # "queued" | "complete" | "error" | "processing" | "failed"
+    priority_level: str | None = None
+    primary_agent: str | None = None
+    error: str | None = None
+    job_id: str | None = None
+    poll_url: str | None = None
+    created_at: str | None = None
+    execution_time_ms: float | None = None
+    verdict_reason: str | None = None
+    blast_radius: dict[str, Any] | None = None
+    remediation_patch: dict[str, Any] | None = None
+
+
+class AnalysisTriggerRequest(BaseModel):
+    webhook_url: str | None = None
+
+
+class JobStatusResponse(BaseModel):
+    job_id: str
+    run_id: str
+    status: str
+    created_at: str
+    started_at: str | None = None
+    completed_at: str | None = None
+    execution_time_ms: float | None = None
+    priority_level: str | None = None
+    primary_cause: str | None = None
+    primary_agent: str | None = None
+    grounded: bool | None = None
+    verdict_reason: str | None = None
+    blast_radius: dict[str, Any] | None = None
+    remediation_patch: dict[str, Any] | None = None
+    error: str | None = None
+    webhook_url: str | None = None
+    webhook_status: str | None = None
+    poll_url: str | None = None
 
 
 class AgentMetrics(BaseModel):
@@ -231,29 +264,96 @@ def get_verdict(run_id: str) -> VerdictResponse:
     )
 
 
-@router.post("/analyze/{run_id}", response_model=AnalysisJobResponse)
-def trigger_analysis(run_id: str) -> AnalysisJobResponse:
-    """Run the full analysis pipeline for a run synchronously and return the verdict."""
-    # Clear cache so re-analysis is always fresh
-    _state._analysis_cache.pop(run_id, None)
-    result = _state.run_full_analysis(run_id)
+@router.post(
+    "/analyze/{run_id}",
+    response_model=AnalysisJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def trigger_analysis(
+    run_id: str,
+    response: Response,
+    sync: bool = False,
+    payload: AnalysisTriggerRequest | None = None,
+) -> AnalysisJobResponse:
+    """
+    Trigger analysis for a run.
+    Default (async): Submits job to background worker pool and immediately returns 202 Accepted.
+    Sync mode (?sync=true): Executes full pipeline synchronously and returns 200 OK.
+    """
+    if sync:
+        _state._analysis_cache.pop(run_id, None)
+        result = _state.run_full_analysis(run_id)
+        response.status_code = status.HTTP_200_OK
 
-    if result.error or not result.bundle:
+        if result.error or not result.bundle:
+            return AnalysisJobResponse(
+                run_id=run_id,
+                status="error",
+                priority_level=None,
+                primary_agent=None,
+                error=result.error or "Analysis failed",
+            )
+
+        db = _state.get_db()
+        blast_radius_dict = (
+            result.bundle.blast_radius.model_dump() if result.bundle.blast_radius else None
+        )
+        if not blast_radius_dict:
+            try:
+                blast_radius_dict = db.get_blast_radius(run_id)
+            except Exception:
+                pass
+
+        remediation_dict = (
+            result.bundle.remediation_patch.model_dump()
+            if result.bundle.remediation_patch
+            else None
+        )
+        if not remediation_dict:
+            try:
+                remediation_dict = db.get_remediation_patch(run_id)
+            except Exception:
+                pass
+
         return AnalysisJobResponse(
             run_id=run_id,
-            status="error",
-            priority_level=None,
-            primary_agent=None,
-            error=result.error or "Analysis failed",
+            status="complete",
+            priority_level=result.bundle.priority_level.value,
+            primary_agent=result.bundle.primary_agent,
+            verdict_reason=result.bundle.summary,
+            blast_radius=blast_radius_dict,
+            remediation_patch=remediation_dict,
+            error=None,
         )
 
+    # Asynchronous background job (Day 69 default)
+    webhook_url = payload.webhook_url if payload else None
+    job = get_job_manager().submit_job(run_id=run_id, webhook_url=webhook_url)
+
+    response.status_code = status.HTTP_202_ACCEPTED
     return AnalysisJobResponse(
         run_id=run_id,
-        status="complete",
-        priority_level=result.bundle.priority_level.value,
-        primary_agent=result.bundle.primary_agent,
-        error=None,
+        job_id=job.job_id,
+        status=job.status.value,
+        poll_url=job.poll_url,
+        created_at=job.created_at,
     )
+
+
+@router.get("/jobs/{job_id}", response_model=JobStatusResponse)
+def get_job_status(job_id: str) -> JobStatusResponse:
+    """Fetch status and analysis results of a background analysis job."""
+    job = get_job_manager().get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+    return JobStatusResponse(**job.model_dump())
+
+
+@router.get("/jobs", response_model=list[JobStatusResponse])
+def list_jobs(run_id: str | None = None, limit: int = 50) -> list[JobStatusResponse]:
+    """List recent background analysis jobs."""
+    jobs = get_job_manager().list_jobs(run_id=run_id, limit=limit)
+    return [JobStatusResponse(**j.model_dump()) for j in jobs]
 
 
 @router.get("/metrics", response_model=MetricsResponse)
