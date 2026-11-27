@@ -22,7 +22,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import dashboard.state as _state
-from analyzers.worker import get_job_manager
+from analyzers.worker import JobStatus, get_job_manager
 from api.metrics import generate_prometheus_metrics
 from api.router import health_router, router
 from capture.queue import get_global_queue
@@ -54,6 +54,23 @@ def sre_client(tmp_path: Path, monkeypatch) -> TestClient:
     app.include_router(router, prefix="/api")
     app.include_router(health_router)
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def mock_evidence_extractor(monkeypatch):
+    """Bypass remote LLM extraction calls to prevent connection timeouts in CI."""
+    from analyzers.evidence_extraction.extractor import EvidenceExtractor, ExtractedEvidence
+
+    def fake_extract(self, raw_output: str, agent: str = "") -> ExtractedEvidence:
+        claim = raw_output[:80] if raw_output else "sample claim"
+        return ExtractedEvidence(
+            claims=[claim],
+            source_count=1,
+            entity_count=1,
+            token_cost=50,
+        )
+
+    monkeypatch.setattr(EvidenceExtractor, "extract", fake_extract)
 
 
 def _seed_sre_run(run_id: str = "sre_run_01") -> None:
@@ -174,7 +191,9 @@ def test_live_telemetry_accuracy(sre_client: TestClient):
 
     manager = get_job_manager()
     job = manager.submit_job("telemetry_run_01")
-    manager.wait_for_job(job.job_id, timeout=10.0)
+    finished_job = manager.wait_for_job(job.job_id, timeout=25.0)
+    assert finished_job is not None
+    assert finished_job.status == JobStatus.COMPLETED
 
     text = generate_prometheus_metrics()
 
