@@ -214,4 +214,15 @@ analysis_worker:
   job_ttl_hours: 24                       # Job result retention in memory
   webhook_timeout_sec: 5.0                # Webhook dispatch timeout in seconds
 
+# ─────────────────────────────────────────────
+# Production SRE & Deployment Guards (Day 70)
+# ─────────────────────────────────────────────
+deployment:
+  environment: "development"               # "development" | "staging" | "production"
+  auto_seed: false                         # Safe default: disabled in production
+  prometheus:
+    enabled: true                          # Enable Prometheus metric exposition
+    path: "/metrics"                       # Default scrape target path
+
+
 

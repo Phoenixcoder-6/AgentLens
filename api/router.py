@@ -31,7 +31,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 # ── Project root on path ──────────────────────────────────────────────────────
@@ -41,6 +42,7 @@ if str(_ROOT) not in sys.path:
 
 import dashboard.state as _state  # noqa: E402
 from analyzers.worker import get_job_manager  # noqa: E402
+from api.metrics import generate_prometheus_metrics  # noqa: E402
 
 # ── Optional auth ─────────────────────────────────────────────────────────────
 
@@ -356,9 +358,27 @@ def list_jobs(run_id: str | None = None, limit: int = 50) -> list[JobStatusRespo
     return [JobStatusResponse(**j.model_dump()) for j in jobs]
 
 
-@router.get("/metrics", response_model=MetricsResponse)
-def get_metrics() -> MetricsResponse:
-    """Aggregate per-agent latency and token metrics across all stored runs."""
+@router.get("/metrics")
+def get_metrics(
+    request: Request,
+    format: str | None = None,
+) -> Response:
+    """
+    Aggregate per-agent latency and token metrics across all stored runs.
+    - If format=prometheus or Accept: text/plain, returns standard Prometheus text exposition.
+    - Otherwise returns JSON MetricsResponse for UI backward compatibility.
+    """
+    accept_header = request.headers.get("accept", "")
+    is_prometheus = (
+        format == "prometheus"
+        or "text/plain" in accept_header
+        or "application/openmetrics-text" in accept_header
+    )
+
+    if is_prometheus:
+        prom_text = generate_prometheus_metrics()
+        return Response(content=prom_text, media_type="text/plain; version=0.0.4; charset=utf-8")
+
     data = _state.get_metrics_data()
     db = _state.get_db()
     total_runs = len(db.list_runs(limit=10000))
@@ -374,7 +394,14 @@ def get_metrics() -> MetricsResponse:
         )
         for ag, v in sorted(data.items())
     ]
-    return MetricsResponse(agents=agents, total_runs=total_runs)
+    return JSONResponse(content=MetricsResponse(agents=agents, total_runs=total_runs).model_dump())
+
+
+@router.get("/metrics/prometheus")
+def get_prometheus_metrics() -> Response:
+    """Dedicated Prometheus text scrape endpoint."""
+    prom_text = generate_prometheus_metrics()
+    return Response(content=prom_text, media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
 # ── Health endpoint (separate, no auth) ───────────────────────────────────────
@@ -429,6 +456,13 @@ def health_check() -> HealthResponse:
         db_status=db_status,
         version="1.0.0",
     )
+
+
+@health_router.get("/metrics")
+def get_root_prometheus_metrics(request: Request, format: str | None = None) -> Response:
+    """Prometheus scrape endpoint mounted at root level (/metrics)."""
+    prom_text = generate_prometheus_metrics()
+    return Response(content=prom_text, media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
 @router.get("/queue/status")

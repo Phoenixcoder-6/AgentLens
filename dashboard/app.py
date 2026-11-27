@@ -2117,14 +2117,50 @@ def mount_routes() -> None:
         print(f"[Warning] REST API mount failed: {_mount_err}")
 
 
+def is_auto_seed_enabled() -> bool:
+    """
+    Day 70 SRE deployment guard:
+    Returns False in production by default to prevent mock data injection into clean databases.
+    Auto-seeding is suppressed if AGENTLENS_AUTO_SEED=0, or if environment is production.
+    """
+    import os
+
+    from config.config_loader import get as cfg_get
+
+    # 1. Explicit env var override takes highest priority
+    env_val = os.getenv("AGENTLENS_AUTO_SEED")
+    if env_val is not None:
+        return env_val.strip() not in ("0", "false", "False", "no", "NO")
+
+    # 2. Check deployment environment
+    app_env = (
+        os.getenv("AGENTLENS_ENV")
+        or os.getenv("ENVIRONMENT")
+        or os.getenv("NODE_ENV")
+        or cfg_get("deployment", "environment")
+        or "development"
+    ).lower()
+
+    if app_env in ("production", "prod"):
+        return False
+
+    # 3. Check config.yaml deployment.auto_seed
+    cfg_auto_seed = cfg_get("deployment", "auto_seed")
+    if cfg_auto_seed is not None:
+        return bool(cfg_auto_seed)
+
+    # 4. Default for local development
+    return True
+
+
 def main() -> None:
     """Launch the AgentLens NiceGUI dashboard (used by `python -m dashboard.app` & `agentlens-dashboard`)."""
     import os
 
     mount_routes()
 
-    # Zero-setup demo seeding if DB is empty and auto-seed is enabled
-    if os.getenv("AGENTLENS_AUTO_SEED", "1") != "0":
+    # Zero-setup demo seeding if DB is empty and auto-seed is enabled (Day 70 guard)
+    if is_auto_seed_enabled():
         try:
             db = state.get_db()
             if not db.list_runs(limit=1):
@@ -2133,6 +2169,8 @@ def main() -> None:
                 generate_demo_traces(seed_db=True)
         except Exception as _seed_err:
             print(f"[Warning] Demo seed skipped: {_seed_err}")
+    else:
+        print("[Info] Auto-seeding disabled by production safety guard.")
 
     assets_dir = os.path.join(os.path.dirname(__file__), "assets")
     host = os.getenv("AGENTLENS_HOST", "0.0.0.0")
